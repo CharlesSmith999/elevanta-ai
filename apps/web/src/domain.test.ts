@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { canReassign, canViewLead, dashboardFor, duplicateMatches, incorrectReviewState, seedLeads, users, validStatusTransition } from './domain.js';
+import { canReassign, canViewLead, dashboardFor, duplicateMatches, incorrectReviewState, seedLeads, sourceOptions, users, validStatusTransition, validWonFinancials } from './domain.js';
 
 const user = (id: string) => users.find((candidate) => candidate.id === id)!;
 
@@ -41,4 +41,14 @@ test('follow-up metrics distinguish a due-today task from an overdue task', () =
   const adminDashboard = dashboardFor(user('shariq'), seedLeads);
   assert.equal(adminDashboard.dueToday, 1);
   assert.equal(adminDashboard.overdue, 1);
+});
+
+test('source dictionary contains the approved dashboard source labels', () => {
+  assert.deepEqual(sourceOptions, ['Bark Paid', 'Bark Stalk', 'Thumbtack', 'SEO', 'Social Media', 'Clutch', 'Email Marketing', 'LinkedIn', 'PPC', 'Other']);
+});
+
+test('won financial values require non-negative total and upfront payment within total', () => {
+  assert.equal(validWonFinancials(1000, 250), true);
+  assert.equal(validWonFinancials(1000, 1200), false);
+  assert.equal(validWonFinancials(-1, 0), false);
 });
