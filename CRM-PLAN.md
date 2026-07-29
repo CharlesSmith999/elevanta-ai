@@ -4,7 +4,7 @@ Status: Planning baseline, approved from stakeholder answers
 
 Branding: The product is named **Elevanta AI**. Its embedded AI sales companion is named **Xaviar**. Xaviar is advisory in Phase 1 and supports lead analysis, follow-up guidance, agent and marketer coaching, and performance reporting. Autonomous outbound communication remains deferred to Phase 2.
 
-CRM readiness reference: [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md). This plan must be completed before Xaviar development. Xaviar evaluation reference: [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md).
+CRM readiness reference: [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md). Shared dashboard definitions are in [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md). These must be completed before Xaviar development. Xaviar evaluation reference: [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md).
 
 ## 1. Product vision
 
