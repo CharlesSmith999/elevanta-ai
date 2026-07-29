@@ -2,7 +2,7 @@
 
 Status owner: Codex with Shariq  
 Last updated: 2026-07-29  
-Source of truth: [CRM-PLAN.md](./CRM-PLAN.md) and [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md)
+Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md), and [CRM-DECISIONS-v1.2.md](./CRM-DECISIONS-v1.2.md)
 
 ## Current position
 
@@ -18,7 +18,7 @@ The full Excel workbook has **not** been imported into the active CRM yet. The c
 | 1 — Foundation | Mostly complete | React/Vite web app, Node API, Supabase migrations, authentication scaffolding, role/manager model, audit-oriented workflow functions, protected lead actions, test accounts, GitHub CI workflow, and a Vercel catch-all Node API entry point are published on GitHub. | Verify the existing Vercel Git connection and preview, connect the real Supabase environment, finish production authentication setup, and confirm the first remote CI run. |
 | 2 — CRM core | In progress / prototype | Lead inbox, lead detail, assignment history, full-context/fresh-start handoff, statuses, notes, follow-ups, and role-aware visibility are working in the test workspace with safe sample data. | Complete the CRM workflow and permissions prototype; production Excel lead-data migration is deferred until after Milestone 4. |
 | 3 — Controls and dashboards | Prototype complete | Incorrect-report flow, three-agent review queue behavior, duplicate candidates, overdue indicators, role dashboards, reports, exports direction, and pipeline intelligence charts are represented in the working preview. | Reconcile dashboard metrics against imported database records and finish admin data-quality/export screens. |
-| 4 — AI support | Advisory prototype | Xaviar coaching cards and role-specific performance guidance are visible; AI remains advisory and does not send messages or change records automatically. | Generate explainable reports from real CRM events, add manager review/annotation, and persist evaluations. |
+| 4 — AI support | Advisory prototype | Embedded Xaviar coach direction is approved: lead-stage guidance, role-specific coaching, safe skill benchmarks, improvement tracking, and explainable reports; AI remains advisory and does not send messages or change records automatically. | Generate explainable reports from real CRM events, add manager review/annotation, and persist evaluations. |
 | 5 — Production data migration | Not started | Deliberately deferred until Milestones 2–4 are complete. | Stage and validate the approved Excel data, preserve provenance, apply duplicate handling, reconcile dashboards, and activate migrated records. |
 | Phase 2 — Workflow automation | Not started | Scope is documented only. | Email, SMS, calendar, phone, digests, escalation, consent enforcement, and human approval gates. |
 | Phase 3 — SaaS product | Not started | Scope is documented only. | Multi-tenancy, billing, self-service administration, onboarding, limits, and product analytics. |
