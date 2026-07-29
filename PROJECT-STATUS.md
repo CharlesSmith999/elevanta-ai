@@ -10,7 +10,7 @@ Elevanta AI has a working Phase 1 CRM foundation and a live dashboard preview. T
 
 The full Excel workbook has **not** been imported into the active CRM yet. The current public preview uses safe sample data in the browser so the workflow can be tested without exposing private lead data.
 
-Step 2 dashboard data-model implementation is published: approved source labels, source validation, Won financial fields, automatic won dates, source filters groundwork, and form validation are implemented. The Supabase migration still needs to be applied to the connected project and verified before this step is marked end-to-end complete.
+Step 2 dashboard data-model implementation is complete and verified: approved source labels, source validation, Won financial fields, automatic won dates, source filters groundwork, and form validation are implemented. Migration `202607290003_dashboard_data_definitions.sql` is applied and verified in Supabase project `jayxyikgefnzitxcbdov`.
 
 ## Milestone tracker
 
@@ -19,7 +19,7 @@ Step 2 dashboard data-model implementation is published: approved source labels,
 | 0 — Planning and validation | Complete | Product name, Xaviar, roles, lifecycle, reassignment history, incorrect-review rule, dashboard requirements, import rules, and Phase 1 boundaries are documented and approved. | Confirm the remaining open decisions when implementation reaches them. |
 | 1 — Foundation | Mostly complete | React/Vite web app, Node API, Supabase migrations, authentication scaffolding, role/manager model, audit-oriented workflow functions, protected lead actions, test accounts, GitHub CI workflow, and a Vercel catch-all Node API entry point are published on GitHub. | Verify the existing Vercel Git connection and preview, connect the real Supabase environment, finish production authentication setup, and confirm the first remote CI run. |
 | 2 — CRM core | In progress / prototype | Lead inbox, lead detail, assignment history, full-context/fresh-start handoff, statuses, notes, follow-ups, and role-aware visibility are working in the test workspace with safe sample data. | Complete the CRM workflow and permissions prototype; production Excel lead-data migration is deferred until after Milestone 4. |
-| 3 — Controls and dashboards | Readiness plan approved; implementation pending | Source-aware reporting, won financial fields, Benchmark Board, Leaderboard, date filters, data-quality controls, and dashboard reconciliation are specified in `CRM-INTELLIGENCE-READINESS-PLAN.md`. | Implement and test the readiness plan before Milestone 4 Xaviar development. Benchmark cohort rules remain open. |
+| 3 — Controls and dashboards | Readiness plan approved; implementation pending | Source-aware reporting, won financial fields, Benchmark Board, Leaderboard, date filters, data-quality controls, and dashboard reconciliation are specified in `CRM-INTELLIGENCE-READINESS-PLAN.md`. Step 2 data definitions are now verified in the connected database. | Implement and test the readiness plan before Milestone 4 Xaviar development. Benchmark cohort rules remain open. |
 | 4 — AI support | Planned phased build | Xaviar will be built and validated in sub-phases 4A–4H using synthetic or safe sample data: data contract, event foundation, explanations, recommendations, coaching, benchmarks, calibrated predictions, dashboard integration, and safety review. | Complete all sub-phases and obtain manager/admin sign-off; no live agent rollout occurs in this milestone. |
 | 5 — Production data migration | Not started | Deliberately deferred until Milestones 2–4 and Xaviar safety review are complete. | Stage and validate the approved Excel data, preserve provenance, apply duplicate handling, reconcile dashboards, activate migrated records, and then begin live agent/marketer use. |
 | Phase 2 — Workflow automation | Not started | Scope is documented only. | Email, SMS, calendar, phone, digests, escalation, consent enforcement, and human approval gates. |
@@ -42,6 +42,7 @@ Step 2 dashboard data-model implementation is published: approved source labels,
 - TypeScript checks pass.
 - Production web build passes.
 - Domain tests were previously verified successfully for the CRM rules.
+- Step 2 Supabase verification passed: all 10 approved source labels exist in `source_dictionary`; `opportunities` contains `total_project_cost`, `upfront_payment_amount`, and `won_at`; the foundational CRM tables are present.
 - Live dashboard smoke test passed for pipeline stages, charts, role switching, marketer view, and browser console errors.
 - Strict screenshot comparison against the design reference remains blocked by the browser comparison policy; functional verification passed.
 
