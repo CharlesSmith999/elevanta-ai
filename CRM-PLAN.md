@@ -134,6 +134,8 @@ Reports show trend versus the agent's prior period, team benchmark, strengths, r
 
 Xaviar is an embedded role-aware coach inside every dashboard, not a separate reporting page. It works in six steps: explain what happened, diagnose why it happened, recommend the next action, coach the user, monitor whether the advice was followed, and later assist with approved actions.
 
+All Xaviar implementation and release testing must follow the focused [Xaviar Evaluation Plan](./XAVIAR-EVALUATION-PLAN.md), which defines evidence requirements, role-specific tests, fairness rules, safety checks, release gates, and post-activation monitoring.
+
 Xaviar supports each lead stage:
 
 - **New:** validate completeness, detect duplicate candidates, predict quality, and recommend routing.
@@ -236,6 +238,8 @@ Incorrect review queue, duplicate review, overdue indicators, dashboards, export
 
 Embedded Xaviar coach with explainable daily/weekly/monthly/lifetime views, lead-stage recommendations, personalized agent and marketer coaching, skill-based team benchmarks, manager review, and improvement tracking. Xaviar remains advisory and does not change records or send outbound messages.
 
+Milestone 4 implementation is not complete until the applicable gates in [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md) pass.
+
 Milestone 4 is delivered in the following controlled sub-phases:
 
 1. **4A — Data contract and readiness:** finalize the event dictionary, outcome/reason lists, attribution rules, minimum sample rules, role visibility rules, and Xaviar evidence requirements before model work begins.
@@ -254,31 +258,3 @@ Milestone 4 is a build and validation milestone, not an operational rollout. Age
 Stage and import the approved Excel lead data, preserve workbook/tab/row provenance, apply deterministic duplicate handling, validate permissions and dashboard reconciliation, and only then activate the migrated records for normal routing.
 
 After activation, newly recorded CRM work becomes Xaviar’s primary source for personalized coaching. Imported historical data is labeled as historical context and is used only when its provenance and quality are sufficient.
-
-### Phase 2 — workflow automation
-
-Track whether Xaviar recommendations are followed, send in-app reminders and escalations, provide daily task guidance, and add email/SMS/calendar/phone connectors with consent enforcement, templates, and human approval gates. Any outbound action requires explicit approval until autonomous operation is separately approved.
-
-### Phase 3 — SaaS product
-
-Multi-tenancy hardening, billing, self-service administration, onboarding, usage limits, tenant-level AI configuration, and product analytics.
-
-## 16. Acceptance criteria for Phase 1
-
-- Every imported record has provenance and a deterministic deduplication outcome.
-- An agent cannot read another agent's unassigned contact details.
-- Managers see only their managed agents' leads; admins see all.
-- Reassignment preserves the complete audit chain and supports full-context/fresh-start visibility.
-- Three distinct incorrect reports create exactly one admin review item and pause assignment.
-- Status, follow-up, and assignment changes are auditable.
-- Dashboards reconcile to the underlying opportunity table.
-- AI reports identify evidence, trend, and actions without autonomous outbound communication.
-- No Phase 2 integration is enabled until consent, unsubscribe, and human-approval policies are implemented.
-
-## 17. Decisions still required before coding
-
-1. Confirm the deployment target for the Node API; GitHub Pages cannot host the API.
-2. Confirm authentication provider and whether managers can belong to multiple teams.
-3. Approve the controlled reason lists for incorrect reports, loss reasons, and follow-up actions.
-4. Decide whether marketing is a separate role in the UI or a permission set layered onto a user.
-5. Confirm the first import sample and the admin responsible for deduplication review.
