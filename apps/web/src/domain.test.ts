@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { benchmarkBySource, canReassign, canViewDataQualityBoard, canViewLead, canViewManagementBoards, dashboardDateRange, dashboardFor, dashboardReconciliation, dataQualityIssues, duplicateMatches, filterDashboardLeads, incorrectReviewState, leaderboardForSales, seedLeads, sourceOptions, stageOwnershipSegments, transitionStage, users, validStatusTransition, validWonFinancials } from './domain.js';
+import { benchmarkBySource, canReassign, canViewDataQualityBoard, canViewLead, canViewManagementBoards, canViewNamedLeaderboard, dashboardDateRange, dashboardFor, dashboardReconciliation, dataQualityIssues, duplicateMatches, filterDashboardLeads, financialMetrics, incorrectReviewState, leaderboardForMarketing, leaderboardForSales, lossReasonBreakdown, responseHours, routingHours, seedLeads, sourceOptions, stageOwnershipSegments, transitionStage, users, validStatusTransition, validWonFinancials } from './domain.js';
 
 const user = (id: string) => users.find((candidate) => candidate.id === id)!;
 
@@ -72,7 +72,7 @@ test('stage ownership is split at reassignment so an agent is never judged for a
   ]);
 });
 
-test('dashboard filters use the selected date range and source without including unmatched leads', () => {
+test('dashboard filters use the selected date range, source, and status without including unmatched leads', () => {
   const range = dashboardDateRange('custom', new Date('2026-07-29T12:00:00.000Z'), { start: '2026-07-01T00:00:00.000Z', end: '2026-07-31T23:59:59.999Z' });
   const leads = [
     { ...structuredClone(seedLeads[0]), id: 'july-bark', source: 'Bark Paid', sourceDate: '2026-07-12' },
@@ -80,14 +80,15 @@ test('dashboard filters use the selected date range and source without including
     { ...structuredClone(seedLeads[2]), id: 'june-bark', source: 'Bark Paid', sourceDate: '2026-06-30' },
   ];
   assert.deepEqual(filterDashboardLeads(leads, range, 'Bark Paid').map((lead) => lead.id), ['july-bark']);
+  assert.deepEqual(filterDashboardLeads(leads, range, 'all', 'follow_up_required').map((lead) => lead.id), ['july-seo']);
 });
 
 test('benchmark metrics keep sources separate and exclude confirmed incorrect records from conversion', () => {
   const leads = structuredClone(seedLeads);
   leads.push({ ...structuredClone(leads[0]), id: 'lead-confirmed-incorrect', source: 'SEO', status: 'incorrect', incorrectReview: { state: 'confirmed_incorrect' }, assignments: [], activities: [], followUps: [], stageHistory: [] });
   const seo = benchmarkBySource(leads).find((item) => item.source === 'SEO')!;
-  assert.equal(seo.sampleSize, 1);
-  assert.equal(seo.sql, 1);
+  assert.equal(seo.sampleSize, 2);
+  assert.equal(seo.sql, 2);
 });
 
 test('leaderboard returns sample size and does not expose contact fields', () => {
@@ -109,4 +110,30 @@ test('management performance boards and data-quality details are limited to the 
   assert.equal(canViewManagementBoards(user('owais')), false);
   assert.equal(canViewDataQualityBoard(user('shariq')), true);
   assert.equal(canViewDataQualityBoard(user('muzammil')), false);
+});
+
+test('marketing leaderboard measures actionable yield, sales acceptance, and downstream conversion without contact fields', () => {
+  const leads = structuredClone(seedLeads);
+  leads.push({ ...structuredClone(leads[0]), id: 'marketing-yield', marketingOwnerId: 'muzammil', source: 'Bark Paid', status: 'won', qualification: 'sql', totalProjectCost: 2000, upfrontPaymentAmount: 500, wonAt: '2026-07-10T10:00:00.000Z', assignments: [{ id: 'assign-marketing-yield', ownerId: 'owais', assignedBy: 'muzammil', at: '2026-07-01T10:00:00.000Z', visibility: 'full_context', reason: 'Initial assignment' }], stageHistory: [{ id: 'stage-marketing-yield', toStatus: 'connected', enteredAt: '2026-07-02T10:00:00.000Z', reason: 'Contacted' }], activities: [], followUps: [], incorrectReports: [] });
+  const entry = leaderboardForMarketing(leads).find((item) => item.userId === 'muzammil')!;
+  assert.equal(entry.sampleSize > 0, true);
+  assert.equal(entry.salesAcceptanceRate !== undefined, true);
+  assert.equal(entry.actionableLeadYield !== undefined, true);
+  assert.equal('email' in entry, false);
+  assert.equal('phone' in entry, false);
+});
+
+test('dashboard completion metrics calculate response/routing time, loss reasons, and only recorded Won financials', () => {
+  const lead = { ...structuredClone(seedLeads[0]), id: 'timed-lost', sourceDate: '2026-07-01T08:00:00.000Z', status: 'lost' as const, lostReason: 'Price or budget' as const, assignments: [{ id: 'timed-assignment', ownerId: 'owais', assignedBy: 'ali', at: '2026-07-01T09:00:00.000Z', visibility: 'full_context' as const, reason: 'Initial assignment' }], stageHistory: [{ id: 'timed-stage', toStatus: 'contacted' as const, enteredAt: '2026-07-01T11:30:00.000Z', reason: 'First call' }], totalProjectCost: undefined, upfrontPaymentAmount: undefined };
+  assert.equal(responseHours(lead), 2.5);
+  assert.equal(routingHours(lead), 1);
+  assert.deepEqual(lossReasonBreakdown([lead]), [{ reason: 'Price or budget', count: 1 }]);
+  assert.deepEqual(financialMetrics([lead]), { financialRecordCount: 0, totalProjectValue: 0, upfrontValue: 0, averageProjectValue: undefined });
+});
+
+test('named leaderboards stay manager/admin-only while individual users receive private standing', () => {
+  assert.equal(canViewNamedLeaderboard(user('shariq')), true);
+  assert.equal(canViewNamedLeaderboard(user('ali')), true);
+  assert.equal(canViewNamedLeaderboard(user('owais')), false);
+  assert.equal(canViewNamedLeaderboard(user('muzammil')), false);
 });

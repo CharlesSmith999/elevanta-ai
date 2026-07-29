@@ -33,6 +33,17 @@ export const qualificationLabels: Record<Qualification, string> = {
   mql: 'MQL', sql: 'SQL', not_available: 'Not available',
 };
 
+export const lostReasonOptions = [
+  'Price or budget',
+  'No response',
+  'Timing or priority',
+  'Competitor selected',
+  'Not a fit',
+  'Proposal declined',
+  'Other',
+] as const;
+export type LostReason = typeof lostReasonOptions[number];
+
 export type User = { id: string; name: string; role: Role; managerId?: string; department: 'marketing' | 'sales' };
 export type Assignment = { id: string; ownerId: string; assignedBy: string; at: string; visibility: VisibilityMode; reason: string; endedAt?: string };
 export type Activity = { id: string; at: string; actorId: string; kind: 'note' | 'status' | 'assignment' | 'follow_up' | 'incorrect_report' | 'system'; body: string };
@@ -62,6 +73,7 @@ export type Lead = {
   totalProjectCost?: number;
   upfrontPaymentAmount?: number;
   wonAt?: string;
+  lostReason?: LostReason;
 };
 
 export const users: User[] = [
@@ -106,6 +118,7 @@ export function canUpdateLead(user: User, lead: Lead, allUsers = users): boolean
 
 export const canViewManagementBoards = (user: User) => user.role === 'admin' || user.role === 'manager';
 export const canViewDataQualityBoard = (user: User) => user.role === 'admin';
+export const canViewNamedLeaderboard = (user: User) => user.role === 'admin' || user.role === 'manager';
 
 export function validStatusTransition(from: OpportunityStatus, to: OpportunityStatus): boolean {
   if (from === to) return false;
@@ -181,8 +194,8 @@ export function isWithinDashboardRange(value: string, range: DashboardDateRange)
   return (!range.start || date >= new Date(range.start).getTime()) && (!range.end || date <= new Date(range.end).getTime());
 }
 
-export function filterDashboardLeads(leads: Lead[], range: DashboardDateRange, source = 'all'): Lead[] {
-  return leads.filter((lead) => (source === 'all' || lead.source === source) && isWithinDashboardRange(lead.sourceDate, range));
+export function filterDashboardLeads(leads: Lead[], range: DashboardDateRange, source = 'all', status: OpportunityStatus | 'all' = 'all'): Lead[] {
+  return leads.filter((lead) => (source === 'all' || lead.source === source) && (status === 'all' || lead.status === status) && isWithinDashboardRange(lead.sourceDate, range));
 }
 
 const excludedFromConversion = (lead: Lead) => lead.status === 'duplicate' || lead.incorrectReview?.state === 'confirmed_incorrect' || lead.incorrectReview?.state === 'merge_duplicate';
@@ -241,6 +254,84 @@ export function leaderboardForSales(leads: Lead[], allUsers = users): Leaderboar
   }).filter((entry) => entry.sampleSize > 0).sort((a, b) => (b.connectionRate ?? -1) - (a.connectionRate ?? -1));
 }
 
+export type MarketingLeaderboardEntry = {
+  userId: string;
+  sampleSize: number;
+  mql: number;
+  sql: number;
+  salesAccepted: number;
+  won: number;
+  actionableLeadYield?: number;
+  qualityRate?: number;
+  salesAcceptanceRate?: number;
+  downstreamConversionRate?: number;
+};
+
+export function leaderboardForMarketing(leads: Lead[], allUsers = users): MarketingLeaderboardEntry[] {
+  return allUsers.filter((user) => user.role === 'marketer').map((user) => {
+    const owned = leads.filter((lead) => lead.marketingOwnerId === user.id && !excludedFromConversion(lead));
+    const actionable = owned.filter((lead) => hasReached(lead, 'contacted') || hasReached(lead, 'connected') || lead.qualification !== 'not_available' || hasReached(lead, 'proposal_sent') || lead.status === 'won');
+    const salesAccepted = owned.filter((lead) => lead.assignments.length > 0);
+    const mql = owned.filter((lead) => lead.qualification === 'mql').length;
+    const sql = owned.filter((lead) => lead.qualification === 'sql').length;
+    const won = owned.filter((lead) => lead.status === 'won').length;
+    return {
+      userId: user.id,
+      sampleSize: owned.length,
+      mql,
+      sql,
+      salesAccepted: salesAccepted.length,
+      won,
+      actionableLeadYield: rate(actionable.length, owned.length),
+      qualityRate: rate(mql + sql, owned.length),
+      salesAcceptanceRate: rate(salesAccepted.length, owned.length),
+      downstreamConversionRate: rate(won, owned.length),
+    };
+  }).filter((entry) => entry.sampleSize > 0).sort((a, b) => (b.actionableLeadYield ?? -1) - (a.actionableLeadYield ?? -1));
+}
+
+export function median(values: Array<number | undefined>): number | undefined {
+  const ordered = values.filter((value): value is number => value !== undefined).sort((a, b) => a - b);
+  if (!ordered.length) return undefined;
+  const middle = Math.floor(ordered.length / 2);
+  return ordered.length % 2 ? ordered[middle] : Math.round((ordered[middle - 1] + ordered[middle]) / 2);
+}
+
+export function firstStageAt(lead: Lead, statuses: OpportunityStatus[]): string | undefined {
+  return (lead.stageHistory ?? []).filter((stage) => statuses.includes(stage.toStatus)).sort((a, b) => a.enteredAt.localeCompare(b.enteredAt))[0]?.enteredAt;
+}
+
+export function responseHours(lead: Lead): number | undefined {
+  const assignedAt = currentAssignment(lead)?.at ?? lead.assignments[0]?.at;
+  const contactedAt = firstStageAt(lead, ['contacted', 'connected']);
+  if (!assignedAt || !contactedAt) return undefined;
+  const elapsed = new Date(contactedAt).getTime() - new Date(assignedAt).getTime();
+  return elapsed >= 0 ? Math.round((elapsed / 3_600_000) * 10) / 10 : undefined;
+}
+
+export function routingHours(lead: Lead): number | undefined {
+  const assignedAt = lead.assignments[0]?.at;
+  if (!assignedAt) return undefined;
+  const elapsed = new Date(assignedAt).getTime() - new Date(lead.sourceDate).getTime();
+  return elapsed >= 0 ? Math.round((elapsed / 3_600_000) * 10) / 10 : undefined;
+}
+
+export function lossReasonBreakdown(leads: Lead[]) {
+  const counts = new Map<string, number>();
+  leads.filter((lead) => lead.status === 'lost' || lead.status === 'not_interested').forEach((lead) => {
+    const reason = lead.lostReason ?? 'Not available';
+    counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  });
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([reason, count]) => ({ reason, count }));
+}
+
+export function financialMetrics(leads: Lead[]) {
+  const won = leads.filter((lead) => lead.status === 'won' && lead.totalProjectCost !== undefined && lead.upfrontPaymentAmount !== undefined);
+  const totalProjectValue = won.reduce((sum, lead) => sum + (lead.totalProjectCost ?? 0), 0);
+  const upfrontValue = won.reduce((sum, lead) => sum + (lead.upfrontPaymentAmount ?? 0), 0);
+  return { financialRecordCount: won.length, totalProjectValue, upfrontValue, averageProjectValue: won.length ? Math.round(totalProjectValue / won.length) : undefined };
+}
+
 export type DataQualityIssue = { leadId: string; type: 'source' | 'won_financials' | 'next_action' | 'date_order' | 'terminal_activity' | 'assignment' | 'review'; message: string };
 export function dataQualityIssues(leads: Lead[], now = new Date()): DataQualityIssue[] {
   return leads.flatMap((lead) => {
@@ -296,17 +387,17 @@ const activity = (id: string, actorId: string, kind: Activity['kind'], body: str
 const initialStage = (id: string, status: OpportunityStatus, enteredAt: string): StageHistory[] => [{ id: `stage-${id}`, toStatus: status, enteredAt, reason: 'Initial test record' }];
 
 export const seedLeads: Lead[] = [
-  { id: 'lead-ronald', name: 'Ronald Fowler', phone: '+1 555 0101', email: 'ronald@example.test', source: 'SEO', marketingOwnerId: 'shayan', sourceDate: '2025-08-01', status: 'connected', qualification: 'sql', priority: 4,
+  { id: 'lead-ronald', name: 'Ronald Fowler', phone: '+1 555 0101', email: 'ronald@example.test', source: 'SEO', marketingOwnerId: 'shayan', sourceDate: daysFromNow(-3), status: 'connected', qualification: 'sql', priority: 4,
     assignments: [{ id: 'as-ronald', ownerId: 'owais', assignedBy: 'shayan', at: daysFromNow(-2), visibility: 'full_context', reason: 'Website inquiry' }],
     stageHistory: initialStage('ronald', 'connected', daysFromNow(-2)),
     activities: [activity('act-ronald-1', 'owais', 'note', 'Connected. Requested proposal after a call tomorrow.')],
     followUps: [{ id: 'fu-ronald', ownerId: 'owais', dueAt: laterToday(), action: 'Call', status: 'open' }], incorrectReports: [] },
-  { id: 'lead-dim', name: 'Dim Carter', phone: '+1 555 0102', email: 'dim@example.test', source: 'Bark Paid', marketingOwnerId: 'shariq', sourceDate: '2025-08-01', status: 'follow_up_required', qualification: 'mql', priority: 3,
+  { id: 'lead-dim', name: 'Dim Carter', phone: '+1 555 0102', email: 'dim@example.test', source: 'Bark Paid', marketingOwnerId: 'shariq', sourceDate: daysFromNow(-10), status: 'follow_up_required', qualification: 'mql', priority: 3,
     assignments: [{ id: 'as-dim', ownerId: 'mustabeen', assignedBy: 'ali', at: daysFromNow(-8), visibility: 'fresh_start', reason: 'Reassigned after no response' }],
     stageHistory: initialStage('dim', 'follow_up_required', daysFromNow(-1)),
     activities: [activity('act-dim-1', 'mustabeen', 'status', 'Status changed to Follow-up Required.')],
     followUps: [{ id: 'fu-dim', ownerId: 'mustabeen', dueAt: daysFromNow(-1), action: 'Call', status: 'open' }], incorrectReports: [] },
-  { id: 'lead-samer', name: 'Samer Jones', phone: '+1 555 0103', email: 'samer@example.test', source: 'Thumbtack', marketingOwnerId: 'shayan', sourceDate: '2025-08-01', status: 'incorrect', qualification: 'not_available', priority: 1,
+  { id: 'lead-samer', name: 'Samer Jones', phone: '+1 555 0103', email: 'samer@example.test', source: 'Thumbtack', marketingOwnerId: 'shayan', sourceDate: daysFromNow(-14), status: 'incorrect', qualification: 'not_available', priority: 1,
     assignments: [{ id: 'as-samer', ownerId: 'owais', assignedBy: 'shayan', at: daysFromNow(-12), visibility: 'full_context', reason: 'Initial routing' }],
     stageHistory: initialStage('samer', 'incorrect', daysFromNow(-4)),
     activities: [activity('act-samer-1', 'owais', 'incorrect_report', 'Reported as incorrect: invalid contact details.')], followUps: [],
@@ -315,8 +406,16 @@ export const seedLeads: Lead[] = [
       { reporterId: 'asad', reason: 'Invalid contact information', at: daysFromNow(-5) },
       { reporterId: 'obaid', reason: 'Invalid contact information', at: daysFromNow(-4) },
     ], incorrectReview: { state: 'pending' }, routingPaused: true },
-  { id: 'lead-maria', name: 'Maria Lopez', phone: '+1 555 0104', email: 'maria@example.test', source: 'Clutch', marketingOwnerId: 'muzammil', sourceDate: '2025-08-01', status: 'proposal_sent', qualification: 'sql', priority: 5,
+  { id: 'lead-maria', name: 'Maria Lopez', phone: '+1 555 0104', email: 'maria@example.test', source: 'Clutch', marketingOwnerId: 'muzammil', sourceDate: daysFromNow(-5), status: 'proposal_sent', qualification: 'sql', priority: 5,
     assignments: [{ id: 'as-maria', ownerId: 'mustabeen', assignedBy: 'muzammil', at: daysFromNow(-4), visibility: 'full_context', reason: 'High intent lead' }],
     stageHistory: initialStage('maria', 'proposal_sent', daysFromNow(-4)),
     activities: [activity('act-maria-1', 'mustabeen', 'note', 'Proposal sent. Follow up on Thursday.')], followUps: [{ id: 'fu-maria', ownerId: 'mustabeen', dueAt: daysFromNow(2), action: 'Email', status: 'open' }], incorrectReports: [] },
+  { id: 'lead-olivia', name: 'Olivia Grant', phone: '+1 555 0105', email: 'olivia@example.test', source: 'Bark Paid', marketingOwnerId: 'yasir', sourceDate: daysFromNow(-16), status: 'won', qualification: 'sql', priority: 5, totalProjectCost: 7200, upfrontPaymentAmount: 1800, wonAt: daysFromNow(-2),
+    assignments: [{ id: 'as-olivia', ownerId: 'asad', assignedBy: 'yasir', at: daysFromNow(-15), visibility: 'full_context', reason: 'High-intent request' }], stageHistory: initialStage('olivia', 'won', daysFromNow(-2)), activities: [activity('act-olivia-1', 'asad', 'status', 'Won after proposal review.')], followUps: [{ id: 'fu-olivia', ownerId: 'asad', dueAt: daysFromNow(-3), action: 'Call', status: 'completed' }], incorrectReports: [] },
+  { id: 'lead-ethan', name: 'Ethan Park', phone: '+1 555 0106', email: 'ethan@example.test', source: 'LinkedIn', marketingOwnerId: 'hamza', sourceDate: daysFromNow(-12), status: 'lost', qualification: 'mql', priority: 2, lostReason: 'Competitor selected',
+    assignments: [{ id: 'as-ethan', ownerId: 'asad', assignedBy: 'hamza', at: daysFromNow(-11), visibility: 'full_context', reason: 'Outbound response' }], stageHistory: initialStage('ethan', 'lost', daysFromNow(-1)), activities: [activity('act-ethan-1', 'asad', 'note', 'Competitor selected after proposal comparison.')], followUps: [], incorrectReports: [] },
+  { id: 'lead-noah', name: 'Noah Wright', phone: '+1 555 0107', email: 'noah@example.test', source: 'SEO', marketingOwnerId: 'hamza', sourceDate: daysFromNow(-20), status: 'won', qualification: 'sql', priority: 4, totalProjectCost: 3600, upfrontPaymentAmount: 900, wonAt: daysFromNow(-4),
+    assignments: [{ id: 'as-noah', ownerId: 'obaid', assignedBy: 'hamza', at: daysFromNow(-19), visibility: 'full_context', reason: 'Organic inquiry' }], stageHistory: initialStage('noah', 'won', daysFromNow(-4)), activities: [activity('act-noah-1', 'obaid', 'status', 'Won after technical discovery.')], followUps: [{ id: 'fu-noah', ownerId: 'obaid', dueAt: daysFromNow(-5), action: 'Email', status: 'completed' }], incorrectReports: [] },
+  { id: 'lead-lucia', name: 'Lucia Chen', phone: '+1 555 0108', email: 'lucia@example.test', source: 'Email Marketing', marketingOwnerId: 'sami', sourceDate: daysFromNow(-6), status: 'connected', qualification: 'mql', priority: 3,
+    assignments: [{ id: 'as-lucia', ownerId: 'obaid', assignedBy: 'sami', at: daysFromNow(-5), visibility: 'full_context', reason: 'Campaign response' }], stageHistory: initialStage('lucia', 'connected', daysFromNow(-4)), activities: [activity('act-lucia-1', 'obaid', 'note', 'Connected and booked discovery.')], followUps: [{ id: 'fu-lucia', ownerId: 'obaid', dueAt: daysFromNow(1), action: 'Call', status: 'open' }], incorrectReports: [] },
 ];

@@ -2,15 +2,16 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { IconActivityHeartbeat, IconAlertTriangle, IconArrowUpRight, IconChartPieFilled, IconCircleCheck, IconTargetArrow } from '@tabler/icons-react';
 import { Area, AreaChart, CartesianGrid, LabelList, RadialBar, RadialBarChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from 'recharts';
 import {
-  Activity, DashboardPeriod, FollowUp, Lead, OpportunityStatus, Qualification, Role, User, benchmarkBySource, canReassign, canUpdateLead, canViewDataQualityBoard, canViewManagementBoards,
-  currentAssignment, dashboardDateRange, dashboardFor, dashboardReconciliation, dataQualityIssues, duplicateMatches, filterDashboardLeads, incorrectReviewState, isLeadIdentity, leaderboardForSales, makeId,
-  ownerId, qualificationLabels, seedLeads, sourceOptions, stageAgeLabel, statusLabels, transitionStage, users, validStatusTransition, validWonFinancials,
+  Activity, DashboardPeriod, FollowUp, Lead, OpportunityStatus, Qualification, Role, User, benchmarkBySource, canReassign, canUpdateLead, canViewDataQualityBoard, canViewManagementBoards, canViewNamedLeaderboard,
+  currentAssignment, dashboardDateRange, dashboardFor, dashboardReconciliation, dataQualityIssues, duplicateMatches, filterDashboardLeads, financialMetrics, incorrectReviewState, isLeadIdentity, leaderboardForMarketing, leaderboardForSales, lossReasonBreakdown, lostReasonOptions, makeId, median,
+  ownerId, qualificationLabels, responseHours, routingHours, seedLeads, sourceOptions, stageAgeLabel, statusLabels, transitionStage, users, validStatusTransition, validWonFinancials,
 } from './domain';
 
 const storageKey = 'elevanta-test-workspace-v1';
 const roleLabels: Record<Role, string> = { admin: 'Admin', manager: 'Sales Manager', marketer: 'Marketing Agent', sales_agent: 'Sales Agent' };
 const statusOptions = Object.keys(statusLabels) as OpportunityStatus[];
 const qualificationOptions = Object.keys(qualificationLabels) as Qualification[];
+type DashboardScope = 'company' | 'marketing' | 'sales';
 
 function safeLeadData() {
   try { return JSON.parse(localStorage.getItem(storageKey) ?? '') as Lead[]; } catch { return structuredClone(seedLeads); }
@@ -36,14 +37,31 @@ export function App() {
   const [notice, setNotice] = useState('');
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>('lifetime');
   const [dashboardSource, setDashboardSource] = useState('all');
+  const [dashboardStatus, setDashboardStatus] = useState<'all' | OpportunityStatus>('all');
+  const [dashboardTeamMember, setDashboardTeamMember] = useState('all');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
+  const [dashboardScope, setDashboardScope] = useState<DashboardScope>('company');
   const viewer = users.find((user) => user.id === viewerId)!;
   const dashboard = useMemo(() => dashboardFor(viewer, leads), [viewer, leads]);
   const selected = leads.find((lead) => lead.id === selectedId);
   const visible = dashboard.visible;
   const selectedRange = useMemo(() => dashboardDateRange(dashboardPeriod, new Date(), { start: customStart || undefined, end: customEnd || undefined }), [dashboardPeriod, customStart, customEnd]);
-  const dashboardLeads = useMemo(() => filterDashboardLeads(visible, selectedRange, dashboardSource), [visible, selectedRange, dashboardSource]);
+  const scopedDashboardLeads = useMemo(() => {
+    if (viewer.role !== 'admin') return visible;
+    if (dashboardScope === 'marketing') return visible.filter((lead) => users.find((user) => user.id === lead.marketingOwnerId)?.department === 'marketing');
+    if (dashboardScope === 'sales') return visible.filter((lead) => users.find((user) => user.id === ownerId(lead))?.department === 'sales');
+    return visible;
+  }, [viewer, visible, dashboardScope]);
+  const dashboardLeads = useMemo(() => {
+    const dateSourceAndStatus = filterDashboardLeads(scopedDashboardLeads, selectedRange, dashboardSource, dashboardStatus);
+    if (dashboardTeamMember === 'all') return dateSourceAndStatus;
+    return dateSourceAndStatus.filter((lead) => {
+      if (dashboardScope === 'marketing') return lead.marketingOwnerId === dashboardTeamMember;
+      if (dashboardScope === 'sales') return ownerId(lead) === dashboardTeamMember;
+      return lead.marketingOwnerId === dashboardTeamMember || ownerId(lead) === dashboardTeamMember;
+    });
+  }, [scopedDashboardLeads, selectedRange, dashboardSource, dashboardStatus, dashboardTeamMember, dashboardScope]);
   const filteredDashboard = useMemo(() => dashboardFor(viewer, dashboardLeads), [viewer, dashboardLeads]);
   const duplicateCount = useMemo(() => duplicateMatches(leads).length, [leads]);
 
@@ -55,6 +73,7 @@ export function App() {
 
   function updateStatus(lead: Lead, next: OpportunityStatus) {
     if (next === 'won') return setNotice('Use the Won financial details form to record total project cost and upfront payment.');
+    if ((next === 'lost' || next === 'not_interested') && !lead.lostReason) return setNotice('Choose a loss reason before closing this opportunity.');
     if (!canUpdateLead(viewer, lead) || !validStatusTransition(lead.status, next)) return setNotice('This status change is not allowed for your role or for a closed lead.');
     mutateLead(lead.id, (current) => ({ ...current, status: next, stageHistory: transitionStage(current.stageHistory, next, viewer.id, new Date().toISOString(), `Status changed from ${statusLabels[current.status]} to ${statusLabels[next]}.`), activities: [...current.activities, leadActivity(viewer.id, 'status', `Status changed from ${statusLabels[current.status]} to ${statusLabels[next]}.`)] }));
     setNotice('Status saved and added to the permanent history.');
@@ -74,6 +93,11 @@ export function App() {
   function updateQualification(lead: Lead, qualification: Qualification) {
     if (!canUpdateLead(viewer, lead)) return setNotice('You do not have permission to update qualification.');
     mutateLead(lead.id, (current) => ({ ...current, qualification, activities: [...current.activities, leadActivity(viewer.id, 'system', `Qualification set to ${qualificationLabels[qualification]}.`)] }));
+  }
+
+  function updateLostReason(lead: Lead, lostReason: Lead['lostReason']) {
+    if (!canUpdateLead(viewer, lead)) return setNotice('You do not have permission to update the loss reason.');
+    mutateLead(lead.id, (current) => ({ ...current, lostReason, activities: [...current.activities, leadActivity(viewer.id, 'system', `Loss reason set to ${lostReason ?? 'Not available'}.`)] }));
   }
 
   function addNote(lead: Lead, event: FormEvent<HTMLFormElement>) {
@@ -142,22 +166,23 @@ export function App() {
   return <main className="app-shell">
     <aside className="sidebar"><div className="brand"><span className="brand-mark">E</span><span>Elevanta <b>AI</b></span></div><p className="brand-subtitle">Sales, made clearer.</p>
       {nav.map((item) => <button key={item} className={page === item ? 'nav-item active' : 'nav-item'} onClick={() => { setPage(item); setSelectedId(undefined); }}>{item}</button>)}
-      {canViewManagementBoards(viewer) && <><button className={page === 'Benchmark Board' ? 'nav-item active' : 'nav-item'} onClick={() => { setPage('Benchmark Board'); setSelectedId(undefined); }}>Benchmark Board</button><button className={page === 'Leaderboard' ? 'nav-item active' : 'nav-item'} onClick={() => { setPage('Leaderboard'); setSelectedId(undefined); }}>Leaderboard</button></>}
+      {canViewManagementBoards(viewer) && <button className={page === 'Benchmark Board' ? 'nav-item active' : 'nav-item'} onClick={() => { setPage('Benchmark Board'); setSelectedId(undefined); }}>Benchmark Board</button>}
+      <button className={page === 'Leaderboard' ? 'nav-item active' : 'nav-item'} onClick={() => { setPage('Leaderboard'); setSelectedId(undefined); }}>{canViewNamedLeaderboard(viewer) ? 'Leaderboard' : 'My standing'}</button>
       {canViewDataQualityBoard(viewer) && <button className={page === 'Data quality' ? 'nav-item active' : 'nav-item'} onClick={() => { setPage('Data quality'); setSelectedId(undefined); }}>Data quality</button>}
       {viewer.role === 'admin' && <button className={page === 'Review queue' ? 'nav-item active' : 'nav-item'} onClick={() => { setPage('Review queue'); setSelectedId(undefined); }}>Review queue</button>}
       <div className="sidebar-bottom"><span>Working as</span><strong>{viewer.name}</strong><small>{roleLabels[viewer.role]}</small><button className="reset" onClick={resetDemo}>Reset test data</button></div>
     </aside>
-    <section className="content"><header className="topbar"><div><p className="eyebrow">ELEVANTA AI / CRM TEST WORKSPACE</p><h1>{page}</h1></div><label>Test as a team member<select value={viewerId} onChange={(event) => { setViewerId(event.target.value); setSelectedId(undefined); }}><optgroup label="Admin & managers">{users.filter((user) => user.role === 'admin' || user.role === 'manager').map((user) => <option key={user.id} value={user.id}>{user.name} — {roleLabels[user.role]}</option>)}</optgroup><optgroup label="Marketing">{users.filter((user) => user.role === 'marketer').map((user) => <option key={user.id} value={user.id}>{user.name} — Marketing</option>)}</optgroup><optgroup label="Sales">{users.filter((user) => user.role === 'sales_agent').map((user) => <option key={user.id} value={user.id}>{user.name} — Sales Agent</option>)}</optgroup></select></label></header>
+    <section className="content"><header className="topbar"><div><p className="eyebrow">ELEVANTA AI / CRM TEST WORKSPACE</p><h1>{page}</h1></div><label>Test as a team member<select value={viewerId} onChange={(event) => { setViewerId(event.target.value); setSelectedId(undefined); setDashboardTeamMember('all'); }}><optgroup label="Admin & managers">{users.filter((user) => user.role === 'admin' || user.role === 'manager').map((user) => <option key={user.id} value={user.id}>{user.name} — {roleLabels[user.role]}</option>)}</optgroup><optgroup label="Marketing">{users.filter((user) => user.role === 'marketer').map((user) => <option key={user.id} value={user.id}>{user.name} — Marketing</option>)}</optgroup><optgroup label="Sales">{users.filter((user) => user.role === 'sales_agent').map((user) => <option key={user.id} value={user.id}>{user.name} — Sales Agent</option>)}</optgroup></select></label></header>
       <div className="notice"><b>Functional test workspace</b><span>These records are safe test data. Every change is kept in this browser only, ready to be replaced by the final verified import.</span></div>{notice && <div className="toast" role="status">{notice}</div>}
-      {['Dashboard', 'Benchmark Board', 'Leaderboard', 'Data quality'].includes(page) && <DashboardFilters period={dashboardPeriod} source={dashboardSource} customStart={customStart} customEnd={customEnd} onPeriod={setDashboardPeriod} onSource={setDashboardSource} onCustomStart={setCustomStart} onCustomEnd={setCustomEnd} />}
-      {page === 'Dashboard' && <><PipelineIntelligence viewer={viewer} leads={dashboardLeads} dashboard={filteredDashboard} onSelect={select} period={dashboardPeriod} /><RoleCharts viewer={viewer} leads={dashboardLeads} dashboard={filteredDashboard} /><section className="workspace-grid dashboard-workspace"><LeadTable leads={dashboardLeads.slice(0, 5)} onSelect={select} onCreate={() => setShowCreate(true)} /><article className="panel xaviar"><span className="spark">✦ XAVIAR</span><h2>Coach’s note</h2><p>{filteredDashboard.overdue ? `Resolve ${filteredDashboard.overdue} overdue follow-up${filteredDashboard.overdue === 1 ? '' : 's'} before adding more work.` : 'Every lead is currently on time. Keep the next follow-up date accurate.'}</p><p>{viewer.role === 'marketer' ? 'Watch MQL/SQL and duplicate rate to improve source quality.' : `Conversion from MQL/SQL to won is ${filteredDashboard.conversionRate}% in this filtered view.`}</p></article></section></>}
-      {page === 'Lead inbox' && <section className="inbox-layout"><LeadTable leads={visible} onSelect={select} onCreate={() => setShowCreate(true)} />{selected && <LeadDetail lead={selected} viewer={viewer} onStatus={updateStatus} onMarkWon={markWon} onQualification={updateQualification} onAddNote={addNote} onAddFollowUp={addFollowUp} onCompleteFollowUp={completeFollowUp} onReassign={reassign} onReportIncorrect={reportIncorrect} onDecision={decideReview} />}</section>}
+      {['Dashboard', 'Benchmark Board', 'Leaderboard', 'Data quality'].includes(page) && <DashboardFilters period={dashboardPeriod} source={dashboardSource} status={dashboardStatus} teamMember={dashboardTeamMember} customStart={customStart} customEnd={customEnd} scope={dashboardScope} viewer={viewer} canChooseScope={viewer.role === 'admin'} onPeriod={setDashboardPeriod} onSource={setDashboardSource} onStatus={setDashboardStatus} onTeamMember={setDashboardTeamMember} onCustomStart={setCustomStart} onCustomEnd={setCustomEnd} onScope={(scope) => { setDashboardScope(scope); setDashboardTeamMember('all'); }} />}
+      {page === 'Dashboard' && <><PipelineIntelligence viewer={viewer} leads={dashboardLeads} dashboard={filteredDashboard} onSelect={select} period={dashboardPeriod} scope={dashboardScope} /><RoleScorecards viewer={viewer} leads={dashboardLeads} scope={dashboardScope} /><RoleCharts viewer={viewer} leads={dashboardLeads} dashboard={filteredDashboard} scope={dashboardScope} /><section className="workspace-grid dashboard-workspace"><LeadTable leads={dashboardLeads.slice(0, 5)} onSelect={select} onCreate={() => setShowCreate(true)} /><article className="panel xaviar"><span className="spark">✦ XAVIAR</span><h2>Coach’s note</h2><p>{filteredDashboard.overdue ? `Resolve ${filteredDashboard.overdue} overdue follow-up${filteredDashboard.overdue === 1 ? '' : 's'} before adding more work.` : 'Every lead is currently on time. Keep the next follow-up date accurate.'}</p><p>{viewer.role === 'marketer' || dashboardScope === 'marketing' ? 'Watch actionable-lead yield, sales acceptance, MQL/SQL, and duplicate rate to improve source quality.' : `Conversion from MQL/SQL to won is ${filteredDashboard.conversionRate}% in this filtered view.`}</p></article></section></>}
+      {page === 'Lead inbox' && <section className="inbox-layout"><LeadTable leads={visible} onSelect={select} onCreate={() => setShowCreate(true)} />{selected && <LeadDetail lead={selected} viewer={viewer} onStatus={updateStatus} onMarkWon={markWon} onQualification={updateQualification} onLostReason={updateLostReason} onAddNote={addNote} onAddFollowUp={addFollowUp} onCompleteFollowUp={completeFollowUp} onReassign={reassign} onReportIncorrect={reportIncorrect} onDecision={decideReview} />}</section>}
       {page === 'Follow-ups' && <FollowUpList leads={visible} viewer={viewer} onSelect={select} onComplete={completeFollowUp} />}
       {page === 'Assignments' && <AssignmentList leads={visible} onSelect={select} />}
       {page === 'Review queue' && <ReviewQueue leads={leads.filter((lead) => lead.incorrectReview?.state === 'pending')} onSelect={select} />}
       {page === 'Reports' && <Reports dashboard={dashboard} viewer={viewer} duplicates={duplicateCount} />}
       {page === 'Benchmark Board' && canViewManagementBoards(viewer) && <BenchmarkBoard leads={dashboardLeads} />}
-      {page === 'Leaderboard' && canViewManagementBoards(viewer) && <Leaderboard leads={dashboardLeads} />}
+      {page === 'Leaderboard' && <Leaderboard leads={dashboardLeads} privateBenchmarkLeads={leads} viewer={viewer} scope={dashboardScope} />}
       {page === 'Data quality' && canViewDataQualityBoard(viewer) && <DataQualityBoard leads={dashboardLeads} range={selectedRange} source={dashboardSource} />}
       {page === 'Xaviar' && <Xaviar dashboard={dashboard} viewer={viewer} />}
     </section>
@@ -168,8 +193,13 @@ export function App() {
 function LeadTable({ leads, onSelect, onCreate }: { leads: Lead[]; onSelect: (id: string) => void; onCreate: () => void }) { return <article className="panel leads-panel"><div className="panel-heading"><div><h2>Lead inbox</h2><p>Only records you are allowed to see are shown.</p></div><button className="primary" onClick={onCreate}>Add lead</button></div><div className="lead-table"><div className="lead-row header"><span>Lead</span><span>Owner</span><span>Status</span><span>Next action</span></div>{leads.length ? leads.map((lead) => { const next = lead.followUps.find((followUp) => followUp.status === 'open'); return <button className="lead-row lead-button" key={lead.id} onClick={() => onSelect(lead.id)}><strong>{lead.name}<small>{lead.source}</small></strong><span>{nameFor(ownerId(lead))}</span><span className={`status ${lead.status}`}>{statusLabels[lead.status]}</span><span>{relativeDue(next)}</span></button>; }) : <p className="empty">No leads are visible for this user.</p>}</div></article>; }
 
 const dashboardPeriodLabels: Record<DashboardPeriod, string> = { daily: 'Today', weekly: 'This week', monthly: 'This month', yearly: 'This year', lifetime: 'Lifetime', custom: 'Custom range' };
-function DashboardFilters({ period, source, customStart, customEnd, onPeriod, onSource, onCustomStart, onCustomEnd }: { period: DashboardPeriod; source: string; customStart: string; customEnd: string; onPeriod: (period: DashboardPeriod) => void; onSource: (source: string) => void; onCustomStart: (value: string) => void; onCustomEnd: (value: string) => void }) {
-  return <section className="dashboard-filters" aria-label="Dashboard filters"><div><span className="eyebrow">DASHBOARD FILTERS</span><p>Lead volume uses the lead-created date. Source and period apply to all cards and graphs in this dashboard view.</p></div><label>Period<select value={period} onChange={(event) => onPeriod(event.target.value as DashboardPeriod)}>{(Object.keys(dashboardPeriodLabels) as DashboardPeriod[]).map((option) => <option value={option} key={option}>{dashboardPeriodLabels[option]}</option>)}</select></label><label>Source<select value={source} onChange={(event) => onSource(event.target.value)}><option value="all">All sources</option>{sourceOptions.map((option) => <option value={option} key={option}>{option}</option>)}</select></label>{period === 'custom' && <><label>From<input type="date" value={customStart} onChange={(event) => onCustomStart(event.target.value)} /></label><label>To<input type="date" value={customEnd} onChange={(event) => onCustomEnd(event.target.value)} /></label></>}</section>;
+function DashboardFilters({ period, source, status, teamMember, customStart, customEnd, scope, viewer, canChooseScope, onPeriod, onSource, onStatus, onTeamMember, onCustomStart, onCustomEnd, onScope }: { period: DashboardPeriod; source: string; status: 'all' | OpportunityStatus; teamMember: string; customStart: string; customEnd: string; scope: DashboardScope; viewer: User; canChooseScope: boolean; onPeriod: (period: DashboardPeriod) => void; onSource: (source: string) => void; onStatus: (status: 'all' | OpportunityStatus) => void; onTeamMember: (userId: string) => void; onCustomStart: (value: string) => void; onCustomEnd: (value: string) => void; onScope: (scope: DashboardScope) => void }) {
+  const members = viewer.role === 'admin'
+    ? users.filter((user) => scope === 'marketing' ? user.role === 'marketer' : scope === 'sales' ? user.role === 'sales_agent' : user.role === 'marketer' || user.role === 'sales_agent')
+    : viewer.role === 'manager' ? users.filter((user) => user.role === 'sales_agent' && user.managerId === viewer.id)
+      : [];
+  const memberLabel = scope === 'marketing' ? 'Marketing agent' : scope === 'sales' ? 'Sales agent' : 'Agent / marketer';
+  return <section className="dashboard-filters" aria-label="Dashboard filters"><div><span className="eyebrow">DASHBOARD FILTERS</span><p>Lead volume uses the lead-created date. Every filter applies to the cards, graphs, and boards in this view.</p></div>{canChooseScope && <label>View<select value={scope} onChange={(event) => onScope(event.target.value as DashboardScope)}><option value="company">Company</option><option value="marketing">Marketing department</option><option value="sales">Sales department</option></select></label>}<label>Period<select value={period} onChange={(event) => onPeriod(event.target.value as DashboardPeriod)}>{(Object.keys(dashboardPeriodLabels) as DashboardPeriod[]).map((option) => <option value={option} key={option}>{dashboardPeriodLabels[option]}</option>)}</select></label><label>Source<select value={source} onChange={(event) => onSource(event.target.value)}><option value="all">All sources</option>{sourceOptions.map((option) => <option value={option} key={option}>{option}</option>)}</select></label><label>Status<select value={status} onChange={(event) => onStatus(event.target.value as 'all' | OpportunityStatus)}><option value="all">All statuses</option>{statusOptions.map((option) => <option value={option} key={option}>{statusLabels[option]}</option>)}</select></label>{members.length > 1 && <label>{memberLabel}<select value={teamMember} onChange={(event) => onTeamMember(event.target.value)}><option value="all">All {memberLabel.toLowerCase()}s</option>{members.map((member) => <option value={member.id} key={member.id}>{member.name}</option>)}</select></label>}{period === 'custom' && <><label>From<input type="date" value={customStart} onChange={(event) => onCustomStart(event.target.value)} /></label><label>To<input type="date" value={customEnd} onChange={(event) => onCustomEnd(event.target.value)} /></label></>}</section>;
 }
 
 const intelligenceClosedStatuses: OpportunityStatus[] = ['won', 'lost', 'not_interested', 'incorrect', 'duplicate', 'do_not_contact'];
@@ -207,15 +237,17 @@ function intelligenceMatrix(leads: Lead[]) {
   });
 }
 
-function intelligenceCopy(viewer: User, dashboard: ReturnType<typeof dashboardFor>) {
+function intelligenceCopy(viewer: User, dashboard: ReturnType<typeof dashboardFor>, scope: DashboardScope) {
+  if (viewer.role === 'admin' && scope === 'marketing') return { title: 'Marketing department intelligence', subtitle: 'See lead quality, routing, acceptance, and downstream outcomes for the marketing team.', risk: dashboard.overdue ? `${dashboard.overdue} routed lead follow-up${dashboard.overdue === 1 ? '' : 's'} need attention.` : 'No overdue follow-ups are visible for Marketing-routed leads.', strength: `${dashboard.mql + dashboard.sql} MQL/SQL decisions are visible in this marketing view.` };
+  if (viewer.role === 'admin' && scope === 'sales') return { title: 'Sales department intelligence', subtitle: 'See sales movement, conversion, follow-up risk, and closing performance.', risk: dashboard.overdue ? `${dashboard.overdue} sales follow-up${dashboard.overdue === 1 ? '' : 's'} need attention.` : 'No overdue sales follow-ups are visible.', strength: `${dashboard.open} active opportunities are currently in the sales pipeline.` };
   if (viewer.role === 'marketer') return { title: 'Lead quality intelligence', subtitle: 'See how your lead quality is translating into Sales-ready conversations.', risk: dashboard.mql + dashboard.sql ? 'Keep qualification notes specific so the team can learn which sources become SQL.' : 'Classify new leads as MQL or SQL to start measuring lead quality.', strength: `${dashboard.visible.length} visible lead${dashboard.visible.length === 1 ? '' : 's'} are attributed to your marketing work.` };
   if (viewer.role === 'sales_agent') return { title: 'My pipeline intelligence', subtitle: 'See where your active opportunities need the right next step.', risk: dashboard.overdue ? `${dashboard.overdue} follow-up${dashboard.overdue === 1 ? '' : 's'} are overdue. Resolve or reschedule them first.` : 'Keep a next follow-up date on every active opportunity.', strength: `${dashboard.conversionRate}% MQL/SQL-to-won conversion in this test workspace.` };
   if (viewer.role === 'manager') return { title: 'Team pipeline intelligence', subtitle: 'See team movement, focus intervention, and coach the next action.', risk: dashboard.overdue ? `${dashboard.overdue} team follow-up${dashboard.overdue === 1 ? '' : 's'} need attention today.` : 'No overdue follow-ups are visible for your team.', strength: `${dashboard.open} active opportunities are currently in the team pipeline.` };
   return { title: 'Pipeline intelligence', subtitle: 'Live visibility into pipeline health, performance, and what to focus on.', risk: dashboard.overdue ? `${dashboard.overdue} follow-up${dashboard.overdue === 1 ? '' : 's'} need attention before the risk grows.` : 'Follow-up timing is healthy across this test workspace.', strength: `${dashboard.open} active opportunities are visible across the company.` };
 }
 
-function PipelineIntelligence({ viewer, leads, dashboard, onSelect, period }: { viewer: User; leads: Lead[]; dashboard: ReturnType<typeof dashboardFor>; onSelect: (leadId: string) => void; period: DashboardPeriod }) {
-  const stages = intelligenceStages(leads, dashboard); const history = intelligenceHistory(leads); const matrix = intelligenceMatrix(leads); const copy = intelligenceCopy(viewer, dashboard);
+function PipelineIntelligence({ viewer, leads, dashboard, onSelect, period, scope }: { viewer: User; leads: Lead[]; dashboard: ReturnType<typeof dashboardFor>; onSelect: (leadId: string) => void; period: DashboardPeriod; scope: DashboardScope }) {
+  const stages = intelligenceStages(leads, dashboard); const history = intelligenceHistory(leads); const matrix = intelligenceMatrix(leads); const copy = intelligenceCopy(viewer, dashboard, scope);
   const duplicates = duplicateMatches(leads).length;
   const healthScore = Math.max(0, Math.min(100, 100 - dashboard.overdue * 22 - dashboard.incorrectReview * 14 - duplicates * 8 + Math.min(10, dashboard.mql * 2 + dashboard.sql * 3)));
   const focusLead = leads.find((lead) => lead.followUps.some((item) => item.status === 'open' && relativeDue(item) === 'Overdue')) ?? leads.find((lead) => !intelligenceClosedStatuses.includes(lead.status));
@@ -230,6 +262,7 @@ function PipelineIntelligence({ viewer, leads, dashboard, onSelect, period }: { 
 
 type ChartDatum = { label: string; value: number; tone?: 'teal' | 'green' | 'red' | 'amber' };
 function chartCount(leads: Lead[], predicate: (lead: Lead) => boolean) { return leads.filter(predicate).length; }
+function reachedStatus(lead: Lead, status: OpportunityStatus) { return lead.status === status || lead.stageHistory?.some((stage) => stage.toStatus === status); }
 function followUpHealth(leads: Lead[]) {
   const openFollowUps = leads.flatMap((lead) => lead.followUps).filter((followUp) => followUp.status === 'open');
   const dueToday = openFollowUps.filter((followUp) => relativeDue(followUp) === 'Today').length;
@@ -256,7 +289,44 @@ function riskData(leads: Lead[]): ChartDatum[] { const health = followUpHealth(l
   { label: 'Duplicates', value: duplicateMatches(leads).length, tone: 'red' },
 ]; }
 function sourceMix(leads: Lead[]): ChartDatum[] { const values = new Map<string, number>(); leads.forEach((lead) => values.set(lead.source, (values.get(lead.source) ?? 0) + 1)); return [...values.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([label, value]) => ({ label: label.length > 18 ? `${label.slice(0, 17)}…` : label, value, tone: 'teal' as const })); }
-function RoleCharts({ viewer, leads, dashboard }: { viewer: User; leads: Lead[]; dashboard: ReturnType<typeof dashboardFor> }) {
+function RoleScorecards({ viewer, leads, scope }: { viewer: User; leads: Lead[]; scope: DashboardScope }) {
+  const marketingView = viewer.role === 'marketer' || (viewer.role === 'admin' && scope === 'marketing');
+  const salesView = viewer.role === 'sales_agent' || viewer.role === 'manager' || (viewer.role === 'admin' && scope === 'sales');
+  const valid = leads.filter((lead) => lead.status !== 'duplicate' && lead.incorrectReview?.state !== 'confirmed_incorrect' && lead.incorrectReview?.state !== 'merge_duplicate');
+  const accepted = valid.filter((lead) => lead.assignments.length > 0).length;
+  const actionable = valid.filter((lead) => reachedStatus(lead, 'contacted') || reachedStatus(lead, 'connected') || lead.qualification !== 'not_available' || reachedStatus(lead, 'proposal_sent') || lead.status === 'won').length;
+  const mqlSql = valid.filter((lead) => lead.qualification !== 'not_available').length;
+  const connected = valid.filter((lead) => reachedStatus(lead, 'connected')).length;
+  const proposals = valid.filter((lead) => reachedStatus(lead, 'proposal_sent')).length;
+  const won = valid.filter((lead) => lead.status === 'won').length;
+  const response = median(valid.map(responseHours));
+  const routing = median(valid.map(routingHours));
+  const financial = financialMetrics(valid);
+  const lost = valid.filter((lead) => lead.status === 'lost' || lead.status === 'not_interested').length;
+  const rate = (value: number, total: number) => total ? `${Math.round((value / total) * 100)}%` : 'Not available';
+  const cards = marketingView ? [
+    ['Actionable lead yield', rate(actionable, valid.length), `${actionable}/${valid.length} valid leads progressed`],
+    ['Sales acceptance', rate(accepted, valid.length), `${accepted}/${valid.length} leads routed to Sales`],
+    ['MQL / SQL quality', `${dashboardFor(viewer, valid).mql} / ${dashboardFor(viewer, valid).sql}`, `${mqlSql}/${valid.length} decisions recorded`],
+    ['Median routing speed', routing === undefined ? 'Not available' : `${routing}h`, 'Lead creation to first sales assignment'],
+    ['Downstream wins', rate(won, valid.length), 'Won opportunities from your marketing work'],
+  ] : salesView ? [
+    ['Connection rate', rate(connected, valid.length), `${connected}/${valid.length} visible opportunities connected`],
+    ['Median response speed', response === undefined ? 'Not available' : `${response}h`, 'Assignment to first Contacted/Connected event'],
+    ['Proposal → Won', rate(won, proposals), `${won}/${proposals} proposal opportunities won`],
+    ['Lost prospects', String(lost), 'Lost or Not Interested opportunities'],
+    ['Project value', financial.financialRecordCount ? String(financial.totalProjectValue) : 'Not available', `${financial.financialRecordCount} Won records with cost`],
+  ] : [
+    ['Valid opportunities', String(valid.length), 'Duplicate and confirmed Incorrect excluded'],
+    ['MQL / SQL', `${dashboardFor(viewer, valid).mql} / ${dashboardFor(viewer, valid).sql}`, 'Qualification decisions recorded'],
+    ['Connection rate', rate(connected, valid.length), `${connected}/${valid.length} visible opportunities connected`],
+    ['Proposal → Won', rate(won, proposals), `${won}/${proposals} proposal opportunities won`],
+    ['Total project value', financial.financialRecordCount ? String(financial.totalProjectValue) : 'Not available', `${financial.financialRecordCount} Won records with cost`],
+  ];
+  return <section className="quality-summary role-scorecards" aria-label="Role dashboard scorecards">{cards.map(([label, value, note]) => <article key={label}><span>{label}</span><b>{value}</b><small>{note}</small></article>)}</section>;
+}
+
+function RoleCharts({ viewer, leads, dashboard, scope }: { viewer: User; leads: Lead[]; dashboard: ReturnType<typeof dashboardFor>; scope: DashboardScope }) {
   const qualityRate = leads.length ? Math.round(((dashboard.mql + dashboard.sql) / leads.length) * 100) : 0;
   const conversionBase = dashboard.won + chartCount(leads, (lead) => lead.status === 'lost');
   const closeRate = conversionBase ? Math.round((dashboard.won / conversionBase) * 100) : 0;
@@ -268,16 +338,19 @@ function RoleCharts({ viewer, leads, dashboard }: { viewer: User; leads: Lead[];
     { label: 'Incorrect', value: chartCount(leads, (lead) => lead.status === 'incorrect'), tone: 'amber' },
     { label: 'Active', value: dashboard.open, tone: 'teal' },
   ];
-  const isMarketer = viewer.role === 'marketer'; const isSales = viewer.role === 'sales_agent'; const isManager = viewer.role === 'manager';
-  const firstTitle = isMarketer ? 'Lead quality funnel' : isSales ? 'My conversion path' : isManager ? 'Team conversion path' : 'Company conversion path';
-  const secondTitle = isMarketer ? 'Lead outcomes' : isSales ? 'My follow-up health' : isManager ? 'Agent workload' : 'Work distribution';
+  const isMarketer = viewer.role === 'marketer' || (viewer.role === 'admin' && scope === 'marketing'); const isSales = viewer.role === 'sales_agent'; const isManager = viewer.role === 'manager' || (viewer.role === 'admin' && scope === 'sales');
+  const marketingTeamView = viewer.role === 'admin' && scope === 'marketing';
+  const firstTitle = isMarketer ? marketingTeamView ? 'Marketing team quality funnel' : 'Lead quality funnel' : isSales ? 'My conversion path' : isManager ? 'Team conversion path' : 'Company conversion path';
+  const secondTitle = isMarketer ? marketingTeamView ? 'Marketing team outcomes' : 'Lead outcomes' : isSales ? 'My follow-up health' : isManager ? 'Agent workload' : 'Work distribution';
   const firstData = funnelData(leads);
   const secondData = isMarketer ? outcomeData : isSales ? followUpHealth(leads) : isManager ? ownerData : sourceData;
   const insight = isMarketer ? `${qualityRate}% of your visible leads are marked MQL or SQL. Improve the source and qualification notes when this falls.` : isSales ? `${closeRate}% of your closed MQL/SQL leads are won. Use loss reasons and notes to improve the next cycle.` : `${dashboard.overdue} overdue follow-up${dashboard.overdue === 1 ? '' : 's'} need attention across the leads you can manage.`;
-  const detailOneTitle = isMarketer ? 'My lead source mix' : isSales ? 'My leads by source' : isManager ? 'Team lead source mix' : 'Company lead source mix';
-  const detailTwoTitle = isMarketer ? 'Quality risk watch' : isSales ? 'My risk watch' : isManager ? 'Team risk watch' : 'Company risk watch';
+  const detailOneTitle = isMarketer ? marketingTeamView ? 'Marketing team source mix' : 'My lead source mix' : isSales ? 'My leads by source' : isManager ? 'Team lead source mix' : 'Company lead source mix';
+  const detailTwoTitle = isMarketer ? 'Quality risk watch' : isSales ? 'Lost reason analysis' : isManager ? 'Lost reason analysis' : 'Company revenue health';
   const detailOneData = sourceMix(leads);
-  const detailTwoData = riskData(leads);
+  const losses = lossReasonBreakdown(leads).map(({ reason, count }) => ({ label: reason, value: count, tone: 'red' as const }));
+  const financial = financialMetrics(leads);
+  const detailTwoData = isMarketer ? riskData(leads) : isSales || isManager ? losses : [{ label: 'Project value', value: financial.totalProjectValue, tone: 'green' as const }, { label: 'Upfront value', value: financial.upfrontValue, tone: 'teal' as const }, { label: 'Won records', value: financial.financialRecordCount, tone: 'green' as const }];
   return <section className="insight-section" aria-label="Role-specific performance graphs"><div className="insight-heading"><div><span className="eyebrow">ROLE PERFORMANCE</span><h2>What you are working toward</h2></div><p>{insight}</p></div><div className="insight-grid"><BarChart title={firstTitle} subtitle={isMarketer ? 'Marketing-qualified and sales-qualified leads compared with final outcomes.' : 'Qualification movement and final outcomes from your visible leads.'} data={firstData} /><BarChart title={secondTitle} subtitle={isMarketer ? 'Use this to see whether lead quality turns into outcomes.' : isSales ? 'Follow-up timing is a controllable daily habit.' : isManager ? 'Shows where team capacity is currently allocated.' : 'Shows which marketer currently owns the visible lead flow.'} data={secondData} /></div><div className="insight-grid secondary-charts"><BarChart title={detailOneTitle} subtitle="Every source is shown separately so performance is never compared across unmatched acquisition routes." data={detailOneData} /><BarChart title={detailTwoTitle} subtitle={isMarketer ? 'Use this to identify quality issues before sending more leads to Sales.' : isSales ? 'Resolve risks before they become lost opportunities.' : 'Use this to prioritise intervention before the risk grows.'} data={detailTwoData} /></div></section>;
 }
 function BarChart({ title, subtitle, data }: { title: string; subtitle: string; data: ChartDatum[] }) {
@@ -291,9 +364,28 @@ function BenchmarkBoard({ leads }: { leads: Lead[] }) {
   return <section className="board"><div className="board-heading"><div><span className="eyebrow">MANAGER / ADMIN</span><h2>Benchmark Board</h2><p>Descriptive source-aware performance only. Sources are never declared universally best or worst while benchmark cohort rules remain open.</p></div><span className="warning">Cohort rules: open</span></div><div className="table-wrap"><table><thead><tr><th>Source</th><th>Sample</th><th>Connection</th><th>MQL / SQL</th><th>Proposal → Won</th><th>Follow-up</th><th>Project value</th></tr></thead><tbody>{rows.map((row) => <tr key={row.source}><td><b>{row.source}</b></td><td>{row.sampleSize}</td><td>{row.connected}/{row.assigned} · {percent(row.connectionRate)}</td><td>{row.mql} / {row.sql}</td><td>{row.won}/{row.proposal} · {percent(row.proposalToWonRate)}</td><td>{row.followUpCompleted}/{row.followUpDue} · {percent(row.followUpCompletionRate)}</td><td>{row.financialRecordCount ? `${row.totalProjectValue} total · ${row.upfrontValue} upfront` : 'Not available'}</td></tr>)}</tbody></table>{!rows.length && <p className="empty">No leads match the selected period and source.</p>}</div></section>;
 }
 
-function Leaderboard({ leads }: { leads: Lead[] }) {
-  const rows = leaderboardForSales(leads);
-  return <section className="board"><div className="board-heading"><div><span className="eyebrow">MANAGER / ADMIN ONLY</span><h2>Leaderboard</h2><p>Names and rankings are intentionally restricted to managers and admins. Every result shows its sample size; confirmed Incorrect and Duplicate leads are excluded.</p></div><span className="warning">Improvement baseline: Not available</span></div><div className="table-wrap"><table><thead><tr><th>Sales agent</th><th>Sample</th><th>Connection rate</th><th>Close rate</th><th>Follow-up completion</th></tr></thead><tbody>{rows.map((row) => <tr key={row.userId}><td><b>{nameFor(row.userId)}</b></td><td>{row.sampleSize}</td><td>{row.connected}/{row.sampleSize} · {percent(row.connectionRate)}</td><td>{row.won}/{row.sampleSize} · {percent(row.closeRate)}</td><td>{percent(row.followUpCompletionRate)}</td></tr>)}</tbody></table>{!rows.length && <p className="empty">Not enough data to rank a sales agent.</p>}</div><p className="board-note">“Most improved” remains separate from highest results and will appear only after a valid prior-period baseline exists.</p></section>;
+function SalesLeaderboardTable({ rows }: { rows: ReturnType<typeof leaderboardForSales> }) {
+  return <div className="table-wrap"><table><thead><tr><th>Sales agent</th><th>Sample</th><th>Connection rate</th><th>Close rate</th><th>Follow-up completion</th></tr></thead><tbody>{rows.map((row) => <tr key={row.userId}><td><b>{nameFor(row.userId)}</b></td><td>{row.sampleSize}</td><td>{row.connected}/{row.sampleSize} · {percent(row.connectionRate)}</td><td>{row.won}/{row.sampleSize} · {percent(row.closeRate)}</td><td>{percent(row.followUpCompletionRate)}</td></tr>)}</tbody></table>{!rows.length && <p className="empty">Not enough data to rank a sales agent.</p>}</div>;
+}
+
+function MarketingLeaderboardTable({ rows }: { rows: ReturnType<typeof leaderboardForMarketing> }) {
+  return <div className="table-wrap"><table><thead><tr><th>Marketing agent</th><th>Sample</th><th>Actionable yield</th><th>Sales acceptance</th><th>MQL / SQL</th><th>Downstream won</th></tr></thead><tbody>{rows.map((row) => <tr key={row.userId}><td><b>{nameFor(row.userId)}</b></td><td>{row.sampleSize}</td><td>{percent(row.actionableLeadYield)}</td><td>{percent(row.salesAcceptanceRate)}</td><td>{row.mql} / {row.sql}</td><td>{row.won}/{row.sampleSize} · {percent(row.downstreamConversionRate)}</td></tr>)}</tbody></table>{!rows.length && <p className="empty">Not enough data to rank a marketing agent.</p>}</div>;
+}
+
+function Leaderboard({ leads, privateBenchmarkLeads, viewer, scope }: { leads: Lead[]; privateBenchmarkLeads: Lead[]; viewer: User; scope: DashboardScope }) {
+  const sales = leaderboardForSales(leads); const marketing = leaderboardForMarketing(leads);
+  const named = canViewNamedLeaderboard(viewer);
+  const marketingView = viewer.role === 'marketer' || (viewer.role === 'admin' && scope === 'marketing');
+  if (!named) {
+    const ownMarketing = marketing.find((row) => row.userId === viewer.id);
+    const ownSales = sales.find((row) => row.userId === viewer.id);
+    const own = viewer.role === 'marketer' ? ownMarketing : ownSales;
+    const benchmark = viewer.role === 'marketer' ? median(leaderboardForMarketing(privateBenchmarkLeads).map((row) => row.actionableLeadYield)) : median(leaderboardForSales(privateBenchmarkLeads).map((row) => row.connectionRate));
+    const metric = viewer.role === 'marketer' ? ownMarketing?.actionableLeadYield : ownSales?.connectionRate;
+    return <section className="board"><div className="board-heading"><div><span className="eyebrow">PRIVATE PERSONAL STANDING</span><h2>My standing</h2><p>Your colleagues’ names are hidden. This compares only your own visible work with an anonymized team benchmark.</p></div><span className="warning">Improvement baseline: Not available</span></div><section className="quality-summary"><article><span>My sample</span><b>{own?.sampleSize ?? 'Not enough data'}</b></article><article><span>{viewer.role === 'marketer' ? 'My actionable yield' : 'My connection rate'}</span><b>{percent(metric)}</b></article><article><span>Anonymous team benchmark</span><b>{percent(benchmark)}</b></article><article><span>Most improved</span><b>Not available</b></article></section><p className="board-note">A private result is shown only when your role has a usable sample. Peer names, contact data, and raw peer records remain hidden.</p></section>;
+  }
+  if (viewer.role === 'admin' && scope === 'company') return <section className="board"><div className="board-heading"><div><span className="eyebrow">ADMIN — COMPANY LEADERBOARDS</span><h2>Sales and marketing performance</h2><p>Named results are visible only to Admin. Every row shows sample size and excludes confirmed Incorrect and Duplicate leads from normal conversion.</p></div><span className="warning">Most improved: Not available</span></div><h3>Sales</h3><SalesLeaderboardTable rows={sales} /><h3>Marketing</h3><MarketingLeaderboardTable rows={marketing} /><p className="board-note">Highest result and most improved remain separate. A prior-period baseline is required before improvement ranking appears.</p></section>;
+  return <section className="board"><div className="board-heading"><div><span className="eyebrow">{marketingView ? 'MARKETING MANAGER' : 'SALES MANAGER'}</span><h2>{marketingView ? 'Marketing leaderboard' : 'Sales leaderboard'}</h2><p>Named results are limited to the manager or Admin’s permitted department scope. Every result includes sample size.</p></div><span className="warning">Most improved: Not available</span></div>{marketingView ? <MarketingLeaderboardTable rows={marketing} /> : <SalesLeaderboardTable rows={sales} />}<p className="board-note">Highest result and most improved remain separate. A prior-period baseline is required before improvement ranking appears.</p></section>;
 }
 
 function DataQualityBoard({ leads, range, source }: { leads: Lead[]; range: ReturnType<typeof dashboardDateRange>; source: string }) {
@@ -301,10 +393,10 @@ function DataQualityBoard({ leads, range, source }: { leads: Lead[]; range: Retu
   return <section className="board"><div className="board-heading"><div><span className="eyebrow">ADMIN ONLY</span><h2>Data quality & reconciliation</h2><p>Exceptions show where a record needs attention before it is used for reporting or coaching.</p></div><span className={reconciliation.passes ? 'success-chip' : 'warning'}>{reconciliation.passes ? 'Reconciled' : 'Needs review'}</span></div><section className="quality-summary"><article><span>Filtered leads</span><b>{reconciliation.filteredLeadCount}</b></article><article><span>Benchmark samples</span><b>{reconciliation.benchmarkSampleCount}</b></article><article><span>Excluded from conversion</span><b>{reconciliation.excludedFromConversion}</b></article><article><span>Exceptions</span><b>{issues.length}</b></article></section><div className="table-wrap"><table><thead><tr><th>Lead</th><th>Exception</th><th>Reason</th></tr></thead><tbody>{issues.map((issue, index) => <tr key={`${issue.leadId}-${issue.type}-${index}`}><td><b>{leads.find((lead) => lead.id === issue.leadId)?.name ?? issue.leadId}</b></td><td>{issue.type.replaceAll('_', ' ')}</td><td>{issue.message}</td></tr>)}</tbody></table>{!issues.length && <p className="empty">No data-quality exceptions match the selected dashboard filter.</p>}</div></section>;
 }
 
-function LeadDetail({ lead, viewer, onStatus, onMarkWon, onQualification, onAddNote, onAddFollowUp, onCompleteFollowUp, onReassign, onReportIncorrect, onDecision }: { lead: Lead; viewer: User; onStatus: (lead: Lead, status: OpportunityStatus) => void; onMarkWon: (lead: Lead, event: FormEvent<HTMLFormElement>) => void; onQualification: (lead: Lead, qualification: Qualification) => void; onAddNote: (lead: Lead, event: FormEvent<HTMLFormElement>) => void; onAddFollowUp: (lead: Lead, event: FormEvent<HTMLFormElement>) => void; onCompleteFollowUp: (lead: Lead, id: string) => void; onReassign: (lead: Lead, event: FormEvent<HTMLFormElement>) => void; onReportIncorrect: (lead: Lead, event: FormEvent<HTMLFormElement>) => void; onDecision: (lead: Lead, decision: 'confirmed_incorrect' | 'rejected' | 'merge_duplicate') => void; }) {
+function LeadDetail({ lead, viewer, onStatus, onMarkWon, onQualification, onLostReason, onAddNote, onAddFollowUp, onCompleteFollowUp, onReassign, onReportIncorrect, onDecision }: { lead: Lead; viewer: User; onStatus: (lead: Lead, status: OpportunityStatus) => void; onMarkWon: (lead: Lead, event: FormEvent<HTMLFormElement>) => void; onQualification: (lead: Lead, qualification: Qualification) => void; onLostReason: (lead: Lead, lostReason: Lead['lostReason']) => void; onAddNote: (lead: Lead, event: FormEvent<HTMLFormElement>) => void; onAddFollowUp: (lead: Lead, event: FormEvent<HTMLFormElement>) => void; onCompleteFollowUp: (lead: Lead, id: string) => void; onReassign: (lead: Lead, event: FormEvent<HTMLFormElement>) => void; onReportIncorrect: (lead: Lead, event: FormEvent<HTMLFormElement>) => void; onDecision: (lead: Lead, decision: 'confirmed_incorrect' | 'rejected' | 'merge_duplicate') => void; }) {
   const edit = canUpdateLead(viewer, lead) && !lead.routingPaused; const owner = currentAssignment(lead); const visibleHistory = owner?.visibility === 'fresh_start' && viewer.id === owner.ownerId ? lead.activities.filter((activity) => activity.at >= owner.at) : lead.activities;
   return <aside className="detail-panel"><div className="detail-heading"><div><span className="spark">LEAD DETAIL</span><h2>{lead.name}</h2><p>{lead.phone ?? 'No phone'} · {lead.email ?? 'No email'}</p></div><span className={`status ${lead.status}`}>{statusLabels[lead.status]}</span></div>
-    <div className="detail-grid"><label>Status<select value={lead.status} disabled={!edit} onChange={(event) => onStatus(lead, event.target.value as OpportunityStatus)}>{statusOptions.filter((status) => status !== 'won' || lead.status === 'won').map((status) => <option key={status} value={status} disabled={!validStatusTransition(lead.status, status)}>{statusLabels[status]}</option>)}</select></label><label>Qualification<select value={lead.qualification} disabled={!edit} onChange={(event) => onQualification(lead, event.target.value as Qualification)}>{qualificationOptions.map((level) => <option key={level} value={level}>{qualificationLabels[level]}</option>)}</select></label></div>
+    <div className="detail-grid"><label>Status<select value={lead.status} disabled={!edit} onChange={(event) => onStatus(lead, event.target.value as OpportunityStatus)}>{statusOptions.filter((status) => status !== 'won' || lead.status === 'won').map((status) => <option key={status} value={status} disabled={!validStatusTransition(lead.status, status)}>{statusLabels[status]}</option>)}</select></label><label>Qualification<select value={lead.qualification} disabled={!edit} onChange={(event) => onQualification(lead, event.target.value as Qualification)}>{qualificationOptions.map((level) => <option key={level} value={level}>{qualificationLabels[level]}</option>)}</select></label>{edit && <label>Loss reason<select value={lead.lostReason ?? ''} onChange={(event) => onLostReason(lead, event.target.value ? event.target.value as Lead['lostReason'] : undefined)}><option value="">Choose before Lost / Not Interested</option>{lostReasonOptions.map((reason) => <option key={reason} value={reason}>{reason}</option>)}</select></label>}</div>
     <section className="detail-section"><h3>Stage timing</h3><p><b>{statusLabels[lead.status]}</b> for {stageAgeLabel(lead)}. This time is kept separately from each agent’s ownership period.</p>{(lead.stageHistory ?? []).slice().reverse().map((stage) => <p className="history" key={stage.id}><b>{statusLabels[stage.toStatus]}</b> · entered {formatDate(stage.enteredAt)}{stage.exitedAt ? ` · left ${formatDate(stage.exitedAt)}` : ' · current stage'}</p>)}</section>
     {edit && lead.status === 'proposal_sent' && <section className="detail-section"><h3>Mark opportunity Won</h3><p>Record financial values now. Historical opportunities without these values remain Not available.</p><form className="inline-form" onSubmit={(event) => onMarkWon(lead, event)}><label>Total project cost<input name="totalProjectCost" type="number" min="0" step="0.01" required /></label><label>Upfront payment<input name="upfrontPaymentAmount" type="number" min="0" step="0.01" required /></label><button className="primary">Save as Won</button></form></section>}
     {lead.status === 'won' && <section className="detail-section"><h3>Won financials</h3><p>Total project cost: {lead.totalProjectCost === undefined ? 'Not available' : lead.totalProjectCost}</p><p>Upfront payment: {lead.upfrontPaymentAmount === undefined ? 'Not available' : lead.upfrontPaymentAmount}</p><p>Won date: {lead.wonAt ? formatDate(lead.wonAt) : 'Not available'}</p></section>}

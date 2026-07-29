@@ -11,7 +11,8 @@ const dashboardPeriods = z.enum(['daily', 'weekly', 'monthly', 'yearly', 'lifeti
 
 const id = z.string().uuid();
 const newLead = z.object({ name: z.string().trim().min(1).max(160), phone: z.string().trim().max(60).optional(), email: z.string().trim().email().max(254).optional(), source: z.enum(sourceOptions).default('Other'), marketingOwnerId: id.optional(), salesOwnerId: id.optional(), description: z.string().trim().max(4000).optional() }).refine((value) => Boolean(value.phone || value.email), { message: 'A lead needs a phone number or email address.' });
-const statusUpdate = z.object({ status: z.enum(['assigned', 'contacted', 'connected', 'follow_up_required', 'qualified', 'proposal_sent', 'won', 'lost', 'not_interested', 'incorrect', 'duplicate', 'do_not_contact']), qualification: z.enum(['mql', 'sql', 'not_available']).optional(), totalProjectCost: z.number().nonnegative().optional(), upfrontPaymentAmount: z.number().nonnegative().optional() });
+const lostReasonOptions = ['Price or budget', 'No response', 'Timing or priority', 'Competitor selected', 'Not a fit', 'Proposal declined', 'Other'] as const;
+const statusUpdate = z.object({ status: z.enum(['assigned', 'contacted', 'connected', 'follow_up_required', 'qualified', 'proposal_sent', 'won', 'lost', 'not_interested', 'incorrect', 'duplicate', 'do_not_contact']), qualification: z.enum(['mql', 'sql', 'not_available']).optional(), totalProjectCost: z.number().nonnegative().optional(), upfrontPaymentAmount: z.number().nonnegative().optional(), lostReason: z.enum(lostReasonOptions).optional() });
 const assignment = z.object({ assignedTo: id, visibility: z.enum(['full_context', 'fresh_start']), reason: z.string().trim().min(1).max(1000) });
 const note = z.object({ body: z.string().trim().min(1).max(5000) });
 const followUp = z.object({ dueAt: z.string().datetime({ offset: true }), actionType: z.enum(['Call', 'Email', 'SMS', 'Task']) });
@@ -74,11 +75,11 @@ export function createApp() {
   app.patch('/v1/opportunities/:id', ...protectedRoute(async (request, response) => {
     const value = parse(statusUpdate.partial(), request.body); const opportunityId = parse(id, request.params.id);
     if (!value.status) { response.status(400).json({ message: 'Use a supported field update.' }); return; }
-    const { error } = await request.supabase!.rpc('set_opportunity_status', { p_opportunity_id: opportunityId, p_status: value.status, p_qualification: value.qualification ?? null, p_total_project_cost: value.totalProjectCost ?? null, p_upfront_payment_amount: value.upfrontPaymentAmount ?? null }); if (error) throw error; response.status(204).end();
+    const { error } = await request.supabase!.rpc('set_opportunity_status', { p_opportunity_id: opportunityId, p_status: value.status, p_qualification: value.qualification ?? null, p_total_project_cost: value.totalProjectCost ?? null, p_upfront_payment_amount: value.upfrontPaymentAmount ?? null, p_lost_reason: value.lostReason ?? null }); if (error) throw error; response.status(204).end();
   }));
   app.post('/v1/opportunities/:id/status', ...protectedRoute(async (request, response) => {
     const value = parse(statusUpdate, request.body); const opportunityId = parse(id, request.params.id);
-    const { error } = await request.supabase!.rpc('set_opportunity_status', { p_opportunity_id: opportunityId, p_status: value.status, p_qualification: value.qualification ?? null, p_total_project_cost: value.totalProjectCost ?? null, p_upfront_payment_amount: value.upfrontPaymentAmount ?? null }); if (error) throw error; response.status(204).end();
+    const { error } = await request.supabase!.rpc('set_opportunity_status', { p_opportunity_id: opportunityId, p_status: value.status, p_qualification: value.qualification ?? null, p_total_project_cost: value.totalProjectCost ?? null, p_upfront_payment_amount: value.upfrontPaymentAmount ?? null, p_lost_reason: value.lostReason ?? null }); if (error) throw error; response.status(204).end();
   }));
   app.post('/v1/opportunities/:id/assignments', ...protectedRoute(async (request, response) => {
     const value = parse(assignment, request.body); const opportunityId = parse(id, request.params.id);
@@ -120,7 +121,7 @@ export function createApp() {
     const role = parse(dashboardRoles, request.params.role); const profile = request.profile!;
     const permitted = profile.role === 'admin' || (role === 'agent' && profile.role === 'sales_agent') || profile.role === role || (role === 'manager' && profile.role === 'manager');
     if (!permitted) { response.status(403).json({ message: 'This dashboard is outside your permitted role scope.' }); return; }
-    const filters = parse(dashboardQuery, request.query); let query = request.supabase!.from('opportunities').select('id,status,qualification,source,total_project_cost,upfront_payment_amount,won_at,created_at').order('created_at', { ascending: false });
+    const filters = parse(dashboardQuery, request.query); let query = request.supabase!.from('opportunities').select('id,status,qualification,source,total_project_cost,upfront_payment_amount,won_at,lost_reason,first_contacted_at,qualified_at,proposal_sent_at,created_at').order('created_at', { ascending: false });
     if (filters.source) query = query.eq('source', filters.source);
     if (filters.start) query = query.gte('created_at', `${filters.start}T00:00:00.000Z`);
     if (filters.end) query = query.lte('created_at', `${filters.end}T23:59:59.999Z`);

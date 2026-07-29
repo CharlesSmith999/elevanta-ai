@@ -23,6 +23,16 @@ Approved starting values:
 
 `Other` is used when the source is unknown and creates a data-quality item for review. New source values require an admin-controlled dictionary update; users should not create spelling variants.
 
+## 1.1 Dashboard event fields
+
+- **Loss reason:** required from the controlled list when a new CRM opportunity is marked Lost or Not Interested: Price or budget, No response, Timing or priority, Competitor selected, Not a fit, Proposal declined, or Other.
+- **First contacted at:** first recorded Contacted or Connected event. It is used for response speed.
+- **Qualified at:** first recorded Qualified event. It is used for qualification-period reporting.
+- **Proposal sent at:** first recorded Proposal Sent event. It is used for proposal conversion.
+- **First sales assignment:** first assignment history event. It is used for routing speed.
+
+For historical data, absent evidence remains `Not available`; it is not inferred.
+
 ## 2. Lifecycle statuses
 
 Working lifecycle:
@@ -109,6 +119,13 @@ Every dashboard supports daily, weekly, monthly, yearly, lifetime, and custom da
 - **Average project value:** total project value ÷ Won opportunities with available project cost.
 - Financial metrics exclude `Not available` values and show the count used.
 
+## 6.1 Filter rules
+
+- Every dashboard board applies the selected date range, source, and status to its cards, charts, tables, and leaderboard.
+- Admin can additionally select company, marketing-department, or sales-department context and then filter by the relevant agent or marketer.
+- The Sales Manager can filter only direct-report sales agents. Individual agents cannot inspect peer data.
+- Project type is a stored opportunity field but is not yet required on the Phase 1 create form. A useful project-type dashboard filter will be enabled when the CRM form has an approved controlled project-type dictionary and recorded values; until then it must show `Not available`, not a fabricated grouping.
+
 ## 7. Dashboard treatment of missing data
 
 - Show `Not available` rather than zero when the value was not recorded.
@@ -141,4 +158,3 @@ Flag records with:
 - Activity after a terminal status
 - Duplicate or incorrect review pending
 - Assignment without a valid owner
-
