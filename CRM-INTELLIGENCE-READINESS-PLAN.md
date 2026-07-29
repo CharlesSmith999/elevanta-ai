@@ -2,7 +2,7 @@
 
 Status: Approved working plan; benchmark cohort rules remain open
 
-Purpose: Prepare the CRM dashboards and data structures before Milestone 4 Xaviar development. This document is subordinate to [CRM-PLAN.md](./CRM-PLAN.md) and is the implementation checklist for source reporting, financial tracking, benchmarks, leaderboards, and dashboard readiness.
+Purpose: Prepare the CRM dashboards and data structures before Milestone 4 Xaviar development. This document is subordinate to [CRM-PLAN.md](./CRM-PLAN.md) and is the implementation checklist for source reporting, financial tracking, benchmarks, leaderboards, and dashboard readiness. Shared definitions are locked in [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md).
 
 ## 1. Source model
 
@@ -92,4 +92,3 @@ Safeguards:
 - Benchmark Board and Leaderboard show counts, rates, period, source, and sample size.
 - Data-quality and permission tests pass.
 - Benchmark cohort rules remain visibly marked as open until formally decided after Xaviar evaluation.
-
