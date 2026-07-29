@@ -4,7 +4,7 @@ Status: Planning baseline, approved from stakeholder answers
 
 Branding: The product is named **Elevanta AI**. Its embedded AI sales companion is named **Xaviar**. Xaviar is advisory in Phase 1 and supports lead analysis, follow-up guidance, agent and marketer coaching, and performance reporting. Autonomous outbound communication remains deferred to Phase 2.
 
-Xaviar evaluation reference: [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md). This focused document governs Xaviar testing, release gates, and post-activation evaluation.
+CRM readiness reference: [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md). This plan must be completed before Xaviar development. Xaviar evaluation reference: [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md).
 
 ## 1. Product vision
 
@@ -163,7 +163,7 @@ Xaviar must retain the advice, the evidence behind it, whether it was followed, 
 workspaces(id, name, created_at)
 users(id, workspace_id, role, manager_id, name, email, active, created_at)
 contacts(id, workspace_id, name, normalized_phone, normalized_email, source, source_external_id, do_not_contact, created_at, updated_at)
-opportunities(id, workspace_id, contact_id, project_type, description, budget_band, timeline_band, source, status, priority, created_at, updated_at)
+opportunities(id, workspace_id, contact_id, project_type, description, budget_band, timeline_band, source, status, priority, total_project_cost, upfront_payment_amount, won_at, created_at, updated_at)
 assignments(id, opportunity_id, assigned_to, assigned_by, visibility_mode, reason, started_at, ended_at)
 activities(id, opportunity_id, actor_id, type, body, from_status, to_status, metadata, created_at)
 follow_ups(id, opportunity_id, owner_id, due_at, action_type, status, completed_at, escalated_at, created_at)
@@ -174,7 +174,7 @@ notifications(id, user_id, type, payload_json, read_at, sent_at, created_at)
 audit_events(id, workspace_id, actor_id, entity_type, entity_id, action, before_json, after_json, created_at)
 ```
 
-Required constraints/indexes: unique normalized email/phone within workspace where present; one active assignment per opportunity; unique incorrect report per opportunity/reporter; indexes on workspace, status, assignee, due date, and created date. Use Supabase Row Level Security for role and manager-scope enforcement.
+Required constraints/indexes: unique normalized email/phone within workspace where present; one active assignment per opportunity; unique incorrect report per opportunity/reporter; indexes on workspace, status, assignee, source, due date, and created date. Use import provenance to identify historical records and CRM form creation to identify new records; do not require a user-maintained origin field. Use Supabase Row Level Security for role and manager-scope enforcement.
 
 ## 11. Node.js/React architecture
 
@@ -232,7 +232,7 @@ Contact/opportunity views, assignment history, statuses, notes, follow-ups, and 
 
 ### Milestone 3 — controls and dashboards
 
-Incorrect review queue, duplicate review, overdue indicators, dashboards, exports, and data-quality reports.
+Incorrect review queue, duplicate review, overdue indicators, dashboards, source-aware reporting, won financial fields, Benchmark Board, Leaderboard, exports, and data-quality reports. Follow [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md). Exact benchmark cohort rules remain open for later Xaviar evaluation.
 
 ### Milestone 4 — AI support
 
@@ -258,3 +258,32 @@ Milestone 4 is a build and validation milestone, not an operational rollout. Age
 Stage and import the approved Excel lead data, preserve workbook/tab/row provenance, apply deterministic duplicate handling, validate permissions and dashboard reconciliation, and only then activate the migrated records for normal routing.
 
 After activation, newly recorded CRM work becomes Xaviar’s primary source for personalized coaching. Imported historical data is labeled as historical context and is used only when its provenance and quality are sufficient.
+
+### Phase 2 — workflow automation
+
+Track whether Xaviar recommendations are followed, send in-app reminders and escalations, provide daily task guidance, and add email/SMS/calendar/phone connectors with consent enforcement, templates, and human approval gates. Any outbound action requires explicit approval until autonomous operation is separately approved.
+
+### Phase 3 — SaaS product
+
+Multi-tenancy hardening, billing, self-service administration, onboarding, usage limits, tenant-level AI configuration, and product analytics.
+
+## 16. Acceptance criteria for Phase 1
+
+- Every imported record has provenance and a deterministic deduplication outcome.
+- An agent cannot read another agent's unassigned contact details.
+- Managers see only their managed agents' leads; admins see all.
+- Reassignment preserves the complete audit chain and supports full-context/fresh-start visibility.
+- Three distinct incorrect reports create exactly one admin review item and pause assignment.
+- Status, follow-up, and assignment changes are auditable.
+- Dashboards reconcile to the underlying opportunity table.
+- AI reports identify evidence, trend, and actions without autonomous outbound communication.
+- No Phase 2 integration is enabled until consent, unsubscribe, and human-approval policies are implemented.
+
+## 17. Decisions still required before coding
+
+1. Confirm the deployment target for the Node API; GitHub Pages cannot host the API.
+2. Confirm authentication provider and whether managers can belong to multiple teams.
+3. Approve the controlled reason lists for incorrect reports, loss reasons, and follow-up actions.
+4. Decide whether marketing is a separate role in the UI or a permission set layered onto a user.
+5. Confirm the first import sample and the admin responsible for deduplication review.
+6. Decide the final benchmark cohort and agent-visibility rules after Xaviar evaluation, using actual CRM evidence.
