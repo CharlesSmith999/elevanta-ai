@@ -4,7 +4,7 @@ Status: Planning baseline, approved from stakeholder answers
 
 Branding: The product is named **Elevanta AI**. Its embedded AI sales companion is named **Xaviar**. Xaviar is advisory in Phase 1 and supports lead analysis, follow-up guidance, agent and marketer coaching, and performance reporting. Autonomous outbound communication remains deferred to Phase 2.
 
-CRM readiness reference: [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md). Shared dashboard definitions are in [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md). These must be completed before Xaviar development. Xaviar evaluation reference: [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md).
+CRM readiness reference: [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md). Shared dashboard definitions are in [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), and the remaining role-dashboard work is defined in [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md). These must be completed before Xaviar development. Xaviar evaluation reference: [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md).
 
 ## 1. Product vision
 
@@ -233,6 +233,22 @@ Contact/opportunity views, assignment history, statuses, notes, follow-ups, and 
 ### Milestone 3 — controls and dashboards
 
 Incorrect review queue, duplicate review, overdue indicators, dashboards, source-aware reporting, won financial fields, Benchmark Board, Leaderboard, exports, and data-quality reports. Follow [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md). Exact benchmark cohort rules remain open for later Xaviar evaluation.
+
+### Pre-Xaviar product refinement gate
+
+Before Milestone 4/Xaviar development begins, complete one focused refinement pass over the CRM screens using the approved role workflows and safe sample data. This is a required release gate, not a new milestone and not a substitute for the dashboard completion gates.
+
+The refinement pass must:
+
+- review every role's dashboard, lead inbox, lead detail, assignment, follow-up, reports, review-queue, and Xaviar entry screens;
+- add, remove, or rename buttons only where the approved workflow requires it;
+- standardize form fields, required fields, dropdown values, date/time controls, empty states, error messages, and confirmation messages;
+- verify that actions are visible only to the correct role and that contact details remain protected;
+- test keyboard access, readable labels, responsive layout, destructive-action confirmation, and audit-history visibility;
+- record each approved screen change in a short UI change log and validate it with role-based smoke tests;
+- freeze the Phase 1 screen and field contract before Xaviar data and coaching work starts.
+
+No Xaviar feature may be treated as complete while an unresolved screen or form change would alter the underlying event, permission, or dashboard data contract.
 
 ### Milestone 4 — AI support
 
