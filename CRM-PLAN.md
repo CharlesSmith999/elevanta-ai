@@ -234,9 +234,24 @@ Incorrect review queue, duplicate review, overdue indicators, dashboards, export
 
 Embedded Xaviar coach with explainable daily/weekly/monthly/lifetime views, lead-stage recommendations, personalized agent and marketer coaching, skill-based team benchmarks, manager review, and improvement tracking. Xaviar remains advisory and does not change records or send outbound messages.
 
+Milestone 4 is delivered in the following controlled sub-phases:
+
+1. **4A — Data contract and readiness:** finalize the event dictionary, outcome/reason lists, attribution rules, minimum sample rules, role visibility rules, and Xaviar evidence requirements before model work begins.
+2. **4B — Xaviar data foundation:** create the event/query layer, performance snapshots, data-quality checks, recommendation ledger, evidence references, feedback states, and model/version audit fields. Use synthetic or safe sample data only.
+3. **4C — Explain:** show daily, weekly, monthly, and lifetime summaries; lead-stage explanations; missing-data warnings; and evidence links. No predictions or rankings are shown as facts.
+4. **4D — Recommend:** add lead prioritization, next-action suggestions, follow-up guidance, qualification guidance, loss-pattern guidance, and marketer source-quality recommendations. Every recommendation has confidence, evidence, expiry, and a human-readable reason.
+5. **4E — Coach and benchmark:** add role-specific coaching, permission-safe skill benchmarks, cohort comparisons, manager coaching plans, and recommendation acknowledgement/completion tracking. Small samples produce “not enough evidence,” not rankings.
+6. **4F — Predict and calibrate:** add connection, qualification, conversion, follow-up-risk, and lead-quality forecasts only after testing against held-out sample outcomes. Store confidence, model version, prediction date, and later outcome for calibration.
+7. **4G — Dashboard integration:** embed Xaviar in the agent, marketer, manager, and admin dashboards with role-specific views and clear explanations of what Xaviar can and cannot see.
+8. **4H — Safety and release evaluation:** test permissions, reassignment attribution, duplicate/incorrect cases, missing data, small teams, delayed outcomes, bias, prompt injection in notes, and unsupported recommendations. Complete manager/admin review before release.
+
+Milestone 4 is a build and validation milestone, not an operational rollout. Agents and marketers do not start using the CRM for live work until Milestone 5 has completed data migration, validation, and activation approval.
+
 ### Milestone 5 — Production data migration
 
 Stage and import the approved Excel lead data, preserve workbook/tab/row provenance, apply deterministic duplicate handling, validate permissions and dashboard reconciliation, and only then activate the migrated records for normal routing.
+
+After activation, newly recorded CRM work becomes Xaviar’s primary source for personalized coaching. Imported historical data is labeled as historical context and is used only when its provenance and quality are sufficient.
 
 ### Phase 2 — workflow automation
 
