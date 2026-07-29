@@ -6,7 +6,7 @@ Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.
 
 ## Current position
 
-Elevanta AI has a working Phase 1 CRM foundation and a live production deployment. The code, dashboard intelligence, API foundation, and Supabase migrations are published on `main`.
+Elevanta AI has a working Phase 1 CRM foundation and an earlier live production deployment. The released API/dashboard foundation is on `main`; the newer authentication and dashboard-completion changes are still being verified on feature branches and must not be described as production-ready until their release gates pass.
 
 The full Excel workbook has **not** been imported into the active CRM yet. The current public preview uses safe sample data in the browser so the workflow can be tested without exposing private lead data.
 
@@ -44,6 +44,7 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 - Supabase project: created and migrations prepared; only sample records are currently present.
 - Production branch: `main`.
 - Production release commits: `61e7eff Complete dashboard readiness and API foundation`; `3511189 Fix Vercel API ESM loading`.
+- Current verification branches: `agent/milestone-1-foundation` contains the environment-gated Supabase sign-in and refinement-gate documentation; draft PR [#3](https://github.com/CharlesSmith999/elevanta-ai/pull/3) contains the dashboard-completion pass. Neither change is counted as released until its migration, authentication, and production smoke checks are complete.
 - GitHub publishing: complete through the authorized ChatGPT Codex Connector, restricted to `CharlesSmith999/elevanta-ai`.
 - Deployment procedure: [DEPLOYMENT-SOP.md](./docs/DEPLOYMENT-SOP.md) is the required reference for all releases; it uses the existing Git-connected Vercel project and forbids duplicate deployment instances.
 - API deployment path: `api/[...path].ts` now routes Vercel `/api/*` requests into the shared Node API without creating a second service.
@@ -75,3 +76,4 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 ## Next milestone target
 
 Finish the remaining Milestone 1 deployment checks, then complete Milestones 2–4 with safe sample data. After Milestone 4, begin Milestone 5 production lead-data migration using staging, provenance, deterministic duplicate handling, and validation before any records enter active routing.
+
