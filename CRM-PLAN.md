@@ -199,7 +199,7 @@ Initialize React/Node project, Supabase project, migrations, authentication, rol
 
 ### Milestone 2 — CRM core
 
-Import staging/commit flow, contact/opportunity views, assignment history, statuses, notes, follow-ups, and agent/manager permissions.
+Contact/opportunity views, assignment history, statuses, notes, follow-ups, and agent/manager permissions using safe sample data. The production Excel lead-data migration is intentionally deferred until after Milestone 4.
 
 ### Milestone 3 — controls and dashboards
 
@@ -208,6 +208,10 @@ Incorrect review queue, duplicate review, overdue indicators, dashboards, export
 ### Milestone 4 — AI support
 
 Explainable coaching metrics, marketer quality report, manager review workflow, and periodic report generation.
+
+### Milestone 5 — Production data migration
+
+Stage and import the approved Excel lead data, preserve workbook/tab/row provenance, apply deterministic duplicate handling, validate permissions and dashboard reconciliation, and only then activate the migrated records for normal routing.
 
 ### Phase 2 — workflow automation
 
