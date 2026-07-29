@@ -6,7 +6,7 @@ Source of truth: [CRM-PLAN.md](./CRM-PLAN.md) and [CRM-DECISIONS-v1.1.md](./CRM-
 
 ## Current position
 
-Elevanta AI has a working Phase 1 CRM foundation and a live dashboard preview. The code, Supabase migrations, role rules, lead workflow, test data, and dashboard intelligence are implemented locally and committed on the `agent/milestone-1-foundation` branch.
+Elevanta AI has a working Phase 1 CRM foundation and a live dashboard preview. The code, Supabase migrations, role rules, lead workflow, test data, and dashboard intelligence are published on the `agent/milestone-1-foundation` branch.
 
 The full Excel workbook has **not** been imported into the active CRM yet. The current public preview uses safe sample data in the browser so the workflow can be tested without exposing private lead data.
 
@@ -28,8 +28,8 @@ The full Excel workbook has **not** been imported into the active CRM yet. The c
 - Hosting decision: Vercel for web/API, Supabase for database/auth/storage.
 - Supabase project: created and migrations prepared; only sample records are currently present.
 - Git branch: `agent/milestone-1-foundation`.
-- Local latest commit: `06ecf6f Record Vercel API deployment progress`.
-- GitHub publishing: blocked only by missing command-line GitHub authentication. No application defect is preventing the push.
+- Published branch commit: `b60cb85 Publish Milestone 1 foundation`.
+- GitHub publishing: complete through the authorized ChatGPT Codex Connector, restricted to `CharlesSmith999/elevanta-ai`.
 - Deployment procedure: [DEPLOYMENT-SOP.md](./docs/DEPLOYMENT-SOP.md) is the required reference for all releases; it uses the existing Git-connected Vercel project and forbids duplicate deployment instances.
 - API deployment path: `api/[...path].ts` now routes Vercel `/api/*` requests into the shared Node API without creating a second service.
 - Latest local validation: workspace typecheck, API catch-all typecheck, and production build pass.
