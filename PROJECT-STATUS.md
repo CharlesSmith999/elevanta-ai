@@ -2,7 +2,7 @@
 
 Status owner: Codex with Shariq  
 Last updated: 2026-07-29  
-Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md), [CRM-DECISIONS-v1.2.md](./CRM-DECISIONS-v1.2.md), and [CRM-DECISIONS-v1.3.md](./CRM-DECISIONS-v1.3.md)
+Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md), [CRM-DECISIONS-v1.2.md](./CRM-DECISIONS-v1.2.md), [CRM-DECISIONS-v1.3.md](./CRM-DECISIONS-v1.3.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
 
 ## Current position
 
