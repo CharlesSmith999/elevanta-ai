@@ -128,6 +128,31 @@ Agent and marketer scores:
 
 Reports show trend versus the agent's prior period, team benchmark, strengths, risks, and two or three recommended actions. Managers/admins can review, annotate, and export reports. Marketers receive the same quality-improvement treatment for source quality, duplicate prevention, and routing accuracy.
 
+### Xaviar operating model
+
+Xaviar is an embedded role-aware coach inside every dashboard, not a separate reporting page. It works in six steps: explain what happened, diagnose why it happened, recommend the next action, coach the user, monitor whether the advice was followed, and later assist with approved actions.
+
+Xaviar supports each lead stage:
+
+- **New:** validate completeness, detect duplicate candidates, predict quality, and recommend routing.
+- **Assigned:** summarize background, prioritize the queue, and recommend full-context or fresh-start handling.
+- **Contacted:** monitor response speed, note quality, follow-up timing, and conversation preparation.
+- **Connected:** suggest qualification questions, MQL/SQL guidance, and next steps.
+- **Qualified:** predict conversion likelihood, identify missing information, and recommend proposal timing.
+- **Proposal sent:** monitor risk, recommend follow-up timing, and compare similar won opportunities.
+- **Won:** capture the behaviors and sources that contributed to success as team best practices.
+- **Lost/not interested:** identify loss patterns, recommend improvements, and suggest a safe reactivation window when appropriate.
+- **Incorrect/duplicate:** summarize evidence for human review; Xaviar never deletes or merges records autonomously.
+
+Role-specific coaching:
+
+- **Sales agents:** personalized prioritization, conversion coaching, follow-up coaching, and comparison with anonymized best-practice patterns from strong agents.
+- **Marketers:** source and campaign quality analysis, duplicate/incorrect prevention, targeting and routing recommendations, and lead-quality coaching.
+- **Managers:** team benchmarking by skill, coaching plans, improvement tracking, and alerts for declining performance or repeated missed actions.
+- **Admins:** organization-wide trend analysis, process bottlenecks, data-quality risks, forecasts, and leadership reports.
+
+Xaviar must retain the advice, the evidence behind it, whether it was followed, and the resulting outcome so coaching can be measured over time. Benchmarks must be permission-aware and privacy-safe; agents receive useful patterns without exposing another person’s private contact data.
+
 ## 10. Supabase database schema (baseline)
 
 ```sql
@@ -207,7 +232,7 @@ Incorrect review queue, duplicate review, overdue indicators, dashboards, export
 
 ### Milestone 4 — AI support
 
-Explainable coaching metrics, marketer quality report, manager review workflow, and periodic report generation.
+Embedded Xaviar coach with explainable daily/weekly/monthly/lifetime views, lead-stage recommendations, personalized agent and marketer coaching, skill-based team benchmarks, manager review, and improvement tracking. Xaviar remains advisory and does not change records or send outbound messages.
 
 ### Milestone 5 — Production data migration
 
@@ -215,7 +240,7 @@ Stage and import the approved Excel lead data, preserve workbook/tab/row provena
 
 ### Phase 2 — workflow automation
 
-Email/SMS/calendar/phone connectors, daily task digests, escalations, templates, consent enforcement, and human approval gates.
+Track whether Xaviar recommendations are followed, send in-app reminders and escalations, provide daily task guidance, and add email/SMS/calendar/phone connectors with consent enforcement, templates, and human approval gates. Any outbound action requires explicit approval until autonomous operation is separately approved.
 
 ### Phase 3 — SaaS product
 
