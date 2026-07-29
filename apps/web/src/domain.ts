@@ -17,6 +17,9 @@ export type Qualification = 'mql' | 'sql' | 'not_available';
 export type VisibilityMode = 'full_context' | 'fresh_start';
 export type FollowUpStatus = 'open' | 'completed' | 'cancelled';
 
+export const sourceOptions = ['Bark Paid', 'Bark Stalk', 'Thumbtack', 'SEO', 'Social Media', 'Clutch', 'Email Marketing', 'LinkedIn', 'PPC', 'Other'] as const;
+export type LeadSource = typeof sourceOptions[number];
+
 export const statusLabels: Record<OpportunityStatus, string> = {
   new: 'New', assigned: 'Assigned', contacted: 'Contacted', connected: 'Connected',
   follow_up_required: 'Follow-up Required', qualified: 'Qualified', proposal_sent: 'Proposal Sent',
@@ -52,6 +55,9 @@ export type Lead = {
   incorrectReview?: IncorrectReview;
   routingPaused?: boolean;
   duplicateOf?: string;
+  totalProjectCost?: number;
+  upfrontPaymentAmount?: number;
+  wonAt?: string;
 };
 
 export const users: User[] = [
@@ -119,6 +125,7 @@ export function duplicateMatches(leads: Lead[]): Array<{ leadId: string; matches
 
 export const normalizePhone = (value: string) => value.replace(/\D/g, '');
 export const makeId = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
+export const validWonFinancials = (total: number, upfront: number) => Number.isFinite(total) && Number.isFinite(upfront) && total >= 0 && upfront >= 0 && upfront <= total;
 
 export const isLeadIdentity = (name: string, phone?: string, email?: string) => Boolean(name.trim() && (phone?.trim() || email?.trim()));
 
@@ -149,15 +156,15 @@ const laterToday = () => {
 const activity = (id: string, actorId: string, kind: Activity['kind'], body: string): Activity => ({ id, actorId, kind, body, at: new Date().toISOString() });
 
 export const seedLeads: Lead[] = [
-  { id: 'lead-ronald', name: 'Ronald Fowler', phone: '+1 555 0101', email: 'ronald@example.test', source: 'Shayan - Owais', marketingOwnerId: 'shayan', sourceDate: '2025-08-01', status: 'connected', qualification: 'sql', priority: 4,
+  { id: 'lead-ronald', name: 'Ronald Fowler', phone: '+1 555 0101', email: 'ronald@example.test', source: 'SEO', marketingOwnerId: 'shayan', sourceDate: '2025-08-01', status: 'connected', qualification: 'sql', priority: 4,
     assignments: [{ id: 'as-ronald', ownerId: 'owais', assignedBy: 'shayan', at: daysFromNow(-2), visibility: 'full_context', reason: 'Website inquiry' }],
     activities: [activity('act-ronald-1', 'owais', 'note', 'Connected. Requested proposal after a call tomorrow.')],
     followUps: [{ id: 'fu-ronald', ownerId: 'owais', dueAt: laterToday(), action: 'Call', status: 'open' }], incorrectReports: [] },
-  { id: 'lead-dim', name: 'Dim Carter', phone: '+1 555 0102', email: 'dim@example.test', source: 'Ali - Leads', marketingOwnerId: 'shariq', sourceDate: '2025-08-01', status: 'follow_up_required', qualification: 'mql', priority: 3,
+  { id: 'lead-dim', name: 'Dim Carter', phone: '+1 555 0102', email: 'dim@example.test', source: 'Bark Paid', marketingOwnerId: 'shariq', sourceDate: '2025-08-01', status: 'follow_up_required', qualification: 'mql', priority: 3,
     assignments: [{ id: 'as-dim', ownerId: 'mustabeen', assignedBy: 'ali', at: daysFromNow(-8), visibility: 'fresh_start', reason: 'Reassigned after no response' }],
     activities: [activity('act-dim-1', 'mustabeen', 'status', 'Status changed to Follow-up Required.')],
     followUps: [{ id: 'fu-dim', ownerId: 'mustabeen', dueAt: daysFromNow(-1), action: 'Call', status: 'open' }], incorrectReports: [] },
-  { id: 'lead-samer', name: 'Samer Jones', phone: '+1 555 0103', email: 'samer@example.test', source: 'Shayan - Owais', marketingOwnerId: 'shayan', sourceDate: '2025-08-01', status: 'incorrect', qualification: 'not_available', priority: 1,
+  { id: 'lead-samer', name: 'Samer Jones', phone: '+1 555 0103', email: 'samer@example.test', source: 'Thumbtack', marketingOwnerId: 'shayan', sourceDate: '2025-08-01', status: 'incorrect', qualification: 'not_available', priority: 1,
     assignments: [{ id: 'as-samer', ownerId: 'owais', assignedBy: 'shayan', at: daysFromNow(-12), visibility: 'full_context', reason: 'Initial routing' }],
     activities: [activity('act-samer-1', 'owais', 'incorrect_report', 'Reported as incorrect: invalid contact details.')], followUps: [],
     incorrectReports: [
@@ -165,7 +172,7 @@ export const seedLeads: Lead[] = [
       { reporterId: 'asad', reason: 'Invalid contact information', at: daysFromNow(-5) },
       { reporterId: 'obaid', reason: 'Invalid contact information', at: daysFromNow(-4) },
     ], incorrectReview: { state: 'pending' }, routingPaused: true },
-  { id: 'lead-maria', name: 'Maria Lopez', phone: '+1 555 0104', email: 'maria@example.test', source: 'Muzammil - Mustabeen', marketingOwnerId: 'muzammil', sourceDate: '2025-08-01', status: 'proposal_sent', qualification: 'sql', priority: 5,
+  { id: 'lead-maria', name: 'Maria Lopez', phone: '+1 555 0104', email: 'maria@example.test', source: 'Clutch', marketingOwnerId: 'muzammil', sourceDate: '2025-08-01', status: 'proposal_sent', qualification: 'sql', priority: 5,
     assignments: [{ id: 'as-maria', ownerId: 'mustabeen', assignedBy: 'muzammil', at: daysFromNow(-4), visibility: 'full_context', reason: 'High intent lead' }],
     activities: [activity('act-maria-1', 'mustabeen', 'note', 'Proposal sent. Follow up on Thursday.')], followUps: [{ id: 'fu-maria', ownerId: 'mustabeen', dueAt: daysFromNow(2), action: 'Email', status: 'open' }], incorrectReports: [] },
 ];
