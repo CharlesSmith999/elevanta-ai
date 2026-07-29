@@ -1,15 +1,22 @@
-import { createApp } from '../apps/api/src/app.js';
+type ExpressHandler = (request: unknown, response: unknown) => unknown;
 
-const app = createApp();
+// Vercel transpiles this entrypoint as CommonJS while the shared API is ESM.
+// Dynamic import keeps the Vercel wrapper compatible without duplicating routes.
+let appPromise: Promise<ExpressHandler> | undefined;
+
+function getApp() {
+  appPromise ??= import('../apps/api/src/app.js').then(({ createApp }) => createApp() as unknown as ExpressHandler);
+  return appPromise;
+}
 
 /**
  * Catch-all Vercel function for `/api/*`. The Express application owns the
  * route definitions without that deployment prefix, so remove it before
  * handing the request to the shared Node API.
  */
-export default function handler(request: { url?: string } & Record<string, unknown>, response: Record<string, unknown>) {
+export default async function handler(request: { url?: string } & Record<string, unknown>, response: Record<string, unknown>) {
   if (typeof request.url === 'string' && request.url.startsWith('/api')) {
     request.url = request.url.slice('/api'.length) || '/';
   }
-  return (app as unknown as (req: unknown, res: unknown) => unknown)(request, response);
+  return (await getApp())(request, response);
 }
