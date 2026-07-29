@@ -10,6 +10,8 @@ Elevanta AI has a working Phase 1 CRM foundation and a live dashboard preview. T
 
 The full Excel workbook has **not** been imported into the active CRM yet. The current public preview uses safe sample data in the browser so the workflow can be tested without exposing private lead data.
 
+Step 2 dashboard data-model implementation is published: approved source labels, source validation, Won financial fields, automatic won dates, source filters groundwork, and form validation are implemented. The Supabase migration still needs to be applied to the connected project and verified before this step is marked end-to-end complete.
+
 ## Milestone tracker
 
 | Milestone | Status | Evidence / current result | Remaining work |
