@@ -1,0 +1,14 @@
+{
+  "name": "elevanta-ai",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Elevanta AI CRM foundation",
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev:web": "pnpm --filter @elevanta/web dev",
+    "dev:api": "pnpm --filter @elevanta/api dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test:domain": "pnpm --filter @elevanta/api exec tsx --test ../web/src/domain.test.ts"
+  }
+}
