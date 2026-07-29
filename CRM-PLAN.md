@@ -4,6 +4,8 @@ Status: Planning baseline, approved from stakeholder answers
 
 Branding: The product is named **Elevanta AI**. Its embedded AI sales companion is named **Xaviar**. Xaviar is advisory in Phase 1 and supports lead analysis, follow-up guidance, agent and marketer coaching, and performance reporting. Autonomous outbound communication remains deferred to Phase 2.
 
+Xaviar evaluation reference: [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md). This focused document governs Xaviar testing, release gates, and post-activation evaluation.
+
 ## 1. Product vision
 
 Replace the current multi-tab Excel lead process with a shared CRM for sales agents, managers, marketers, and administrators. The CRM must preserve the complete history of every lead while allowing a reassigned agent to receive either the full prior thread or a fresh working view. Managers and administrators always retain the full history.
