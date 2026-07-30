@@ -7,6 +7,8 @@ import {
   ownerId, qualificationLabels, responseHours, routingHours, seedLeads, sourceOptions, stageAgeLabel, statusLabels, transitionStage, users, validStatusTransition, validWonFinancials,
 } from './domain';
 import { authEnabled, supabase, type AuthState } from './auth';
+import { addRemoteFollowUp, addRemoteNote, completeRemoteFollowUp, createRemoteLead, decideRemoteReview, loadRemoteLeads, reassignRemoteLead, reportRemoteIncorrect, updateRemoteStatus } from './api';
+import type { Session } from '@supabase/supabase-js';
 
 const storageKey = 'elevanta-test-workspace-v1';
 const roleLabels: Record<Role, string> = { admin: 'Admin', manager: 'Sales Manager', marketer: 'Marketing Agent', sales_agent: 'Sales Agent' };
@@ -29,8 +31,9 @@ function relativeDue(followUp?: FollowUp) {
 }
 function leadActivity(actorId: string, kind: Activity['kind'], body: string): Activity { return { id: makeId('activity'), actorId, kind, body, at: new Date().toISOString() }; }
 
-function WorkspaceApp({ onSignOut }: { onSignOut?: () => void }) {
+function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?: Session }) {
   const [leads, setLeads] = useState<Lead[]>(safeLeadData);
+  const [remoteLoaded, setRemoteLoaded] = useState(false);
   const [viewerId, setViewerId] = useState('shariq');
   const [page, setPage] = useState('Dashboard');
   const [selectedId, setSelectedId] = useState<string | undefined>();
@@ -68,6 +71,17 @@ function WorkspaceApp({ onSignOut }: { onSignOut?: () => void }) {
 
   useEffect(() => { localStorage.setItem(storageKey, JSON.stringify(leads)); }, [leads]);
   useEffect(() => { if (notice) { const timer = window.setTimeout(() => setNotice(''), 3500); return () => window.clearTimeout(timer); } }, [notice]);
+  useEffect(() => {
+    if (!session) return;
+    let active = true;
+    loadRemoteLeads(session).then((remoteLeads) => { if (active) { setLeads(remoteLeads); setRemoteLoaded(true); setNotice('Connected to the CRM workspace.'); } }).catch((error: unknown) => { if (active) { setRemoteLoaded(false); setNotice(error instanceof Error ? `CRM connection unavailable: ${error.message}` : 'CRM connection unavailable; safe sample data remains active.'); } });
+    return () => { active = false; };
+  }, [session]);
+
+  function persist(action: (activeSession: Session) => Promise<unknown>, success?: string) {
+    if (!session) return;
+    void action(session).then(() => { if (success) setNotice(success); }).catch((error: unknown) => setNotice(error instanceof Error ? error.message : 'The CRM could not save this change.'));
+  }
 
   const mutateLead = (leadId: string, mutate: (lead: Lead) => Lead) => setLeads((existing) => existing.map((lead) => lead.id === leadId ? mutate(lead) : lead));
   const select = (leadId: string) => { setSelectedId(leadId); setPage('Lead inbox'); };
@@ -77,6 +91,7 @@ function WorkspaceApp({ onSignOut }: { onSignOut?: () => void }) {
     if ((next === 'lost' || next === 'not_interested') && !lead.lostReason) return setNotice('Choose a loss reason before closing this opportunity.');
     if (!canUpdateLead(viewer, lead) || !validStatusTransition(lead.status, next)) return setNotice('This status change is not allowed for your role or for a closed lead.');
     mutateLead(lead.id, (current) => ({ ...current, status: next, stageHistory: transitionStage(current.stageHistory, next, viewer.id, new Date().toISOString(), `Status changed from ${statusLabels[current.status]} to ${statusLabels[next]}.`), activities: [...current.activities, leadActivity(viewer.id, 'status', `Status changed from ${statusLabels[current.status]} to ${statusLabels[next]}.`)] }));
+    persist((activeSession) => updateRemoteStatus(activeSession, lead.id, { status: next }), 'Status saved to the CRM.');
     setNotice('Status saved and added to the permanent history.');
   }
 
@@ -88,12 +103,14 @@ function WorkspaceApp({ onSignOut }: { onSignOut?: () => void }) {
     const upfront = Number(form.get('upfrontPaymentAmount'));
     if (!validWonFinancials(total, upfront)) return setNotice('Enter valid non-negative costs; upfront payment cannot exceed total project cost.');
     mutateLead(lead.id, (current) => { const at = new Date().toISOString(); return { ...current, status: 'won', stageHistory: transitionStage(current.stageHistory, 'won', viewer.id, at, 'Marked Won'), totalProjectCost: total, upfrontPaymentAmount: upfront, wonAt: at, activities: [...current.activities, leadActivity(viewer.id, 'status', `Marked Won. Total project cost: ${total}; upfront payment: ${upfront}.`)] }; });
+    persist((activeSession) => updateRemoteStatus(activeSession, lead.id, { status: 'won', qualification: lead.qualification, totalProjectCost: total, upfrontPaymentAmount: upfront }), 'Won opportunity saved to the CRM.');
     event.currentTarget.reset(); setNotice('Won opportunity saved with financial details.');
   }
 
   function updateQualification(lead: Lead, qualification: Qualification) {
     if (!canUpdateLead(viewer, lead)) return setNotice('You do not have permission to update qualification.');
     mutateLead(lead.id, (current) => ({ ...current, qualification, activities: [...current.activities, leadActivity(viewer.id, 'system', `Qualification set to ${qualificationLabels[qualification]}.`)] }));
+    persist((activeSession) => updateRemoteStatus(activeSession, lead.id, { status: lead.status, qualification }), 'Qualification saved to the CRM.');
   }
 
   function updateLostReason(lead: Lead, lostReason: Lead['lostReason']) {
@@ -108,6 +125,7 @@ function WorkspaceApp({ onSignOut }: { onSignOut?: () => void }) {
     if (!body) return;
     if (!canUpdateLead(viewer, lead)) return setNotice('You cannot add a note to this lead.');
     mutateLead(lead.id, (current) => ({ ...current, activities: [...current.activities, leadActivity(viewer.id, 'note', body)] }));
+    persist((activeSession) => addRemoteNote(activeSession, lead.id, { body }), 'Note saved to the CRM.');
     event.currentTarget.reset(); setNotice('Note saved.');
   }
 
@@ -118,12 +136,14 @@ function WorkspaceApp({ onSignOut }: { onSignOut?: () => void }) {
     if (!due) return setNotice('Choose a date and time for the follow-up.');
     const owner = ownerId(lead); if (!owner) return setNotice('Assign this lead before creating a follow-up.');
     mutateLead(lead.id, (current) => ({ ...current, followUps: [...current.followUps, { id: makeId('follow-up'), ownerId: owner, dueAt: new Date(due).toISOString(), action, status: 'open' }], activities: [...current.activities, leadActivity(viewer.id, 'follow_up', `${action} follow-up scheduled for ${formatDate(new Date(due).toISOString())}.`)] }));
+    persist((activeSession) => addRemoteFollowUp(activeSession, lead.id, { dueAt: new Date(due).toISOString(), actionType: action }), 'Follow-up saved to the CRM.');
     event.currentTarget.reset(); setNotice('Follow-up scheduled.');
   }
 
   function completeFollowUp(lead: Lead, followUpId: string) {
     if (!canUpdateLead(viewer, lead)) return setNotice('You cannot complete this follow-up.');
     mutateLead(lead.id, (current) => ({ ...current, followUps: current.followUps.map((followUp) => followUp.id === followUpId ? { ...followUp, status: 'completed' } : followUp), activities: [...current.activities, leadActivity(viewer.id, 'follow_up', 'Follow-up completed.')] }));
+    persist((activeSession) => completeRemoteFollowUp(activeSession, followUpId), 'Follow-up completed in the CRM.');
   }
 
   function reassign(lead: Lead, event: FormEvent<HTMLFormElement>) {
@@ -132,6 +152,7 @@ function WorkspaceApp({ onSignOut }: { onSignOut?: () => void }) {
     if (!canReassign(viewer, lead, nextOwnerId)) return setNotice(lead.routingPaused ? 'Assignment is paused while the Incorrect Review is pending.' : 'You can only assign leads within your permitted scope.');
     const old = currentAssignment(lead);
     mutateLead(lead.id, (current) => { const at = new Date().toISOString(); const nextStatus = current.status === 'new' ? 'assigned' : current.status; return { ...current, status: nextStatus, stageHistory: nextStatus === current.status ? current.stageHistory : transitionStage(current.stageHistory, nextStatus, viewer.id, at, 'Initial sales assignment'), assignments: current.assignments.map((assignment) => assignment.id === old?.id ? { ...assignment, endedAt: at } : assignment).concat({ id: makeId('assignment'), ownerId: nextOwnerId, assignedBy: viewer.id, at, visibility, reason }), activities: [...current.activities, leadActivity(viewer.id, 'assignment', `Assigned to ${nameFor(nextOwnerId)} with ${visibility === 'full_context' ? 'full context' : 'a fresh working view'}: ${reason}`)] }; });
+    persist((activeSession) => reassignRemoteLead(activeSession, lead.id, { assignedTo: nextOwnerId, visibility, reason }), 'Assignment history saved to the CRM.');
     event.currentTarget.reset(); setNotice('Assignment saved; the earlier ownership record remains in history.');
   }
 
@@ -141,12 +162,14 @@ function WorkspaceApp({ onSignOut }: { onSignOut?: () => void }) {
     if (!reason) return setNotice('Choose an incorrect-lead reason.');
     if (lead.incorrectReports.some((report) => report.reporterId === viewer.id)) return setNotice('Each agent may report a lead as incorrect only once.');
     mutateLead(lead.id, (current) => { const at = new Date().toISOString(); const incorrectReports = [...current.incorrectReports, { reporterId: viewer.id, reason, evidence: evidence || undefined, at }]; const incorrectReview = incorrectReviewState(incorrectReports, current.incorrectReview); return { ...current, status: 'incorrect', stageHistory: current.status === 'incorrect' ? current.stageHistory : transitionStage(current.stageHistory, 'incorrect', viewer.id, at, 'Incorrect lead reported'), incorrectReports, incorrectReview, routingPaused: incorrectReview?.state === 'pending', activities: [...current.activities, leadActivity(viewer.id, 'incorrect_report', `Incorrect report submitted: ${reason}.${evidence ? ` Evidence: ${evidence}` : ''}`)] }; });
+    persist((activeSession) => reportRemoteIncorrect(activeSession, lead.id, { reasonCode: reason, evidence: evidence || undefined }), 'Incorrect report saved to the CRM.');
     event.currentTarget.reset(); setNotice('Incorrect report saved. A review queue opens after three different agents report it.');
   }
 
   function decideReview(lead: Lead, decision: 'confirmed_incorrect' | 'rejected' | 'merge_duplicate') {
     if (viewer.role !== 'admin' || lead.incorrectReview?.state !== 'pending') return setNotice('Only an admin can decide a pending incorrect review.');
     mutateLead(lead.id, (current) => { const at = new Date().toISOString(); const nextStatus = decision === 'rejected' ? 'follow_up_required' : decision === 'merge_duplicate' ? 'duplicate' : 'incorrect'; return { ...current, status: nextStatus, stageHistory: nextStatus === current.status ? current.stageHistory : transitionStage(current.stageHistory, nextStatus, viewer.id, at, `Admin review decision: ${decision.replaceAll('_', ' ')}.`), routingPaused: false, incorrectReview: { state: decision, reviewerId: viewer.id, reason: decision === 'rejected' ? 'Admin review rejected the incorrect classification.' : 'Admin decision recorded.', decidedAt: at }, activities: [...current.activities, leadActivity(viewer.id, 'system', `Admin review decision: ${decision.replaceAll('_', ' ')}.`)] }; });
+    persist((activeSession) => decideRemoteReview(activeSession, lead.id, { decision }), 'Review decision saved to the CRM.');
     setNotice('Admin review decision recorded in audit history.');
   }
 
@@ -159,6 +182,7 @@ function WorkspaceApp({ onSignOut }: { onSignOut?: () => void }) {
     const lead: Lead = { id: makeId('lead'), name, phone: phone || undefined, email: email || undefined, source, marketingOwnerId: viewer.id, sourceDate: at.slice(0, 10), status, qualification: 'not_available', priority: 0, assignments: owner ? [{ id: makeId('assignment'), ownerId: owner, assignedBy: viewer.id, at, visibility: 'full_context', reason: 'Initial assignment' }] : [], stageHistory: [{ id: makeId('stage'), toStatus: status, enteredAt: at, actorId: viewer.id, reason: 'Lead created' }], activities: [leadActivity(viewer.id, 'system', 'Lead created in the test workspace.')], followUps: [], incorrectReports: [] };
     const duplicate = duplicateMatches([...leads, lead]).find((candidate) => candidate.leadId === lead.id);
     setLeads((current) => [...current, lead]); setShowCreate(false); event.currentTarget.reset(); setNotice(duplicate ? 'Lead created and flagged as a duplicate candidate for review.' : 'Lead created successfully.');
+    persist((activeSession) => createRemoteLead(activeSession, { name, phone: phone || undefined, email: email || undefined, source, salesOwnerId: owner || undefined }), 'Lead created in the CRM.');
   }
 
   function resetDemo() { setLeads(structuredClone(seedLeads)); setSelectedId(undefined); setNotice('Test workspace reset to the protected sample data.'); }
@@ -207,7 +231,7 @@ function AuthGate() {
 
   if (!authEnabled || !supabase) return <WorkspaceApp />;
   if (state.loading) return <main className="auth-shell"><article className="auth-card"><span className="spark">ELEVANTA AI</span><h1>Loading your workspace…</h1><p>Checking your secure session.</p></article></main>;
-  if (state.session) return <WorkspaceApp onSignOut={() => { void supabase!.auth.signOut(); }} />;
+  if (state.session) return <WorkspaceApp session={state.session} onSignOut={() => { void supabase!.auth.signOut(); }} />;
 
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setSubmitting(true); setState((current) => ({ ...current, error: undefined }));

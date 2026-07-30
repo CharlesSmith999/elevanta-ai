@@ -419,4 +419,3 @@ export const seedLeads: Lead[] = [
   { id: 'lead-lucia', name: 'Lucia Chen', phone: '+1 555 0108', email: 'lucia@example.test', source: 'Email Marketing', marketingOwnerId: 'sami', sourceDate: daysFromNow(-6), status: 'connected', qualification: 'mql', priority: 3,
     assignments: [{ id: 'as-lucia', ownerId: 'obaid', assignedBy: 'sami', at: daysFromNow(-5), visibility: 'full_context', reason: 'Campaign response' }], stageHistory: initialStage('lucia', 'connected', daysFromNow(-4)), activities: [activity('act-lucia-1', 'obaid', 'note', 'Connected and booked discovery.')], followUps: [{ id: 'fu-lucia', ownerId: 'obaid', dueAt: daysFromNow(1), action: 'Call', status: 'open' }], incorrectReports: [] },
 ];
-
