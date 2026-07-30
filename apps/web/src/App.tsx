@@ -7,6 +7,8 @@ import {
   ownerId, qualificationLabels, responseHours, routingHours, seedLeads, sourceOptions, stageAgeLabel, statusLabels, transitionStage, users, validStatusTransition, validWonFinancials,
 } from './domain';
 import { authEnabled, supabase, type AuthState } from './auth';
+import { addRemoteFollowUp, addRemoteNote, completeRemoteFollowUp, createAdminUser, createRemoteLead, decideRemoteReview, loadAdminUsers, loadRemoteLeads, reassignRemoteLead, reportRemoteIncorrect, updateAdminUser, updateRemoteStatus, type ManagedUser } from './api';
+import type { Session } from '@supabase/supabase-js';
 
 const storageKey = 'elevanta-test-workspace-v1';
 const roleLabels: Record<Role, string> = { admin: 'Admin', manager: 'Sales Manager', marketer: 'Marketing Agent', sales_agent: 'Sales Agent' };
@@ -29,8 +31,9 @@ function relativeDue(followUp?: FollowUp) {
 }
 function leadActivity(actorId: string, kind: Activity['kind'], body: string): Activity { return { id: makeId('activity'), actorId, kind, body, at: new Date().toISOString() }; }
 
-function WorkspaceApp({ onSignOut }: { onSignOut?: () => void }) {
+function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?: Session }) {
   const [leads, setLeads] = useState<Lead[]>(safeLeadData);
+  const [remoteLoaded, setRemoteLoaded] = useState(false);
   const [viewerId, setViewerId] = useState('shariq');
   const [page, setPage] = useState('Dashboard');
   const [selectedId, setSelectedId] = useState<string | undefined>();
@@ -68,6 +71,17 @@ function WorkspaceApp({ onSignOut }: { onSignOut?: () => void }) {
 
   useEffect(() => { localStorage.setItem(storageKey, JSON.stringify(leads)); }, [leads]);
   useEffect(() => { if (notice) { const timer = window.setTimeout(() => setNotice(''), 3500); return () => window.clearTimeout(timer); } }, [notice]);
+  useEffect(() => {
+    if (!session) return;
+    let active = true;
+    loadRemoteLeads(session).then((remoteLeads) => { if (active) { setLeads(remoteLeads); setRemoteLoaded(true); setNotice('Connected to the CRM workspace.'); } }).catch((error: unknown) => { if (active) { setRemoteLoaded(false); setNotice(error instanceof Error ? `CRM connection unavailable: ${error.message}` : 'CRM connection unavailable; safe sample data remains active.'); } });
+    return () => { active = false; };
+  }, [session]);
+
+  function persist(action: (activeSession: Session) => Promise<unknown>, success?: string) {
+    if (!session) return;
+    void action(session).then(() => { if (success) setNotice(success); }).catch((error: unknown) => setNotice(error instanceof Error ? error.message : 'The CRM could not save this change.'));
+  }
 
   const mutateLead = (leadId: string, mutate: (lead: Lead) => Lead) => setLeads((existing) => existing.map((lead) => lead.id === leadId ? mutate(lead) : lead));
   const select = (leadId: string) => { setSelectedId(leadId); setPage('Lead inbox'); };
@@ -77,6 +91,7 @@ function WorkspaceApp({ onSignOut }: { onSignOut?: () => void }) {
     if ((next === 'lost' || next === 'not_interested') && !lead.lostReason) return setNotice('Choose a loss reason before closing this opportunity.');
     if (!canUpdateLead(viewer, lead) || !validStatusTransition(lead.status, next)) return setNotice('This status change is not allowed for your role or for a closed lead.');
     mutateLead(lead.id, (current) => ({ ...current, status: next, stageHistory: transitionStage(current.stageHistory, next, viewer.id, new Date().toISOString(), `Status changed from ${statusLabels[current.status]} to ${statusLabels[next]}.`), activities: [...current.activities, leadActivity(viewer.id, 'status', `Status changed from ${statusLabels[current.status]} to ${statusLabels[next]}.`)] }));
+    persist((activeSession) => updateRemoteStatus(activeSession, lead.id, { status: next }), 'Status saved to the CRM.');
     setNotice('Status saved and added to the permanent history.');
   }
 
@@ -88,12 +103,14 @@ function WorkspaceApp({ onSignOut }: { onSignOut?: () => void }) {
     const upfront = Number(form.get('upfrontPaymentAmount'));
     if (!validWonFinancials(total, upfront)) return setNotice('Enter valid non-negative costs; upfront payment cannot exceed total project cost.');
     mutateLead(lead.id, (current) => { const at = new Date().toISOString(); return { ...current, status: 'won', stageHistory: transitionStage(current.stageHistory, 'won', viewer.id, at, 'Marked Won'), totalProjectCost: total, upfrontPaymentAmount: upfront, wonAt: at, activities: [...current.activities, leadActivity(viewer.id, 'status', `Marked Won. Total project cost: ${total}; upfront payment: ${upfront}.`)] }; });
+    persist((activeSession) => updateRemoteStatus(activeSession, lead.id, { status: 'won', qualification: lead.qualification, totalProjectCost: total, upfrontPaymentAmount: upfront }), 'Won opportunity saved to the CRM.');
     event.currentTarget.reset(); setNotice('Won opportunity saved with financial details.');
   }
 
   function updateQualification(lead: Lead, qualification: Qualification) {
     if (!canUpdateLead(viewer, lead)) return setNotice('You do not have permission to update qualification.');
     mutateLead(lead.id, (current) => ({ ...current, qualification, activities: [...current.activities, leadActivity(viewer.id, 'system', `Qualification set to ${qualificationLabels[qualification]}.`)] }));
+    persist((activeSession) => updateRemoteStatus(activeSession, lead.id, { status: lead.status, qualification }), 'Qualification saved to the CRM.');
   }
 
   function updateLostReason(lead: Lead, lostReason: Lead['lostReason']) {
@@ -108,6 +125,7 @@ function WorkspaceApp({ onSignOut }: { onSignOut?: () => void }) {
     if (!body) return;
     if (!canUpdateLead(viewer, lead)) return setNotice('You cannot add a note to this lead.');
     mutateLead(lead.id, (current) => ({ ...current, activities: [...current.activities, leadActivity(viewer.id, 'note', body)] }));
+    persist((activeSession) => addRemoteNote(activeSession, lead.id, { body }), 'Note saved to the CRM.');
     event.currentTarget.reset(); setNotice('Note saved.');
   }
 
@@ -118,12 +136,14 @@ function WorkspaceApp({ onSignOut }: { onSignOut?: () => void }) {
     if (!due) return setNotice('Choose a date and time for the follow-up.');
     const owner = ownerId(lead); if (!owner) return setNotice('Assign this lead before creating a follow-up.');
     mutateLead(lead.id, (current) => ({ ...current, followUps: [...current.followUps, { id: makeId('follow-up'), ownerId: owner, dueAt: new Date(due).toISOString(), action, status: 'open' }], activities: [...current.activities, leadActivity(viewer.id, 'follow_up', `${action} follow-up scheduled for ${formatDate(new Date(due).toISOString())}.`)] }));
+    persist((activeSession) => addRemoteFollowUp(activeSession, lead.id, { dueAt: new Date(due).toISOString(), actionType: action }), 'Follow-up saved to the CRM.');
     event.currentTarget.reset(); setNotice('Follow-up scheduled.');
   }
 
   function completeFollowUp(lead: Lead, followUpId: string) {
     if (!canUpdateLead(viewer, lead)) return setNotice('You cannot complete this follow-up.');
     mutateLead(lead.id, (current) => ({ ...current, followUps: current.followUps.map((followUp) => followUp.id === followUpId ? { ...followUp, status: 'completed' } : followUp), activities: [...current.activities, leadActivity(viewer.id, 'follow_up', 'Follow-up completed.')] }));
+    persist((activeSession) => completeRemoteFollowUp(activeSession, followUpId), 'Follow-up completed in the CRM.');
   }
 
   function reassign(lead: Lead, event: FormEvent<HTMLFormElement>) {
@@ -132,6 +152,7 @@ function WorkspaceApp({ onSignOut }: { onSignOut?: () => void }) {
     if (!canReassign(viewer, lead, nextOwnerId)) return setNotice(lead.routingPaused ? 'Assignment is paused while the Incorrect Review is pending.' : 'You can only assign leads within your permitted scope.');
     const old = currentAssignment(lead);
     mutateLead(lead.id, (current) => { const at = new Date().toISOString(); const nextStatus = current.status === 'new' ? 'assigned' : current.status; return { ...current, status: nextStatus, stageHistory: nextStatus === current.status ? current.stageHistory : transitionStage(current.stageHistory, nextStatus, viewer.id, at, 'Initial sales assignment'), assignments: current.assignments.map((assignment) => assignment.id === old?.id ? { ...assignment, endedAt: at } : assignment).concat({ id: makeId('assignment'), ownerId: nextOwnerId, assignedBy: viewer.id, at, visibility, reason }), activities: [...current.activities, leadActivity(viewer.id, 'assignment', `Assigned to ${nameFor(nextOwnerId)} with ${visibility === 'full_context' ? 'full context' : 'a fresh working view'}: ${reason}`)] }; });
+    persist((activeSession) => reassignRemoteLead(activeSession, lead.id, { assignedTo: nextOwnerId, visibility, reason }), 'Assignment history saved to the CRM.');
     event.currentTarget.reset(); setNotice('Assignment saved; the earlier ownership record remains in history.');
   }
 
@@ -141,12 +162,14 @@ function WorkspaceApp({ onSignOut }: { onSignOut?: () => void }) {
     if (!reason) return setNotice('Choose an incorrect-lead reason.');
     if (lead.incorrectReports.some((report) => report.reporterId === viewer.id)) return setNotice('Each agent may report a lead as incorrect only once.');
     mutateLead(lead.id, (current) => { const at = new Date().toISOString(); const incorrectReports = [...current.incorrectReports, { reporterId: viewer.id, reason, evidence: evidence || undefined, at }]; const incorrectReview = incorrectReviewState(incorrectReports, current.incorrectReview); return { ...current, status: 'incorrect', stageHistory: current.status === 'incorrect' ? current.stageHistory : transitionStage(current.stageHistory, 'incorrect', viewer.id, at, 'Incorrect lead reported'), incorrectReports, incorrectReview, routingPaused: incorrectReview?.state === 'pending', activities: [...current.activities, leadActivity(viewer.id, 'incorrect_report', `Incorrect report submitted: ${reason}.${evidence ? ` Evidence: ${evidence}` : ''}`)] }; });
+    persist((activeSession) => reportRemoteIncorrect(activeSession, lead.id, { reasonCode: reason, evidence: evidence || undefined }), 'Incorrect report saved to the CRM.');
     event.currentTarget.reset(); setNotice('Incorrect report saved. A review queue opens after three different agents report it.');
   }
 
   function decideReview(lead: Lead, decision: 'confirmed_incorrect' | 'rejected' | 'merge_duplicate') {
     if (viewer.role !== 'admin' || lead.incorrectReview?.state !== 'pending') return setNotice('Only an admin can decide a pending incorrect review.');
     mutateLead(lead.id, (current) => { const at = new Date().toISOString(); const nextStatus = decision === 'rejected' ? 'follow_up_required' : decision === 'merge_duplicate' ? 'duplicate' : 'incorrect'; return { ...current, status: nextStatus, stageHistory: nextStatus === current.status ? current.stageHistory : transitionStage(current.stageHistory, nextStatus, viewer.id, at, `Admin review decision: ${decision.replaceAll('_', ' ')}.`), routingPaused: false, incorrectReview: { state: decision, reviewerId: viewer.id, reason: decision === 'rejected' ? 'Admin review rejected the incorrect classification.' : 'Admin decision recorded.', decidedAt: at }, activities: [...current.activities, leadActivity(viewer.id, 'system', `Admin review decision: ${decision.replaceAll('_', ' ')}.`)] }; });
+    persist((activeSession) => decideRemoteReview(activeSession, lead.id, { decision }), 'Review decision saved to the CRM.');
     setNotice('Admin review decision recorded in audit history.');
   }
 
@@ -159,6 +182,7 @@ function WorkspaceApp({ onSignOut }: { onSignOut?: () => void }) {
     const lead: Lead = { id: makeId('lead'), name, phone: phone || undefined, email: email || undefined, source, marketingOwnerId: viewer.id, sourceDate: at.slice(0, 10), status, qualification: 'not_available', priority: 0, assignments: owner ? [{ id: makeId('assignment'), ownerId: owner, assignedBy: viewer.id, at, visibility: 'full_context', reason: 'Initial assignment' }] : [], stageHistory: [{ id: makeId('stage'), toStatus: status, enteredAt: at, actorId: viewer.id, reason: 'Lead created' }], activities: [leadActivity(viewer.id, 'system', 'Lead created in the test workspace.')], followUps: [], incorrectReports: [] };
     const duplicate = duplicateMatches([...leads, lead]).find((candidate) => candidate.leadId === lead.id);
     setLeads((current) => [...current, lead]); setShowCreate(false); event.currentTarget.reset(); setNotice(duplicate ? 'Lead created and flagged as a duplicate candidate for review.' : 'Lead created successfully.');
+    persist((activeSession) => createRemoteLead(activeSession, { name, phone: phone || undefined, email: email || undefined, source, salesOwnerId: owner || undefined }), 'Lead created in the CRM.');
   }
 
   function resetDemo() { setLeads(structuredClone(seedLeads)); setSelectedId(undefined); setNotice('Test workspace reset to the protected sample data.'); }
@@ -167,6 +191,7 @@ function WorkspaceApp({ onSignOut }: { onSignOut?: () => void }) {
   return <main className="app-shell">
     <aside className="sidebar"><div className="brand"><span className="brand-mark">E</span><span>Elevanta <b>AI</b></span></div><p className="brand-subtitle">Sales, made clearer.</p>
       {nav.map((item) => <button key={item} className={page === item ? 'nav-item active' : 'nav-item'} onClick={() => { setPage(item); setSelectedId(undefined); }}>{item}</button>)}
+      {viewer.role === 'admin' && <button className={page === 'User management' ? 'nav-item active' : 'nav-item'} onClick={() => { setPage('User management'); setSelectedId(undefined); }}>User management</button>}
       {canViewManagementBoards(viewer) && <button className={page === 'Benchmark Board' ? 'nav-item active' : 'nav-item'} onClick={() => { setPage('Benchmark Board'); setSelectedId(undefined); }}>Benchmark Board</button>}
       <button className={page === 'Leaderboard' ? 'nav-item active' : 'nav-item'} onClick={() => { setPage('Leaderboard'); setSelectedId(undefined); }}>{canViewNamedLeaderboard(viewer) ? 'Leaderboard' : 'My standing'}</button>
       {canViewDataQualityBoard(viewer) && <button className={page === 'Data quality' ? 'nav-item active' : 'nav-item'} onClick={() => { setPage('Data quality'); setSelectedId(undefined); }}>Data quality</button>}
@@ -186,6 +211,7 @@ function WorkspaceApp({ onSignOut }: { onSignOut?: () => void }) {
       {page === 'Leaderboard' && <Leaderboard leads={dashboardLeads} privateBenchmarkLeads={leads} viewer={viewer} scope={dashboardScope} />}
       {page === 'Data quality' && canViewDataQualityBoard(viewer) && <DataQualityBoard leads={dashboardLeads} range={selectedRange} source={dashboardSource} />}
       {page === 'Xaviar' && <Xaviar dashboard={dashboard} viewer={viewer} />}
+      {page === 'User management' && viewer.role === 'admin' && session && <AdminUserManagement session={session} onNotice={setNotice} />}
     </section>
     {showCreate && <CreateLead viewer={viewer} onClose={() => setShowCreate(false)} onSubmit={createLead} />}
   </main>;
@@ -196,18 +222,21 @@ function AuthGate() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [mode, setMode] = useState<'sign_in' | 'forgot' | 'reset'>('sign_in');
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     if (!authEnabled || !supabase) return;
     let active = true;
     supabase.auth.getSession().then(({ data, error }) => { if (active) setState({ session: data.session, loading: false, error: error?.message }); });
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => setState({ session, loading: false }));
+    const { data } = supabase.auth.onAuthStateChange((event, session) => { if (event === 'PASSWORD_RECOVERY') setMode('reset'); setState({ session, loading: false }); });
     return () => { active = false; data.subscription.unsubscribe(); };
   }, []);
 
   if (!authEnabled || !supabase) return <WorkspaceApp />;
   if (state.loading) return <main className="auth-shell"><article className="auth-card"><span className="spark">ELEVANTA AI</span><h1>Loading your workspace…</h1><p>Checking your secure session.</p></article></main>;
-  if (state.session) return <WorkspaceApp onSignOut={() => { void supabase!.auth.signOut(); }} />;
+  if (state.session && mode === 'reset') return <PasswordReset session={state.session} onComplete={() => { setMode('sign_in'); setState({ session: null, loading: false }); }} />;
+  if (state.session) return <WorkspaceApp session={state.session} onSignOut={() => { void supabase!.auth.signOut(); }} />;
 
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setSubmitting(true); setState((current) => ({ ...current, error: undefined }));
@@ -215,7 +244,19 @@ function AuthGate() {
     if (error) setState((current) => ({ ...current, loading: false, error: error.message }));
     setSubmitting(false);
   }
-  return <main className="auth-shell"><article className="auth-card"><span className="spark">✦ ELEVANTA AI</span><h1>Sign in to your CRM</h1><p>Use your approved company account. Access is controlled by your CRM role and manager relationship.</p><form className="stack-form auth-form" onSubmit={signIn}><label>Email<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label><label>Password<input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>{state.error && <p className="form-error" role="alert">{state.error}</p>}<button className="primary" type="submit" disabled={submitting}>{submitting ? 'Signing in…' : 'Sign in'}</button></form></article></main>;
+  async function requestReset(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setSubmitting(true); setState((current) => ({ ...current, error: undefined })); setMessage('');
+    const { error } = await supabase!.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin });
+    if (error) setState((current) => ({ ...current, loading: false, error: error.message })); else setMessage('If that email belongs to an approved account, a password-reset link has been sent. Check your inbox and spam folder.');
+    setSubmitting(false);
+  }
+  return <main className="auth-shell"><article className="auth-card"><span className="spark">✦ ELEVANTA AI</span>{mode === 'forgot' ? <><h1>Reset your password</h1><p>Enter your work email and we’ll send a secure reset link.</p><form className="stack-form auth-form" onSubmit={requestReset}><label>Email<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>{state.error && <p className="form-error" role="alert">{state.error}</p>}{message && <p className="success-chip" role="status">{message}</p>}<button className="primary" type="submit" disabled={submitting}>{submitting ? 'Sending…' : 'Send reset link'}</button><button className="quiet" type="button" onClick={() => { setMode('sign_in'); setMessage(''); }}>Back to sign in</button></form></> : <><h1>Sign in to your CRM</h1><p>Use your approved company account. Access is controlled by your CRM role and manager relationship.</p><form className="stack-form auth-form" onSubmit={signIn}><label>Email<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label><label>Password<input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>{state.error && <p className="form-error" role="alert">{state.error}</p>}<button className="primary" type="submit" disabled={submitting}>{submitting ? 'Signing in…' : 'Sign in'}</button><button className="quiet" type="button" onClick={() => { setMode('forgot'); setState((current) => ({ ...current, error: undefined })); }}>Forgot password?</button></form></>}</article></main>;
+}
+
+function PasswordReset({ session, onComplete }: { session: Session; onComplete: () => void }) {
+  const [password, setPassword] = useState(''); const [confirmation, setConfirmation] = useState(''); const [error, setError] = useState(''); const [saving, setSaving] = useState(false);
+  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setError(''); if (password.length < 8) return setError('Password must be at least 8 characters.'); if (password !== confirmation) return setError('Passwords do not match.'); setSaving(true); const { error: updateError } = await supabase!.auth.updateUser({ password }); if (updateError) setError(updateError.message); else { await supabase!.auth.signOut(); onComplete(); } setSaving(false); }
+  return <main className="auth-shell"><article className="auth-card"><span className="spark">✦ ELEVANTA AI</span><h1>Choose a new password</h1><p>Your reset link is valid. Create a new password, then sign in again.</p><form className="stack-form auth-form" onSubmit={submit}><label>New password<input type="password" autoComplete="new-password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required /></label><label>Confirm new password<input type="password" autoComplete="new-password" minLength={8} value={confirmation} onChange={(event) => setConfirmation(event.target.value)} required /></label>{error && <p className="form-error" role="alert">{error}</p>}<button className="primary" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Set new password'}</button></form><small>For security, your current session will be signed out after the password changes.</small></article></main>;
 }
 
 export function App() { return <AuthGate />; }
@@ -445,4 +486,13 @@ function AssignmentList({ leads, onSelect }: { leads: Lead[]; onSelect: (id: str
 function ReviewQueue({ leads, onSelect }: { leads: Lead[]; onSelect: (id: string) => void }) { return <article className="panel"><h2>Incorrect Review queue</h2><p>Three different agents must report a lead before it reaches this queue. Leads stay paused until Admin decides.</p>{leads.length ? leads.map((lead) => <div className="task-row" key={lead.id}><button className="text-button dark" onClick={() => onSelect(lead.id)}>{lead.name}</button><span>{lead.incorrectReports.length} reports</span><span>Routing paused</span><span>{lead.incorrectReports.map((report) => nameFor(report.reporterId)).join(', ')}</span></div>) : <p className="empty">No lead is waiting for review.</p>}</article>; }
 function Reports({ dashboard, viewer, duplicates }: { dashboard: ReturnType<typeof dashboardFor>; viewer: User; duplicates: number }) { return <section className="report-grid"><article className="panel"><h2>{viewer.role === 'marketer' ? 'Marketing quality report' : 'Sales performance report'}</h2><div className="report-row"><span>Visible leads</span><b>{dashboard.visible.length}</b></div><div className="report-row"><span>MQL / SQL</span><b>{dashboard.mql} / {dashboard.sql}</b></div><div className="report-row"><span>Won</span><b>{dashboard.won}</b></div><div className="report-row"><span>Conversion</span><b>{dashboard.conversionRate}%</b></div><div className="report-row"><span>Overdue follow-ups</span><b>{dashboard.overdue}</b></div><div className="report-row"><span>Duplicate candidates</span><b>{duplicates}</b></div></article><article className="panel"><span className="spark dark">XAVIAR EVIDENCE MODEL</span><h2>What this report will use</h2><p>Response speed, follow-up consistency, qualification outcome, note quality, source quality, duplicate rate, and conversion. The production version will cite the exact CRM events behind each recommendation.</p></article></section>; }
 function Xaviar({ dashboard, viewer }: { dashboard: ReturnType<typeof dashboardFor>; viewer: User }) { return <article className="panel xaviar full"><span className="spark">✦ XAVIAR</span><h2>Coaching preview</h2><p>{dashboard.overdue ? `${dashboard.overdue} overdue item${dashboard.overdue === 1 ? '' : 's'} need attention. Complete or reschedule them before the end of the day.` : 'Follow-up timing is healthy in the current test workspace.'}</p><p>{viewer.role === 'marketer' ? `You have ${dashboard.mql} MQL and ${dashboard.sql} SQL decisions. In production, Xaviar will compare their later sales outcomes to improve lead quality.` : `The current MQL/SQL-to-won conversion is ${dashboard.conversionRate}%. Xaviar will only advise; it will never change a lead or contact a prospect in Phase 1.`}</p></article>; }
+function AdminUserManagement({ session, onNotice }: { session: Session; onNotice: (message: string) => void }) {
+  const [managed, setManaged] = useState<ManagedUser[]>([]); const [loading, setLoading] = useState(true); const [editing, setEditing] = useState<ManagedUser | null>(null); const [creating, setCreating] = useState(false);
+  const refresh = () => { setLoading(true); void loadAdminUsers(session).then((result) => setManaged(result.users)).catch((error: unknown) => onNotice(error instanceof Error ? error.message : 'Unable to load users.')).finally(() => setLoading(false)); };
+  useEffect(refresh, [session]);
+  const managers = managed.filter((user) => user.role === 'manager' && user.active);
+  const save = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = new FormData(event.currentTarget); const role = String(form.get('role') ?? 'sales_agent') as ManagedUser['role']; const dept = role === 'admin' ? null : String(form.get('department') ?? '') as 'marketing' | 'sales'; const managerId = role === 'admin' ? null : String(form.get('managerId') ?? '') || null; const base = { fullName: String(form.get('fullName') ?? '').trim(), role, department: dept, managerId }; if (!base.fullName) return onNotice('Full name is required.'); if (creating) { const email = String(form.get('email') ?? '').trim(); const password = String(form.get('password') ?? ''); if (!email || password.length < 8) return onNotice('Email and a password of at least 8 characters are required.'); void createAdminUser(session, { ...base, email, password }).then(() => { onNotice('User created and audit logged.'); setCreating(false); refresh(); }).catch((error: unknown) => onNotice(error instanceof Error ? error.message : 'Unable to create user.')); } else if (editing) { const active = form.get('active') === 'on'; void updateAdminUser(session, editing.id, { ...base, active }).then(() => { onNotice('User updated and audit logged.'); setEditing(null); refresh(); }).catch((error: unknown) => onNotice(error instanceof Error ? error.message : 'Unable to update user.')); } };
+  return <section className="board"><div className="board-heading"><div><span className="eyebrow">ADMIN ONLY</span><h2>User management</h2><p>Create and maintain accounts, roles, departments, manager relationships, and active access. Passwords are never displayed or stored in the CRM profile.</p></div><button className="primary" onClick={() => { setEditing(null); setCreating(true); }}>Add user</button></div>{loading ? <p className="empty">Loading workspace users…</p> : <div className="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Department</th><th>Manager</th><th>Access</th><th>Last sign-in</th><th /></tr></thead><tbody>{managed.map((user) => <tr key={user.id}><td><b>{user.full_name}</b></td><td>{user.email || 'Not available'}</td><td>{roleLabels[user.role]}</td><td>{user.department ?? '—'}</td><td>{managed.find((candidate) => candidate.id === user.manager_id)?.full_name ?? '—'}</td><td><span className={user.active ? 'success-chip' : 'warning'}>{user.active ? 'Active' : 'Inactive'}</span></td><td>{user.last_sign_in_at ? formatDate(user.last_sign_in_at) : 'Never'}</td><td><button className="quiet" onClick={() => { setCreating(false); setEditing(user); }}>Edit</button></td></tr>)}</tbody></table>{!managed.length && <p className="empty">No profiles are available.</p>}</div>}{(creating || editing) && <div className="modal-backdrop" role="presentation"><form className="modal" onSubmit={save}><div className="panel-heading"><div><span className="spark dark">{creating ? 'NEW USER' : 'EDIT USER'}</span><h2>{creating ? 'Add a workspace user' : `Edit ${editing?.full_name}`}</h2></div><button type="button" className="quiet" onClick={() => { setCreating(false); setEditing(null); }}>Close</button></div><div className="detail-grid"><label>Full name<input name="fullName" defaultValue={editing?.full_name ?? ''} required /></label>{creating ? <label>Email<input name="email" type="email" required /></label> : <label>Email<input value={editing?.email ?? ''} readOnly /></label>}<label>Role<select name="role" defaultValue={editing?.role ?? 'sales_agent'}>{(['admin', 'manager', 'marketer', 'sales_agent'] as ManagedUser['role'][]).map((role) => <option key={role} value={role}>{roleLabels[role]}</option>)}</select></label><label>Department<select name="department" defaultValue={editing?.department ?? ''}><option value="">Choose department</option><option value="marketing">Marketing</option><option value="sales">Sales</option></select></label><label>Manager<select name="managerId" defaultValue={editing?.manager_id ?? ''}><option value="">Choose manager</option>{managers.filter((manager) => manager.id !== editing?.id).map((manager) => <option key={manager.id} value={manager.id}>{manager.full_name} · {manager.department ?? 'Department not set'}</option>)}</select></label>{creating ? <label>Temporary password<input name="password" type="password" minLength={8} required placeholder="At least 8 characters" /></label> : <label className="checkbox-label"><input name="active" type="checkbox" defaultChecked={editing?.active} /> Account active</label>}</div><p className="board-note">Rules: admins have no manager; non-admin users need a same-department active manager; the last active admin and your own admin access cannot be removed.</p><button className="primary">{creating ? 'Create user' : 'Save changes'}</button></form></div>}</section>;
+}
+
 function CreateLead({ viewer, onClose, onSubmit }: { viewer: User; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) { const allowed = viewer.role === 'admin' || viewer.role === 'marketer'; return <div className="modal-backdrop" role="presentation"><form className="modal" onSubmit={onSubmit}><div className="panel-heading"><div><span className="spark dark">NEW LEAD</span><h2>Create a lead</h2></div><button type="button" className="quiet" onClick={onClose}>Close</button></div>{allowed ? <><p>A record only becomes a lead when it has a name plus a phone number or email address.</p><div className="detail-grid"><label>Name<input name="name" required /></label><label>Source<select name="source" defaultValue="" required><option value="" disabled>Choose source</option>{sourceOptions.map((source) => <option key={source} value={source}>{source}</option>)}</select></label><label>Phone<input name="phone" type="tel" /></label><label>Email<input name="email" type="email" /></label><label>Initial sales owner<select name="owner" defaultValue=""><option value="">Leave unassigned</option>{users.filter((user) => user.role === 'sales_agent').map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select></label></div><button className="primary">Create lead</button></> : <p className="warning">Only Admin and Marketing can create leads.</p>}</form></div>; }
