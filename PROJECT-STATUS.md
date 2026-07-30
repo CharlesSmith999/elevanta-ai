@@ -48,7 +48,7 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 - GitHub publishing: complete through the authorized ChatGPT Codex Connector, restricted to `CharlesSmith999/elevanta-ai`.
 - Deployment procedure: [DEPLOYMENT-SOP.md](./docs/DEPLOYMENT-SOP.md) is the required reference for all releases; it uses the existing Git-connected Vercel project and forbids duplicate deployment instances.
 - API deployment path: `api/[...path].ts` now routes Vercel `/api/*` requests into the shared Node API without creating a second service.
-- Latest release validation: Vercel production deployment for `6d8ba91` is Ready. The API wrapper now normalizes both relative and absolute Vercel request URLs, resolving the signed-in dashboard's `/api/v1/opportunities` 404 path. The Supabase stage-history table and ownership view are verified.
+- Latest release validation: Vercel production deployment for `8ce737b` is Ready. The production web client now always targets the same-origin `/api` route, and the shared Node API defensively strips a forwarded `/api` prefix. The prior signed-in dashboard 404 fix was rebuilt and verified green on Vercel; the Supabase stage-history table and ownership view remain verified.
 
 ## Validation completed
 
@@ -64,7 +64,7 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 - Strict screenshot comparison against the design reference remains blocked by the browser comparison policy; functional verification passed.
 - Dashboard completion local verification passed: all five role contexts were smoke-checked with safe test data; 19 domain/permission/dashboard tests, API typecheck, web typecheck, production build, and `git diff --check` pass. The pre-Xaviar form refinement added explicit labels and required constraints for follow-up, handoff, and incorrect-report controls. The local web bundle warning remains non-blocking: the main compressed bundle is approximately 200 kB gzip and can be split later.
 - PR #7 remote validation passed: GitHub Actions workflow `Validate Elevanta AI`, run 135, completed successfully after correcting the workflow order so pnpm is installed before Node cache setup. The merged release includes the CRM core, dashboard completion, and follow-up completion migration files; no real lead data was included.
-- Supabase console/SQL check on 2026-07-29: project health is Healthy and Auth reports no recent warnings/errors. SQL confirmed the seven foundation tables and the expected public CRM routines, including the reconciled status, source-validation, and timestamp controls. The full local migration bundle was intentionally not re-run because it stopped at the existing `app_role` type; the safe reconciliation patch was applied instead and no data, tables, or schemas were dropped. The migration ledger is still absent, so traceability remains open. Vercel has the approved Supabase variables configured for Production/Preview. The merged production deployment is Ready; signed-in smoke test with `codex.smoketest@elevanta.test` passed and sign-out returned to the login screen. No real lead data was included.
+- Supabase console/SQL check on 2026-07-29: project health is Healthy and Auth reports no recent warnings/errors. SQL confirmed the seven foundation tables and the expected public CRM routines, including the reconciled status, source-validation, and timestamp controls. The full local migration bundle was intentionally not re-run because it stopped at the existing `app_role` type; the safe reconciliation patch was applied instead and no data, tables, or schemas were dropped. The migration ledger is still absent, so traceability remains open. Vercel has the approved Supabase variables configured for Production/Preview. The merged production deployment for `8ce737b` is Ready; the Vercel check passed after the production API-origin fix. Signed-in smoke test with `codex.smoketest@elevanta.test` passed previously; the remaining browser confirmation is to refresh the live dashboard and verify the toast no longer appears. No real lead data was included.
 
 ## Rules for future updates
 
@@ -74,6 +74,10 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 4. Keep private workbook/lead data out of the public repository.
 5. Do not enable Phase 2 outbound automation until consent, unsubscribe, and human-approval controls are implemented.
 6. Do not reopen or request production Excel migration during Milestones 1–4. Use safe sample/synthetic data for testing; schedule real-data staging, validation, and activation only under Milestone 5.
+
+## Latest production incident
+
+On 2026-07-30 the live dashboard still showed `CRM connection unavailable: CRM request failed (404)` despite the earlier route-normalization release. Investigation found that production needed a guaranteed same-origin API base and a defensive prefix cleanup in the shared Express app. PR [#11](https://github.com/CharlesSmith999/elevanta-ai/pull/11) merged as `8ce737b`; its Vercel production check is green and the deployment is Ready. Do not begin Xaviar work until the refreshed signed-in dashboard confirms the toast is gone.
 
 ## Next milestone target
 
