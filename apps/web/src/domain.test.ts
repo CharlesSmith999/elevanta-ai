@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { benchmarkBySource, canReassign, canViewDataQualityBoard, canViewLead, canViewManagementBoards, canViewNamedLeaderboard, dashboardDateRange, dashboardFor, dashboardReconciliation, dataQualityIssues, duplicateMatches, filterDashboardLeads, financialMetrics, incorrectReviewState, leaderboardForMarketing, leaderboardForSales, lossReasonBreakdown, responseHours, routingHours, seedLeads, sourceOptions, stageOwnershipSegments, transitionStage, users, validStatusTransition, validWonFinancials } from './domain.js';
+import { benchmarkBySource, canReassign, canUpdateLead, canViewDataQualityBoard, canViewLead, canViewManagementBoards, canViewNamedLeaderboard, dashboardDateRange, dashboardFor, dashboardReconciliation, dataQualityIssues, duplicateMatches, dueToday, filterDashboardLeads, financialMetrics, incorrectReviewState, isLeadIdentity, leaderboardForMarketing, leaderboardForSales, lossReasonBreakdown, overdue, responseHours, routingHours, seedLeads, sourceOptions, stageOwnershipSegments, transitionStage, users, validStatusTransition, validWonFinancials } from './domain.js';
 
 const user = (id: string) => users.find((candidate) => candidate.id === id)!;
 
@@ -136,4 +136,67 @@ test('named leaderboards stay manager/admin-only while individual users receive 
   assert.equal(canViewNamedLeaderboard(user('ali')), true);
   assert.equal(canViewNamedLeaderboard(user('owais')), false);
   assert.equal(canViewNamedLeaderboard(user('muzammil')), false);
+});
+
+
+test('lead identity requires a name plus at least one contact method', () => {
+  assert.equal(isLeadIdentity('Jane', '+1 555 0100'), true);
+  assert.equal(isLeadIdentity('Jane', undefined, 'jane@example.com'), true);
+  assert.equal(isLeadIdentity('Jane'), false);
+  assert.equal(isLeadIdentity('   ', '+1 555 0100'), false);
+});
+
+test('duplicate matching normalizes phone formatting but does not fuzzy-match values', () => {
+  const leads = structuredClone(seedLeads);
+  leads.push({ ...structuredClone(leads[0]), id: 'phone-format-copy', phone: '+1 (555) 0101', email: undefined, assignments: [], activities: [], followUps: [], incorrectReports: [] });
+  leads.push({ ...structuredClone(leads[0]), id: 'near-match', phone: '+1 555 0102', email: undefined, assignments: [], activities: [], followUps: [], incorrectReports: [] });
+  const match = duplicateMatches(leads).find((item) => item.leadId === 'lead-ronald');
+  assert.equal(match?.matches.includes('phone-format-copy'), true);
+  assert.equal(match?.matches.includes('near-match'), false);
+});
+
+test('incorrect threshold counts distinct reporters only', () => {
+  const reports = [
+    { reporterId: 'owais', reason: 'Invalid', at: '2026-07-01T09:00:00.000Z' },
+    { reporterId: 'owais', reason: 'Duplicate', at: '2026-07-01T10:00:00.000Z' },
+    { reporterId: 'asad', reason: 'Invalid', at: '2026-07-01T11:00:00.000Z' },
+  ];
+  assert.equal(incorrectReviewState(reports), undefined);
+  assert.equal(incorrectReviewState([...reports, { reporterId: 'obaid', reason: 'Spam', at: '2026-07-01T12:00:00.000Z' }])?.state, 'pending');
+});
+
+test('completed or cancelled follow-ups never remain due or overdue', () => {
+  const now = new Date('2026-07-30T12:00:00.000Z');
+  assert.equal(overdue({ id: 'open', ownerId: 'owais', dueAt: '2026-07-29T12:00:00.000Z', action: 'Call', status: 'open' }, now), true);
+  assert.equal(overdue({ id: 'done', ownerId: 'owais', dueAt: '2026-07-29T12:00:00.000Z', action: 'Call', status: 'completed' }, now), false);
+  assert.equal(dueToday({ id: 'cancelled', ownerId: 'owais', dueAt: '2026-07-30T12:00:00.000Z', action: 'Call', status: 'cancelled' }, now), false);
+});
+
+test('terminal statuses are all protected from reopening', () => {
+  for (const terminal of ['won', 'lost', 'not_interested', 'incorrect', 'duplicate', 'do_not_contact'] as const) {
+    assert.equal(validStatusTransition(terminal, 'connected'), false);
+  }
+});
+
+test('marketer cannot update another marketer’s lead and sales agent cannot update an unassigned lead', () => {
+  const marketingLead = seedLeads.find((lead) => lead.marketingOwnerId === 'muzammil')!;
+  const unassigned = { ...structuredClone(seedLeads[0]), assignments: [] };
+  assert.equal(canUpdateLead(user('yasir'), marketingLead), false);
+  assert.equal(canUpdateLead(user('owais'), unassigned), false);
+});
+
+test('invalid assignment and stage date order are reported as data-quality issues', () => {
+  const broken = {
+    ...structuredClone(seedLeads[0]),
+    id: 'broken-order',
+    assignments: [{ id: 'bad-assignment', ownerId: 'owais', assignedBy: 'ali', at: '2026-07-10T10:00:00.000Z', endedAt: '2026-07-09T10:00:00.000Z', visibility: 'full_context' as const, reason: 'Bad data' }],
+    stageHistory: [{ id: 'bad-stage', toStatus: 'contacted' as const, enteredAt: '2026-07-10T10:00:00.000Z', exitedAt: '2026-07-09T10:00:00.000Z', reason: 'Bad data' }],
+  };
+  const issues = dataQualityIssues([broken]);
+  assert.equal(issues.filter((issue) => issue.type === 'date_order').length, 2);
+});
+
+test('empty qualified sample does not invent a conversion rate', () => {
+  const leads = structuredClone(seedLeads).map((lead) => ({ ...lead, qualification: 'not_available' as const, status: 'assigned' as const }));
+  assert.equal(dashboardFor(user('shariq'), leads).conversionRate, 0);
 });
