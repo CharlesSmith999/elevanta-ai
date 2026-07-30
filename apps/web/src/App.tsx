@@ -397,7 +397,8 @@ function RoleScorecards({ viewer, leads, scope }: { viewer: User; leads: Lead[];
     ['Proposal → Won', rate(won, proposals), `${won}/${proposals} proposal opportunities won`],
     ['Total project value', financial.financialRecordCount ? String(financial.totalProjectValue) : 'Not available', `${financial.financialRecordCount} Won records with cost`],
   ];
-  return <section className="quality-summary role-scorecards" aria-label="Role dashboard scorecards">{cards.map(([label, value, note]) => <article key={label}><span>{label}</span><b>{value}</b><small>{note}</small></article>)}</section>;
+  const scorecardIcons = [IconActivityHeartbeat, IconTargetArrow, IconChartPieFilled, IconCircleCheck, IconArrowUpRight];
+  return <section className="quality-summary role-scorecards" aria-label="Role dashboard scorecards">{cards.map(([label, value, note], index) => { const Icon = scorecardIcons[index % scorecardIcons.length]; return <article className={`scorecard-card scorecard-${index + 1}`} key={label}><span className="scorecard-icon"><Icon size={21} stroke={1.8} /></span><div className="scorecard-copy"><span>{label}</span><b>{value}</b><small><i />{note}</small></div></article>; })}</section>;
 }
 
 function RoleCharts({ viewer, leads, dashboard, scope }: { viewer: User; leads: Lead[]; dashboard: ReturnType<typeof dashboardFor>; scope: DashboardScope }) {
