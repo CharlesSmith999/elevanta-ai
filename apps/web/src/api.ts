@@ -1,7 +1,9 @@
 import type { Session } from '@supabase/supabase-js';
 import type { Activity, Assignment, FollowUp, IncorrectReport, Lead, OpportunityStatus, Qualification, StageHistory } from './domain';
 
-const apiBase = (import.meta.env.VITE_API_URL as string | undefined) || '/api';
+// The dashboard and API are deployed together, so production requests always
+// use the current site's serverless route. This avoids stale API-host settings.
+const apiBase = '/api';
 
 type OpportunityRecord = {
   id: string;
