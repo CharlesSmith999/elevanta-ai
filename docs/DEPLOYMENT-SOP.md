@@ -52,10 +52,11 @@ Set these values in Vercel. Keep the values secret. Add each variable to both Pr
 | `VITE_API_URL` | Web app | Base URL for the Elevanta Node API | Yes. |
 | `SUPABASE_URL` | Node API | Supabase project URL | Yes, but server configuration only. |
 | `SUPABASE_ANON_KEY` | Node API | Validates user sessions while using the caller’s access token | Treat as configuration; RLS still protects data. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Node API, server-only | Required only by the Admin user-management endpoints to create Auth users and read Auth metadata; never sent to browsers | No; server secret only. |
 | `WEB_ORIGIN` | Node API | Exact allowed web origins, comma-separated | Yes. |
 | `PORT` | Local API only | Local development port; Vercel supplies production routing | Yes. |
 
-`SUPABASE_SERVICE_ROLE_KEY` must not be used by the normal user-facing API. If a future server-only import or admin task genuinely needs it, it must be implemented as a separate narrowly scoped function and approved before use.
+`SUPABASE_SERVICE_ROLE_KEY` must not be used by normal lead, dashboard, or workflow requests. It is permitted only inside the narrowly scoped Admin user-management endpoints documented in [ADMIN-USER-MANAGEMENT.md](./ADMIN-USER-MANAGEMENT.md), and must never be exposed through a `VITE_` variable, browser bundle, Git commit, log, or response payload.
 
 ## 6. Required first-time configuration
 
@@ -66,10 +67,11 @@ Complete these once, in this order:
 3. Create or confirm the approved Supabase project.
 4. Apply the committed migrations in `supabase/migrations/` in filename order. Do not create untracked SQL changes in the Supabase dashboard.
 5. Configure Supabase Auth for email/password only; disable providers that are not approved.
-6. Add the first workspace, Shariq’s administrator profile, and approved test accounts using a reviewed bootstrap process.
-7. Configure the Vercel environment variables from Section 5.
-8. Deploy from GitHub and verify the web application, API health endpoint, authentication, and role restrictions.
-9. Record the verified project IDs, production URL, and completion date in `PROJECT-STATUS.md` without recording secrets.
+6. Add the production web origin to Supabase Auth URL Configuration so password-reset links can safely return to the CRM (for example, `https://elevanta-ai-pipeline.vercel.app`).
+7. Add the first workspace, Shariq’s administrator profile, and approved test accounts using a reviewed bootstrap process.
+8. Configure the Vercel environment variables from Section 5.
+9. Deploy from GitHub and verify the web application, API health endpoint, authentication, password reset, and role restrictions.
+10. Record the verified project IDs, production URL, and completion date in `PROJECT-STATUS.md` without recording secrets.
 
 ## 7. Normal release process
 
@@ -111,6 +113,7 @@ Every production deployment must confirm:
 - The application loads without browser-console errors.
 - The API health endpoint responds successfully once the API deployment is enabled.
 - Email/password sign-in works for an approved test account.
+- Password reset sends a generic response, accepts a valid recovery link, enforces matching minimum-length passwords, and signs the user out after a successful change.
 - Sales agents cannot access leads outside their assignment scope.
 - Managers see their team only; admins see the workspace.
 - Status, note, follow-up, reassignment, and incorrect-review actions create audit history.
