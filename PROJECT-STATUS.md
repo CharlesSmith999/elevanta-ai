@@ -78,4 +78,3 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 ## Next milestone target
 
 Milestones 1–3 are closed for the released safe-sample CRM foundation. Next, complete the required pre-Xaviar product-refinement gate, then begin Milestone 4 Xaviar development with synthetic/safe sample data. After Milestone 4, begin Milestone 5 production lead-data migration using staging, provenance, deterministic duplicate handling, and validation before any records enter active routing.
-
