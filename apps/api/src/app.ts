@@ -62,6 +62,14 @@ export function createApp() {
   const app = express();
   app.use(cors({ origin: process.env.WEB_ORIGIN?.split(',') ?? true }));
   app.use(express.json({ limit: '100kb' }));
+  // Keep the shared app resilient if a platform adapter forwards the
+  // deployment prefix instead of removing it first.
+  app.use((request, _response, next) => {
+    if (request.url === '/api' || request.url.startsWith('/api/')) {
+      request.url = request.url.slice('/api'.length) || '/';
+    }
+    next();
+  });
   app.get('/health', (_request, response) => response.json({ service: 'elevanta-api', status: 'ok', phase: 1 }));
 
   const requireUser = asyncRoute(async (request, response) => {
