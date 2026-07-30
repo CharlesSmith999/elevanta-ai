@@ -48,7 +48,7 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 - GitHub publishing: complete through the authorized ChatGPT Codex Connector, restricted to `CharlesSmith999/elevanta-ai`.
 - Deployment procedure: [DEPLOYMENT-SOP.md](./docs/DEPLOYMENT-SOP.md) is the required reference for all releases; it uses the existing Git-connected Vercel project and forbids duplicate deployment instances.
 - API deployment path: `api/[...path].ts` now routes Vercel `/api/*` requests into the shared Node API without creating a second service.
-- Latest release validation: Vercel production deployment for `8ce737b` is Ready. The production web client now always targets the same-origin `/api` route, and the shared Node API defensively strips a forwarded `/api` prefix. The prior signed-in dashboard 404 fix was rebuilt and verified green on Vercel; the Supabase stage-history table and ownership view remain verified.
+- Latest release validation: Vercel production deployment for `89bc441` is Ready. Production `/api/v1/*` CRM routing is explicitly served by a dedicated Vercel catch-all, and the verified Supabase database state includes `profiles.department` plus the authenticated read grants governed by existing Row Level Security policies. A fresh signed-in dashboard check confirms zero CRM connection errors.
 
 ## Validation completed
 
@@ -77,7 +77,7 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 
 ## Latest production incident
 
-On 2026-07-30 the live dashboard still showed `CRM connection unavailable: CRM request failed (404)` despite the earlier route-normalization release. Investigation found that production needed a guaranteed same-origin API base and a defensive prefix cleanup in the shared Express app. PR [#11](https://github.com/CharlesSmith999/elevanta-ai/pull/11) merged as `8ce737b`; its Vercel production check is green and the deployment is Ready. Do not begin Xaviar work until the refreshed signed-in dashboard confirms the toast is gone.
+On 2026-07-30 the live dashboard initially showed `CRM connection unavailable: CRM request failed (404)`. The failure was reproduced while signed in: Vercel returned `NOT_FOUND` for `/api/v1/opportunities` before the Node API executed. PR [#12](https://github.com/CharlesSmith999/elevanta-ai/pull/12), merged as `93d1499`, adds a concrete Vercel function route for CRM `/api/v1/*` traffic. A follow-up live test then exposed the real database gate: the required `profiles.department` migration had not been applied and the `authenticated` database role lacked SELECT permissions despite the existing Row Level Security policies. The missing schema change and grants were applied in Supabase; PR [#13](https://github.com/CharlesSmith999/elevanta-ai/pull/13), merged as `89bc441`, records the permission repair. A fresh signed-in production test now loads the dashboard with **zero** CRM connection errors.
 
 ## Next milestone target
 
