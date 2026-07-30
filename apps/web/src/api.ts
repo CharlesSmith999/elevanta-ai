@@ -25,6 +25,19 @@ export class ApiError extends Error {
   constructor(status: number, message: string) { super(message); this.status = status; }
 }
 
+export type ManagedUser = {
+  id: string;
+  workspace_id: string;
+  email: string;
+  full_name: string;
+  role: 'admin' | 'manager' | 'sales_agent' | 'marketer';
+  department: 'marketing' | 'sales' | null;
+  manager_id: string | null;
+  active: boolean;
+  created_at: string;
+  last_sign_in_at: string | null;
+};
+
 async function request<T>(session: Session, path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, {
     ...init,
@@ -83,3 +96,6 @@ export const completeRemoteFollowUp = (session: Session, id: string) => request<
 export const reassignRemoteLead = (session: Session, id: string, body: unknown) => request<void>(session, `/v1/opportunities/${id}/assignments`, { method: 'POST', body: JSON.stringify(body) });
 export const reportRemoteIncorrect = (session: Session, id: string, body: unknown) => request<void>(session, `/v1/opportunities/${id}/incorrect-reports`, { method: 'POST', body: JSON.stringify(body) });
 export const decideRemoteReview = (session: Session, id: string, body: unknown) => request<void>(session, `/v1/opportunities/${id}/incorrect-review`, { method: 'POST', body: JSON.stringify(body) });
+export const loadAdminUsers = (session: Session) => request<{ users: ManagedUser[] }>(session, '/v1/admin/users');
+export const createAdminUser = (session: Session, body: unknown) => request<{ user: ManagedUser }>(session, '/v1/admin/users', { method: 'POST', body: JSON.stringify(body) });
+export const updateAdminUser = (session: Session, id: string, body: unknown) => request<{ user: ManagedUser }>(session, `/v1/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
