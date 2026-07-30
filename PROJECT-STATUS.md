@@ -78,4 +78,3 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 ## Next milestone target
 
 Milestone 1 is closed. Continue Milestones 2–4 with safe sample data; after Milestone 4, begin Milestone 5 production lead-data migration using staging, provenance, deterministic duplicate handling, and validation before any records enter active routing.
-
