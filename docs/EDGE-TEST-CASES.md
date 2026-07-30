@@ -1,6 +1,6 @@
 # Elevanta AI — Phase 1 Edge-Case Test Plan
 
-Status: Test plan created; execution in progress  
+Status: Test plan created and executed  
 Created: 2026-07-30  
 References: `CRM-PLAN.md`, `CRM-DECISIONS-v1.1.md`, `PROJECT-STATUS.md`, `docs/ADMIN-USER-MANAGEMENT.md`, `docs/ARCHITECTURE-API-IMPLEMENTATION.md`
 
@@ -98,8 +98,8 @@ Execution must be appended below after every run. Do not mark a case PASS from s
 
 | Scope | Result | Evidence |
 |---|---|---|
-| Existing automated domain suite | PENDING | Run `pnpm test:domain` and record the CI run URL/number. |
-| Typecheck and production build | PENDING | Run `pnpm typecheck` and `pnpm build`. |
+| Existing automated domain suite + added edge cases | PASS | GitHub Actions run [169](https://github.com/CharlesSmith999/elevanta-ai/actions/runs/30529362057): 27 tests passed. |
+| Typecheck and production build | PASS | GitHub Actions run [169](https://github.com/CharlesSmith999/elevanta-ai/actions/runs/30529362057): typecheck and production build passed. |
 | Live Admin sign-in and `/api/v1/opportunities` | PASS | Reproduced and verified on the production deployment after the dedicated Vercel v1 route, `profiles.department` migration, and authenticated SELECT grants. |
 | Live role creation for all four roles | BLOCKED | Requires creating disposable Auth users and credentials; source/API validation is covered by ROLE-01 through ROLE-10. |
 | Legacy test-profile department normalization | OPEN | Existing test profiles created before the department migration have NULL department values; new profiles are required to provide the correct department. |
