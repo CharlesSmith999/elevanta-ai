@@ -1,14 +1,9 @@
 import type { Session } from '@supabase/supabase-js';
 import type { Activity, Assignment, FollowUp, IncorrectReport, Lead, OpportunityStatus, Qualification, StageHistory } from './domain';
 
-/**
- * Production is a single Vercel deployment, so API calls must stay on the
- * current origin. This prevents an old VITE_API_URL value baked into a
- * cached bundle from sending signed-in requests to a retired API host.
- * Local development may still opt into an explicit API URL.
- */
-const configuredApiBase = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
-const apiBase = import.meta.env.DEV && configuredApiBase ? configuredApiBase.replace(/\\/+$/, '') : '/api';
+// The dashboard and API are deployed together, so production requests always
+// use the current site's serverless route. This avoids stale API-host settings.
+const apiBase = '/api';
 
 type OpportunityRecord = {
   id: string;
