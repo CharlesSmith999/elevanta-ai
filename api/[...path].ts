@@ -3,8 +3,8 @@ type ExpressHandler = (request: unknown, response: unknown) => unknown;
 type VercelRequest = { url?: string; originalUrl?: string } & Record<string, unknown>;
 
 /**
- * Vercel can provide either a path (/api/v1/...) or an absolute URL to a
- * serverless function. Express expects the path without the /api function
+ * Vercel can provide either a path (`/api/v1/...`) or an absolute URL to a
+ * serverless function. Express expects the path without the `/api` function
  * mount, so normalize both forms before handing the request to the app.
  */
 function normalizeApiPath(request: VercelRequest) {
@@ -39,8 +39,9 @@ function getApp() {
 }
 
 /**
- * Catch-all Vercel function for /api/*. The Express application owns the
- * route definitions without that deployment prefix.
+ * Catch-all Vercel function for `/api/*`. The Express application owns the
+ * route definitions without that deployment prefix, so remove it before
+ * handing the request to the shared Node API.
  */
 export default async function handler(request: VercelRequest, response: Record<string, unknown>) {
   normalizeApiPath(request);
