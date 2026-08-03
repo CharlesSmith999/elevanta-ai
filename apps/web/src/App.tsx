@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 24215)
-Total output lines: 533
-
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { IconActivityHeartbeat, IconAlertTriangle, IconArrowUpRight, IconChartPieFilled, IconCircleCheck, IconMoonStars, IconSun, IconTargetArrow } from '@tabler/icons-react';
 import { Area, AreaChart, Bar as RechartsBar, BarChart as RechartsBarChart, CartesianGrid, Cell, LabelList, RadialBar, RadialBarChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from 'recharts';
@@ -306,7 +303,95 @@ function intelligenceHistory(leads: Lead[]) {
     return { key: date.toDateString(), date: intelligenceDate.format(date), activity: 0 };
   });
   const positions = new Map(days.map((day, index) => [day.key, index]));
-  leads.flatMap((lead) => lead.activities).forEach((activity) => { const index = positions.get(new Date(activity.at).toDateString()); if (index !== undefined) days[…4215 tokens truncated…keting work'],
+  leads.flatMap((lead) => lead.activities).forEach((activity) => { const index = positions.get(new Date(activity.at).toDateString()); if (index !== undefined) days[index].activity += 1; });
+  leads.flatMap((lead) => lead.followUps).forEach((followUp) => { const index = positions.get(new Date(followUp.dueAt).toDateString()); if (index !== undefined) days[index].activity += 1; });
+  return days;
+}
+
+function intelligenceMatrix(leads: Lead[]) {
+  return leads.filter((lead) => !intelligenceClosedStatuses.includes(lead.status)).map((lead) => {
+    const followUp = lead.followUps.find((item) => item.status === 'open');
+    const timeUntilDue = followUp ? new Date(followUp.dueAt).getTime() - Date.now() : 4 * 86_400_000;
+    const urgency = followUp ? timeUntilDue < 0 ? 92 : timeUntilDue < 86_400_000 ? 78 : Math.max(28, 64 - Math.round(timeUntilDue / 86_400_000) * 8) : 30;
+    const highValue = lead.priority >= 4 || (lead.totalProjectCost ?? 0) >= 5000;
+    const highLikelihood = ['connected', 'qualified', 'proposal_sent'].includes(lead.status) || lead.qualification === 'sql';
+    return { name: lead.name, x: urgency, y: Math.max(20, lead.priority * 18), z: 100, quadrant: highValue ? highLikelihood ? 'High value · High likelihood' : 'High value · Lower likelihood' : highLikelihood ? 'Lower value · High likelihood' : 'Lower value · Lower likelihood' };
+  });
+}
+
+function intelligenceCopy(viewer: User, dashboard: ReturnType<typeof dashboardFor>, scope: DashboardScope) {
+  if (viewer.role === 'admin' && scope === 'marketing') return { title: 'Marketing department intelligence', subtitle: 'See lead quality, routing, acceptance, and downstream outcomes for the marketing team.', risk: dashboard.overdue ? `${dashboard.overdue} routed lead follow-up${dashboard.overdue === 1 ? '' : 's'} need attention.` : 'No overdue follow-ups are visible for Marketing-routed leads.', strength: `${dashboard.mql + dashboard.sql} MQL/SQL decisions are visible in this marketing view.` };
+  if (viewer.role === 'admin' && scope === 'sales') return { title: 'Sales department intelligence', subtitle: 'See sales movement, conversion, follow-up risk, and closing performance.', risk: dashboard.overdue ? `${dashboard.overdue} sales follow-up${dashboard.overdue === 1 ? '' : 's'} need attention.` : 'No overdue sales follow-ups are visible.', strength: `${dashboard.open} active opportunities are currently in the sales pipeline.` };
+  if (viewer.role === 'marketer') return { title: 'Lead quality intelligence', subtitle: 'See how your lead quality is translating into Sales-ready conversations.', risk: dashboard.mql + dashboard.sql ? 'Keep qualification notes specific so the team can learn which sources become SQL.' : 'Classify new leads as MQL or SQL to start measuring lead quality.', strength: `${dashboard.visible.length} visible lead${dashboard.visible.length === 1 ? '' : 's'} are attributed to your marketing work.` };
+  if (viewer.role === 'sales_agent') return { title: 'My pipeline intelligence', subtitle: 'See where your active opportunities need the right next step.', risk: dashboard.overdue ? `${dashboard.overdue} follow-up${dashboard.overdue === 1 ? '' : 's'} are overdue. Resolve or reschedule them first.` : 'Keep a next follow-up date on every active opportunity.', strength: `${dashboard.conversionRate}% MQL/SQL-to-won conversion in this test workspace.` };
+  if (viewer.role === 'manager') return { title: 'Team pipeline intelligence', subtitle: 'See team movement, focus intervention, and coach the next action.', risk: dashboard.overdue ? `${dashboard.overdue} team follow-up${dashboard.overdue === 1 ? '' : 's'} need attention today.` : 'No overdue follow-ups are visible for your team.', strength: `${dashboard.open} active opportunities are currently in the team pipeline.` };
+  return { title: 'Pipeline intelligence', subtitle: 'Live visibility into pipeline health, performance, and what to focus on.', risk: dashboard.overdue ? `${dashboard.overdue} follow-up${dashboard.overdue === 1 ? '' : 's'} need attention before the risk grows.` : 'Follow-up timing is healthy across this test workspace.', strength: `${dashboard.open} active opportunities are visible across the company.` };
+}
+
+function PipelineIntelligence({ viewer, leads, dashboard, onSelect, period, scope }: { viewer: User; leads: Lead[]; dashboard: ReturnType<typeof dashboardFor>; onSelect: (leadId: string) => void; period: DashboardPeriod; scope: DashboardScope }) {
+  const stages = intelligenceStages(leads, dashboard); const history = intelligenceHistory(leads); const matrix = intelligenceMatrix(leads); const copy = intelligenceCopy(viewer, dashboard, scope);
+  const duplicates = duplicateMatches(leads).length;
+  const healthScore = Math.max(0, Math.min(100, 100 - dashboard.overdue * 22 - dashboard.incorrectReview * 14 - duplicates * 8 + Math.min(10, dashboard.mql * 2 + dashboard.sql * 3)));
+  const focusLead = leads.find((lead) => lead.followUps.some((item) => item.status === 'open' && relativeDue(item) === 'Overdue')) ?? leads.find((lead) => !intelligenceClosedStatuses.includes(lead.status));
+  return <section className="intelligence" aria-label="Pipeline intelligence dashboard">
+    <div className="intelligence-heading"><div><span className="eyebrow">ROLE PERFORMANCE</span><h2>{copy.title}</h2><p>{copy.subtitle}</p></div><div className="intelligence-period"><IconActivityHeartbeat size={17} /> {dashboardPeriodLabels[period]}</div></div>
+    <article className="pipeline-conversion" aria-label="Pipeline conversion graph"><div className="pipeline-conversion-heading"><div><span className="eyebrow">PIPELINE CONVERSION</span><h3>See where momentum is being lost</h3></div><span>{dashboard.open + dashboard.won} opportunities in view</span></div><div className="pipeline-stage-row">{stages.map((stage, index) => <div className="pipeline-stage-summary" key={stage.label}><span>{stage.label}</span><strong>{stage.value}</strong><small>{index === 0 ? 'Current active work' : `${stage.conversion}% of previous`}</small></div>)}</div><div className="pipeline-chart" role="img" aria-label={`Pipeline conversion: ${stages.map((stage) => `${stage.label} ${stage.value}`).join(', ')}`}><ResponsiveContainer width="100%" height="100%"><AreaChart data={stages} margin={{ top: 14, right: 14, left: 14, bottom: 4 }}><defs><linearGradient id="pipelineConversionFill" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor="#5b21e6" stopOpacity={.88} /><stop offset="56%" stopColor="#3568f7" stopOpacity={.72} /><stop offset="100%" stopColor="#23c7dd" stopOpacity={.25} /></linearGradient></defs><CartesianGrid vertical={false} stroke="var(--chart-grid)" strokeDasharray="3 6" /><XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} /><YAxis hide domain={[0, 'dataMax']} /><Tooltip cursor={{ stroke: 'var(--accent)', strokeWidth: 1 }} contentStyle={{ borderRadius: 12, borderColor: 'var(--border)', background: 'var(--surface)', color: 'var(--text)', boxShadow: '0 16px 36px rgba(19, 10, 75, .18)' }} /><Area type="monotone" dataKey="value" stroke="#5b21e6" strokeWidth={3} fill="url(#pipelineConversionFill)" activeDot={{ r: 5, fill: '#23c7dd', stroke: '#ffffff', strokeWidth: 2 }} /></AreaChart></ResponsiveContainer></div></article>
+    <div className="intelligence-grid"><article className="trend-panel"><div className="visual-heading"><div><h3>Activity over the last 14 days</h3><p>Recorded notes, status changes, assignments, and scheduled follow-ups.</p></div><span className="conversion-stat"><b>{dashboard.conversionRate}%</b> MQL/SQL to won</span></div><div className="area-chart" role="img" aria-label="CRM activity over the last 14 days"><ResponsiveContainer width="100%" height="100%"><AreaChart data={history} margin={{ top: 12, right: 8, left: -22, bottom: 0 }}><defs><linearGradient id="activityFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#1d7d83" stopOpacity={.3} /><stop offset="100%" stopColor="#1d7d83" stopOpacity={.02} /></linearGradient></defs><CartesianGrid vertical={false} stroke="#e5edf2" /><XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#718297', fontSize: 10 }} interval="preserveStartEnd" /><YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: '#718297', fontSize: 10 }} /><Tooltip cursor={{ stroke: '#8dd8cb', strokeWidth: 1 }} contentStyle={{ borderRadius: 10, borderColor: '#dbe7ee', boxShadow: '0 10px 25px #10253e18' }} /><Area type="monotone" dataKey="activity" stroke="#176e78" strokeWidth={3} fill="url(#activityFill)" activeDot={{ r: 5, fill: '#176e78' }} /></AreaChart></ResponsiveContainer></div><div className="trend-summary"><span><b>{leads.flatMap((lead) => lead.activities).length}</b> recorded activities</span><span><b>{dashboard.open}</b> active opportunities</span><span><b>{dashboard.overdue}</b> overdue follow-ups</span></div></article>
+      <aside className="intelligence-aside"><article className="health-panel"><div><span className="eyebrow">PIPELINE HEALTH</span><h3>{healthScore}<small>/100</small></h3><p>{healthScore >= 75 ? 'On track' : healthScore >= 50 ? 'Needs attention' : 'Action needed'}</p></div><div className="health-ring"><ResponsiveContainer width="100%" height="100%"><RadialBarChart innerRadius="69%" outerRadius="95%" startAngle={90} endAngle={-270} data={[{ value: healthScore }]}><RadialBar dataKey="value" cornerRadius={8} fill="#2f9e92" background={{ fill: '#e8eff2' }} /></RadialBarChart></ResponsiveContainer><IconChartPieFilled size={25} /></div></article><article className="coaching-panel"><span className="xaviar-label">✦ XAVIAR COACHING</span><h3>Focus for maximum impact</h3><div className="coach-item risk"><IconAlertTriangle size={18} /><div><small>Risk to address</small><b>{copy.risk}</b></div></div><div className="coach-item strength"><IconCircleCheck size={18} /><div><small>Strength to build on</small><b>{copy.strength}</b></div></div></article></aside></div>
+    <article className="matrix-panel"><div className="visual-heading"><div><h3>Opportunity matrix</h3><p>Prioritise high-impact, high-urgency opportunities first.</p></div><div className="matrix-legend"><span><i className="dot high" /> High impact</span><span><i className="dot risk" /> Needs attention</span></div></div><div className="matrix-layout"><div className="matrix-scale"><span>Impact</span><b>High</b><small>Low</small></div><div className="matrix-chart"><ResponsiveContainer width="100%" height="100%"><ScatterChart margin={{ top: 16, right: 28, bottom: 24, left: 6 }}><CartesianGrid strokeDasharray="4 4" stroke="#dbe6ed" /><XAxis type="number" dataKey="x" name="Urgency" domain={[0, 100]} tick={false} axisLine={{ stroke: '#8da2b5' }} label={{ value: 'Urgency', position: 'bottom', fill: '#60758a', fontSize: 11 }} /><YAxis type="number" dataKey="y" name="Impact" domain={[0, 100]} tick={false} axisLine={{ stroke: '#8da2b5' }} /><ZAxis type="number" dataKey="z" range={[80, 160]} /><Tooltip cursor={{ strokeDasharray: '4 4' }} contentStyle={{ borderRadius: 10, borderColor: '#dbe7ee', boxShadow: '0 10px 25px #10253e18' }} formatter={(_value, _name, item) => item.payload?.name} /><Scatter name="Opportunities" data={matrix} fill="#167985"><LabelList dataKey="name" position="right" fill="#18354e" fontSize={11} /></Scatter></ScatterChart></ResponsiveContainer></div>{focusLead ? <button className="matrix-focus" onClick={() => onSelect(focusLead.id)}><IconTargetArrow size={25} /><span><small>Focus here</small><b>{focusLead.name}</b><em>{focusLead.status === 'follow_up_required' ? 'Follow-up is required' : 'Open lead needs its next step'}</em></span><IconArrowUpRight size={18} /></button> : <div className="matrix-focus empty-focus"><IconTargetArrow size={25} /><span><small>Focus here</small><b>No open opportunities</b><em>Create or assign a lead to populate the matrix.</em></span></div>}</div></article>
+  </section>;
+}
+
+type ChartDatum = { label: string; value: number; tone?: 'teal' | 'green' | 'red' | 'amber' };
+function chartCount(leads: Lead[], predicate: (lead: Lead) => boolean) { return leads.filter(predicate).length; }
+function reachedStatus(lead: Lead, status: OpportunityStatus) { return lead.status === status || lead.stageHistory?.some((stage) => stage.toStatus === status); }
+function followUpHealth(leads: Lead[]) {
+  const openFollowUps = leads.flatMap((lead) => lead.followUps).filter((followUp) => followUp.status === 'open');
+  const dueToday = openFollowUps.filter((followUp) => relativeDue(followUp) === 'Today').length;
+  const overdue = openFollowUps.filter((followUp) => relativeDue(followUp) === 'Overdue').length;
+  return [{ label: 'On track', value: Math.max(0, openFollowUps.length - dueToday - overdue), tone: 'green' as const }, { label: 'Due today', value: dueToday, tone: 'amber' as const }, { label: 'Overdue', value: overdue, tone: 'red' as const }];
+}
+function funnelData(leads: Lead[]): ChartDatum[] { return [
+  { label: 'MQL', value: chartCount(leads, (lead) => lead.qualification === 'mql'), tone: 'teal' },
+  { label: 'SQL', value: chartCount(leads, (lead) => lead.qualification === 'sql'), tone: 'teal' },
+  { label: 'Won', value: chartCount(leads, (lead) => lead.status === 'won'), tone: 'green' },
+  { label: 'Lost', value: chartCount(leads, (lead) => lead.status === 'lost'), tone: 'red' },
+]; }
+function pipelineData(leads: Lead[]): ChartDatum[] { return [
+  { label: 'New / assigned', value: chartCount(leads, (lead) => lead.status === 'new' || lead.status === 'assigned'), tone: 'teal' },
+  { label: 'Contacted', value: chartCount(leads, (lead) => lead.status === 'contacted'), tone: 'teal' },
+  { label: 'Connected', value: chartCount(leads, (lead) => lead.status === 'connected'), tone: 'green' },
+  { label: 'Follow-up', value: chartCount(leads, (lead) => lead.status === 'follow_up_required'), tone: 'amber' },
+  { label: 'Proposal sent', value: chartCount(leads, (lead) => lead.status === 'proposal_sent'), tone: 'teal' },
+]; }
+function riskData(leads: Lead[]): ChartDatum[] { const health = followUpHealth(leads); return [
+  { label: 'Overdue', value: health.find((datum) => datum.label === 'Overdue')?.value ?? 0, tone: 'red' },
+  { label: 'Due today', value: health.find((datum) => datum.label === 'Due today')?.value ?? 0, tone: 'amber' },
+  { label: 'Incorrect', value: chartCount(leads, (lead) => lead.status === 'incorrect'), tone: 'amber' },
+  { label: 'Duplicates', value: duplicateMatches(leads).length, tone: 'red' },
+]; }
+function sourceMix(leads: Lead[]): ChartDatum[] { const values = new Map<string, number>(); leads.forEach((lead) => values.set(lead.source, (values.get(lead.source) ?? 0) + 1)); return [...values.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([label, value]) => ({ label: label.length > 18 ? `${label.slice(0, 17)}…` : label, value, tone: 'teal' as const })); }
+function RoleScorecards({ viewer, leads, scope }: { viewer: User; leads: Lead[]; scope: DashboardScope }) {
+  const marketingView = viewer.role === 'marketer' || (viewer.role === 'admin' && scope === 'marketing');
+  const salesView = viewer.role === 'sales_agent' || viewer.role === 'manager' || (viewer.role === 'admin' && scope === 'sales');
+  const valid = leads.filter((lead) => lead.status !== 'duplicate' && lead.incorrectReview?.state !== 'confirmed_incorrect' && lead.incorrectReview?.state !== 'merge_duplicate');
+  const accepted = valid.filter((lead) => lead.assignments.length > 0).length;
+  const actionable = valid.filter((lead) => reachedStatus(lead, 'contacted') || reachedStatus(lead, 'connected') || lead.qualification !== 'not_available' || reachedStatus(lead, 'proposal_sent') || lead.status === 'won').length;
+  const mqlSql = valid.filter((lead) => lead.qualification !== 'not_available').length;
+  const connected = valid.filter((lead) => reachedStatus(lead, 'connected')).length;
+  const proposals = valid.filter((lead) => reachedStatus(lead, 'proposal_sent')).length;
+  const won = valid.filter((lead) => lead.status === 'won').length;
+  const response = median(valid.map(responseHours));
+  const routing = median(valid.map(routingHours));
+  const financial = financialMetrics(valid);
+  const lost = valid.filter((lead) => lead.status === 'lost' || lead.status === 'not_interested').length;
+  const rate = (value: number, total: number) => total ? `${Math.round((value / total) * 100)}%` : 'Not available';
+  const cards = marketingView ? [
+    ['Actionable lead yield', rate(actionable, valid.length), `${actionable}/${valid.length} valid leads progressed`],
+    ['Sales acceptance', rate(accepted, valid.length), `${accepted}/${valid.length} leads routed to Sales`],
+    ['MQL / SQL quality', `${dashboardFor(viewer, valid).mql} / ${dashboardFor(viewer, valid).sql}`, `${mqlSql}/${valid.length} decisions recorded`],
+    ['Median routing speed', routing === undefined ? 'Not available' : `${routing}h`, 'Lead creation to first sales assignment'],
+    ['Downstream wins', rate(won, valid.length), 'Won opportunities from your marketing work'],
   ] : salesView ? [
     ['Connection rate', rate(connected, valid.length), `${connected}/${valid.length} visible opportunities connected`],
     ['Median response speed', response === undefined ? 'Not available' : `${response}h`, 'Assignment to first Contacted/Connected event'],
