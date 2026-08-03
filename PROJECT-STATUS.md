@@ -75,6 +75,14 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 5. Do not enable Phase 2 outbound automation until consent, unsubscribe, and human-approval controls are implemented.
 6. Do not reopen or request production Excel migration during Milestones 1–4. Use safe sample/synthetic data for testing; schedule real-data staging, validation, and activation only under Milestone 5.
 
+## 2026-08-03 release record
+
+- Dashboard visual refinement and CRM foundation released through PR #18: https://github.com/CharlesSmith999/elevanta-ai/pull/18
+- Squash-merged to `main` at commit `d74f4693fe6db694b146e49d6934888259bdbb80`.
+- GitHub validation passed: typecheck, domain tests, and production build.
+- Vercel production deployment passed: https://elevanta-ai-pipeline.vercel.app/
+- No approved decision changed; production lead-data migration remains deferred to Milestone 5.
+
 ## Next milestone target
 
 Milestones 1–3 are closed for the released safe-sample CRM foundation. The pre-Xaviar technical refinement gate is complete; the only remaining gate item is Shariq's explicit approval of the Phase 1 screen and field contract. Once approved, begin Milestone 4 Xaviar development with synthetic/safe sample data. After Milestone 4, begin Milestone 5 production lead-data migration using staging, provenance, deterministic duplicate handling, and validation before any records enter active routing.
