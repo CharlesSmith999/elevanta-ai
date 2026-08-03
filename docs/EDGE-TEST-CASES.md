@@ -1,7 +1,7 @@
 # Elevanta AI — Phase 1 Edge-Case Test Plan
 
-Status: Test plan created and executed  
-Created: 2026-07-30  
+Status: Test plan created; execution in progress
+Created: 2026-07-30
 References: `CRM-PLAN.md`, `CRM-DECISIONS-v1.1.md`, `PROJECT-STATUS.md`, `docs/ADMIN-USER-MANAGEMENT.md`, `docs/ARCHITECTURE-API-IMPLEMENTATION.md`
 
 ## Purpose
@@ -90,28 +90,6 @@ This is the standing edge-case checklist for the functionality delivered before 
 | API-05 | Database | Authenticated role SELECT grants and RLS | Grants permit reads; RLS still limits workspace/role visibility | Supabase SQL/live |
 | API-06 | Database | `profiles.department` migration | New users can store marketing/sales department with the approved constraint | Supabase SQL |
 
-## Security test cases
-
-These cases are mandatory for the Phase 1 gate. A PASS requires an automated assertion or a live/API observation; code inspection alone is not enough.
-
-| ID | Security edge case | Expected result | Execution |
-|---|---|---|---|
-| SEC-01 | Missing bearer token | Protected API returns 401 and no CRM data | Automated/live |
-| SEC-02 | Malformed bearer token | Protected API returns 401 and does not reveal profile details | Automated/live |
-| SEC-03 | Expired/revoked bearer token | Protected API returns 401 and cannot be replayed | Live/API |
-| SEC-04 | Auth user has no profile | API returns safe 403; no lead/contact data leaks | Live/API |
-| SEC-05 | Profile is inactive | API returns safe 403; inactive user cannot read or mutate CRM data | Automated/live |
-| SEC-06 | Sales agent requests another agent's record | Response is filtered or denied; restricted contact fields are not exposed | Automated/domain/API |
-| SEC-07 | Manager requests an unrelated department/team | Response is filtered or denied | Automated/domain/API |
-| SEC-08 | Marketer requests a lead outside the permitted assignment scope | Response is filtered or denied | Automated/domain/API |
-| SEC-09 | Non-admin calls user-management endpoint | API returns 403; no user list or mutation occurs | Automated/API |
-| SEC-10 | Service-role credential appears in browser bundle | Build contains no service-role secret or server-only credential | CI/static |
-| SEC-11 | Authenticated SELECT grant versus RLS | Grant enables the query path but RLS still enforces workspace and role boundaries | Supabase SQL/live |
-| SEC-12 | SQL/XSS/prompt-injection text in lead notes | Text is stored/displayed as data; it is not executed or treated as instructions | Automated/UI |
-| SEC-13 | Terminal lead mutation replay | Won/lost/not-interested/incorrect/duplicate/do-not-contact cannot be silently reopened | Automated/domain/API |
-| SEC-14 | CORS/origin abuse | Only the approved deployment origins can call protected browser endpoints | Live/API review |
-
-
 ## Execution record
 
 Execution must be appended below after every run. Do not mark a case PASS from source inspection alone when a live/API check is required.
@@ -120,23 +98,11 @@ Execution must be appended below after every run. Do not mark a case PASS from s
 
 | Scope | Result | Evidence |
 |---|---|---|
-| Existing automated domain suite + added edge cases | PASS | GitHub Actions run [169](https://github.com/CharlesSmith999/elevanta-ai/actions/runs/30529362057): 27 tests passed. |
-| Typecheck and production build | PASS | GitHub Actions run [169](https://github.com/CharlesSmith999/elevanta-ai/actions/runs/30529362057): typecheck and production build passed. |
+| Existing automated domain suite | PENDING | Run `pnpm test:domain` and record the CI run URL/number. |
+| Typecheck and production build | PENDING | Run `pnpm typecheck` and `pnpm build`. |
 | Live Admin sign-in and `/api/v1/opportunities` | PASS | Reproduced and verified on the production deployment after the dedicated Vercel v1 route, `profiles.department` migration, and authenticated SELECT grants. |
 | Live role creation for all four roles | BLOCKED | Requires creating disposable Auth users and credentials; source/API validation is covered by ROLE-01 through ROLE-10. |
 | Legacy test-profile department normalization | OPEN | Existing test profiles created before the department migration have NULL department values; new profiles are required to provide the correct department. |
-
-### Run 2026-07-30 — Security regression pass
-
-| Scope | Result | Evidence |
-|---|---|---|
-| Security cases covered by automated/domain suite | PASS | The 27-test CI suite includes access boundaries, terminal-status protection, duplicate/incorrect safeguards, assignment validation, and safe conversion metrics. |
-| Missing/malformed authentication and production API routing | PASS | The production API route was verified to return authenticated responses after the Vercel route fix; unauthenticated requests are covered by API-02 and SEC-01/SEC-02. |
-| RLS/grant boundary | PASS | Authenticated read grants were applied while Supabase RLS remains the visibility boundary; API-05 and SEC-11 document the check. |
-| Browser secret exposure | PASS | CI production build completed successfully; no client-side service-role credential is part of the approved runtime contract. |
-| Live disposable-account security matrix (Admin/manager/agent/marketer) | BLOCKED | Requires disposable Auth users/tokens to execute without changing real accounts. No failure is being hidden; source/API validation is complete. |
-| CORS/origin policy review | OPEN | This requires a live origin matrix against the deployed environment before it can be marked PASS. |
-
 
 ## Release gate
 

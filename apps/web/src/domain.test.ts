@@ -138,7 +138,6 @@ test('named leaderboards stay manager/admin-only while individual users receive 
   assert.equal(canViewNamedLeaderboard(user('muzammil')), false);
 });
 
-
 test('lead identity requires a name plus at least one contact method', () => {
   assert.equal(isLeadIdentity('Jane', '+1 555 0100'), true);
   assert.equal(isLeadIdentity('Jane', undefined, 'jane@example.com'), true);
@@ -148,8 +147,8 @@ test('lead identity requires a name plus at least one contact method', () => {
 
 test('duplicate matching normalizes phone formatting but does not fuzzy-match values', () => {
   const leads = structuredClone(seedLeads);
-  leads.push({ ...structuredClone(leads[0]), id: 'phone-format-copy', phone: '+1 (555) 0101', email: undefined, assignments: [], activities: [], followUps: [], incorrectReports: [] });
-  leads.push({ ...structuredClone(leads[0]), id: 'near-match', phone: '+1 555 0102', email: undefined, assignments: [], activities: [], followUps: [], incorrectReports: [] });
+  leads.push({ ...structuredClone(leads[0]), id: 'phone-format-copy', phone: '(1) 555-0101', email: undefined, assignments: [], activities: [], followUps: [], incorrectReports: [] });
+  leads.push({ ...structuredClone(leads[0]), id: 'near-match', phone: '5550100001', email: undefined, assignments: [], activities: [], followUps: [], incorrectReports: [] });
   const match = duplicateMatches(leads).find((item) => item.leadId === 'lead-ronald');
   assert.equal(match?.matches.includes('phone-format-copy'), true);
   assert.equal(match?.matches.includes('near-match'), false);
