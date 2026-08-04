@@ -238,3 +238,149 @@
   .admin-reference-section[aria-label="Performance"] { padding-bottom: 23px; }
   .admin-reference-section[aria-label="Momentum and recognition"] { padding-bottom: 20px; }
 }
+
+/* Admin command center — approved light reference implementation. */
+.theme-light.admin-reference-shell {
+  --admin-ink: #121735;
+  --admin-muted: #69718c;
+  --admin-panel: #ffffff;
+  --admin-panel-strong: #fbfcff;
+  --admin-line: #dfe4f0;
+  --admin-purple: #6035e5;
+  --admin-purple-strong: #4e25d1;
+  --admin-green: #06a86c;
+  --admin-amber: #e28a00;
+  --admin-red: #ef3340;
+  background: #fbfcff;
+}
+.theme-light.admin-reference-shell .sidebar {
+  border-right-color: #e1e5ef;
+  background: #ffffff;
+  color: #121735;
+}
+.theme-light.admin-reference-shell .content { background: #fbfcff; }
+.theme-light .admin-reference-dashboard {
+  background: radial-gradient(circle at 65% -15%, #f6f1ff 0%, transparent 27%), #fbfcff;
+}
+.theme-light .admin-reference-brand { color: #171a35; }
+.theme-light .admin-reference-brand b { color: #171a35; }
+.theme-light .admin-reference-brand .admin-reference-spark {
+  color: #6a39ef;
+  filter: drop-shadow(0 0 7px #7850ee38);
+}
+.theme-light .admin-reference-nav { color: #28304c; }
+.theme-light .admin-reference-nav svg { color: #252c4a; }
+.theme-light .admin-reference-nav:hover { color: #5630d8; background: #f5f2ff; }
+.theme-light .admin-reference-nav.active {
+  color: #5430d6;
+  background: #eee8ff;
+  box-shadow: none;
+}
+.theme-light .admin-reference-nav.active svg { color: #5d31df; }
+.theme-light .admin-reference-sidebar-bottom { border-top-color: #e2e5ee; }
+.theme-light .admin-reference-profile { color: #161b37; }
+.theme-light .admin-reference-profile > span {
+  border-color: #3426a0;
+  color: #ffffff;
+  background: linear-gradient(145deg, #4b38bd, #241977);
+}
+.theme-light .admin-reference-profile small { color: #68708a; }
+.theme-light .admin-reference-profile svg { color: #2b3150; }
+.theme-light .admin-reference-topbar { border-bottom-color: #e0e4ed; }
+.theme-light .admin-reference-topbar h1 { color: #111630; }
+.theme-light .admin-reference-select {
+  border-color: #d9deea;
+  color: #202641;
+  background: #ffffff;
+  box-shadow: 0 2px 7px #22284a08;
+}
+.theme-light .admin-reference-select svg { color: #111735; }
+.theme-light .admin-reference-theme { color: #242943; }
+.theme-light .admin-reference-theme button { background: #e7e4f4; box-shadow: inset 0 0 0 1px #d0cbe0; }
+.theme-light .admin-reference-theme button i { background: #6840df; box-shadow: 0 1px 4px #3821944d; }
+.theme-light .admin-reference-avatar {
+  border-color: #d6dae7;
+  color: #4b31b4;
+  background: #ffffff;
+  box-shadow: 0 3px 10px #252c5a10;
+}
+.theme-light .admin-reference-section {
+  border-color: #dfe4ef;
+  background: #ffffff;
+  box-shadow: 0 9px 26px #28335a08;
+}
+.theme-light .admin-reference-section-heading h2 { color: #5125d5; }
+.theme-light .admin-reference-section-heading button,
+.theme-light .admin-reference-footer-link { color: #6334e6; }
+.theme-light .admin-reference-metric,
+.theme-light .admin-reference-panel {
+  border-color: #dfe4ef;
+  background: #ffffff;
+  box-shadow: 0 3px 11px #27345a07;
+}
+.theme-light .admin-reference-metric:hover { border-color: #b8a7ed; box-shadow: 0 8px 20px #5e39c312; }
+.theme-light .admin-reference-metric h3,
+.theme-light .admin-reference-metric strong,
+.theme-light .admin-reference-panel-heading h3 { color: #121735; }
+.theme-light .admin-reference-metric small { color: #6c748d; }
+.theme-light .admin-reference-metric-icon {
+  border-color: #d9cdfd;
+  color: #6031dc;
+  background: #eee9ff;
+  box-shadow: none;
+}
+.theme-light .admin-reference-metric.tone-pink .admin-reference-metric-icon { border-color: #efd0f5; color: #8e1ca4; background: #fae8fe; }
+.theme-light .admin-reference-metric.tone-blue .admin-reference-metric-icon { border-color: #d9d7ff; color: #4c38df; background: #eeedff; }
+.theme-light .admin-reference-metric.tone-green .admin-reference-metric-icon { border-color: #c8eee5; color: #078a78; background: #e4f8f4; }
+.theme-light .admin-reference-metric.tone-cyan .admin-reference-metric-icon { border-color: #c5edf1; color: #087f8e; background: #e1f7f8; }
+.theme-light .admin-reference-metric.tone-amber .admin-reference-metric-icon { border-color: #f3dfc1; color: #b46100; background: #fff2df; }
+.theme-light .admin-reference-panel-heading span,
+.theme-light .admin-reference-funnel-values small,
+.theme-light .admin-reference-funnel-values footer,
+.theme-light .admin-reference-risk small,
+.theme-light .admin-reference-execution-row span,
+.theme-light .admin-reference-rank-list span,
+.theme-light .admin-reference-win-list small,
+.theme-light .admin-reference-win-list em,
+.theme-light .admin-reference-recognition-list small { color: #69718b; }
+.theme-light .admin-reference-funnel-values,
+.theme-light .admin-reference-funnel-values b,
+.theme-light .admin-reference-risk,
+.theme-light .admin-reference-execution-row b,
+.theme-light .admin-reference-rank-list b,
+.theme-light .admin-reference-win-list,
+.theme-light .admin-reference-recognition-list b,
+.theme-light .admin-reference-recognition-list strong { color: #121735; }
+.theme-light .admin-reference-funnel-values > div,
+.theme-light .admin-reference-execution-row,
+.theme-light .admin-reference-rank-list > div { border-bottom-color: #e3e7f0; }
+.theme-light .admin-reference-risk,
+.theme-light .admin-reference-win-list > button {
+  border-color: #e1e5ee;
+  color: #121735;
+  background: #ffffff;
+}
+.theme-light .risk-red > span { color: #ef3340; background: #ffe7e9; }
+.theme-light .risk-amber > span { color: #d77700; background: #fff0dc; }
+.theme-light .risk-yellow > span { color: #be8a00; background: #fff8d8; }
+.theme-light .admin-reference-source-list > div { color: #222844; }
+.theme-light .admin-reference-source-list i { background: #eceefa; }
+.theme-light .admin-reference-source-list i b { background: linear-gradient(90deg, #7148e9, #9b6bf8); }
+.theme-light .admin-reference-source-list strong { color: #252b49; }
+.theme-light .admin-reference-spark .recharts-line-curve { filter: drop-shadow(0 0 2px #6b3ce85c); }
+.theme-light .admin-reference-win-list > button > span { color: #078f81; background: #e3f8f4; }
+.theme-light .admin-reference-recognition-list > div > span {
+  border-color: #8e6cf4;
+  background: radial-gradient(circle at 38% 32%, #9e70ff, #5427d3 68%);
+  box-shadow: 0 10px 22px #5d39c82b;
+}
+.theme-light .admin-reference-recognition-list .recognition-2 > span {
+  border-color: #5ca4ef;
+  background: radial-gradient(circle at 38% 32%, #5fa9ff, #1660ad 68%);
+  box-shadow: 0 10px 22px #1d66b72b;
+}
+.theme-light .admin-reference-recognition-list .recognition-3 > span {
+  border-color: #36cdb0;
+  background: radial-gradient(circle at 38% 32%, #36d7b5, #078979 68%);
+  box-shadow: 0 10px 22px #078a792b;
+}
