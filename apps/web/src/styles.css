@@ -216,3 +216,11 @@
 /* Dark mode is the left position, matching the approved Admin reference. */
 .admin-reference-theme button i { transform: translateX(0); }
 .theme-light .admin-reference-theme button i { transform: translateX(16px); }
+
+/* Match the reference's full-height three-row command-center composition. */
+@media (min-width: 1241px) {
+  .admin-reference-section { margin-top: 0; }
+  .admin-reference-metric { min-height: 168px; }
+  .admin-reference-performance-grid .admin-reference-panel { min-height: 284px; }
+  .admin-reference-momentum-grid .admin-reference-panel { min-height: 306px; }
+}
