@@ -4,7 +4,7 @@ Status: Planning baseline, approved from stakeholder answers
 
 Branding: The product is named **Elevanta AI**. Its embedded AI sales companion is named **Xaviar**. Xaviar is advisory in Phase 1 and supports lead analysis, follow-up guidance, agent and marketer coaching, and performance reporting. Autonomous outbound communication remains deferred to Phase 2.
 
-CRM readiness reference: [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md). Shared dashboard definitions are in [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), and the remaining role-dashboard work is defined in [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md). These must be completed before Xaviar development. Xaviar evaluation reference: [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md).
+CRM readiness reference: [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md). Shared dashboard definitions are in [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), the released dashboard baseline is in [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), the approved redesign decisions are in [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), and the pending screen specification is in [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md). Xaviar evaluation reference: [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md).
 
 ## 1. Product vision
 
@@ -36,7 +36,7 @@ An assignment is a time-bounded ownership event, not an overwrite. Every assignm
 - `contact`: normalized name, phone, email, source identity, duplicate keys, and consent flags.
 - `opportunity`: project type, description, budget/timeline signals, current status, and qualification fields.
 - `assignment`: routing history and current assignee.
-- `activity`: calls, emails, SMS, notes, status changes, reminders, and system events.
+- `activity`: calls, emails, SMS, notes, status changes, contact outcomes, reminders, sales-acceptance decisions, and system events.
 - `follow_up`: next action, due time, completion, escalation state.
 - `incorrect_report`: agent's incorrect classification with reason and evidence.
 - `incorrect_review`: admin decision after the three-agent threshold.
@@ -113,6 +113,10 @@ Workspace health: total contacts, duplicate candidates, missing contact fields, 
 ### Marketer dashboard
 
 Lead volume by source/campaign, lead quality, duplicate rate, incorrect rate, routing speed, and downstream conversion. Includes a lead-import validation report before records enter the active queue.
+
+### Approved dashboard-revamp direction
+
+The next dashboard implementation follows [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md). Every role view begins with urgent work, then selected-period performance, then an evidence-backed improvement area, followed by permitted recognition and benchmark context. The current non-governed Lead Score preview must be removed as part of that implementation. Final screen layouts require a separately approved role-by-role screen specification before implementation.
 
 ## 9. AI coaching and reporting
 
@@ -295,11 +299,10 @@ Multi-tenancy hardening, billing, self-service administration, onboarding, usage
 - AI reports identify evidence, trend, and actions without autonomous outbound communication.
 - No Phase 2 integration is enabled until consent, unsubscribe, and human-approval policies are implemented.
 
-## 17. Decisions still required before coding
+## 17. Decisions still required before future implementation
 
-1. Confirm the deployment target for the Node API; GitHub Pages cannot host the API.
-2. Confirm authentication provider and whether managers can belong to multiple teams.
-3. Approve the controlled reason lists for incorrect reports, loss reasons, and follow-up actions.
-4. Decide whether marketing is a separate role in the UI or a permission set layered onto a user.
-5. Confirm the first import sample and the admin responsible for deduplication review.
-6. Decide the final benchmark cohort and agent-visibility rules after Xaviar evaluation, using actual CRM evidence.
+1. Confirm the first import sample and the admin responsible for deduplication review during Milestone 5.
+2. Decide the final benchmark cohort and agent-visibility rules after Xaviar evaluation, using actual CRM evidence.
+3. Approve the role-by-role dashboard screen specification before the dashboard revamp is implemented.
+
+Approved dashboard and operating decisions are recorded in [CRM-DECISIONS-v1.5.md](./CRM-DECISIONS-v1.5.md) and [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md).
