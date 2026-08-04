@@ -25,3 +25,34 @@
 ## Release decision
 
 **PASSED** — the approved Direction 1 dashboard is released with dark/light visual parity, role-appropriate content, and only the approved chart families.
+
+---
+
+## Admin command-center reference correction
+
+**Date:** 2026-08-04
+**Reference image:** `/Users/shariq/Desktop/111.png`
+**Scope:** Admin / Company dashboard only. Other role dashboards are unchanged.
+
+### Exact visual comparison
+
+- Reference and preview were captured at the same `1487 × 1058` viewport and reviewed together in one comparison image.
+- The Admin screen now matches the reference composition: compact left navigation, Company Command Center header, six Work now cards, the four Performance panels, and the three Momentum & Recognition panels.
+- Geometry was measured and matched for the three main content rows: Work now `84–303`, Performance `303–651`, and Momentum & Recognition `651–1018` in the preview. This aligns to the reference row structure within a few pixels.
+- Widget contract now matches the reference: Conversion funnel; priority-banded overdue follow-ups; source quality by win rate; sales execution with meetings/proposals/win rate; top performers by won revenue; recent wins; and Top Closer / Most Meetings / Fastest Growth recognition.
+- Values use the safe CRM test workspace. They deliberately do not copy the screenshot’s fictitious company values or performance deltas.
+
+### Functional checks
+
+- Admin dark-mode control: passed.
+- Period and source filters: passed.
+- “View all actions” navigation to Follow-ups and return to Command Center: passed.
+- Command Center sidebar navigation: passed.
+- No browser error state or request-failure toast appeared during the control test.
+- TypeScript checks: passed for API and web workspaces.
+- Domain and edge tests: 27 passed, 0 failed.
+- Production build: passed for API and web workspaces.
+
+### Final result
+
+**PASSED** — the Admin dashboard is ready for release from the reviewed preview. The remaining role-specific dashboard work is intentionally out of scope for this Admin-only correction.
