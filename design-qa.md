@@ -56,3 +56,35 @@
 ### Final result
 
 **PASSED** — the Admin dashboard is ready for release from the reviewed preview. The remaining role-specific dashboard work is intentionally out of scope for this Admin-only correction.
+
+---
+
+## Admin light-mode reference implementation
+
+**Date:** 2026-08-04
+**Reference image:** `/Users/shariq/Desktop/Codex Image Aug 4, 2026, 02_25_50 PM.png`
+**Scope:** Admin / Company dashboard light mode only. The Admin dark-mode widget contract and the other role dashboards remain unchanged.
+
+### Exact visual comparison
+
+- The approved light reference and the authenticated Vercel preview were reviewed together at the same `1487 × 1058` browser viewport.
+- The light screen preserves the approved command-center geometry: white sidebar and canvas, pale-lavender active navigation, six Work now cards, four Performance panels, and three Momentum & Recognition panels.
+- Light tokens now cover the complete screen rather than recoloring only the page background: navigation, filters, metric tiles, card borders, funnel labels, risk rows, source-quality bars, execution sparklines, performer rows, recent wins, recognition badges, links, and theme controls.
+- Typography remains navy and high-contrast; status accents retain semantic purple, blue, teal, green, amber, and red treatment from the approved design.
+- Values continue to come from the CRM test workspace. The reference's fictitious company values and historical deltas were not copied.
+
+### Functional checks
+
+- Source filter changed to SEO and returned to All Sources: passed.
+- Period filter changed to This month and returned to Lifetime: passed.
+- Dark/light toggle preserved the same three dashboard sections and returned to light mode: passed.
+- “View all actions” opened Follow-ups and Dashboard returned to Company Command Center: passed.
+- Authenticated preview browser errors: none.
+- TypeScript checks: passed for API and web workspaces.
+- Domain and edge tests: 27 passed, 0 failed.
+- Production build: passed for API and web workspaces.
+- `git diff --check`: passed.
+
+### Final result
+
+**PASSED** — the Admin light-mode dashboard matches the approved visual direction and is ready for production release.
