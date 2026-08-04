@@ -44,3 +44,7 @@ This task supersedes the previous visual interpretation for the **Admin / Compan
 ## Change control
 
 This document governs the Admin dashboard work until its release is accepted. The previous dashboard task remains the governing plan for role data and privacy rules, but not for the Admin visual layout.
+
+## Light-mode companion reference
+
+The approved Admin light-mode treatment is governed by [`ADMIN-DASHBOARD-LIGHT-REFERENCE-IMPLEMENTATION.md`](./ADMIN-DASHBOARD-LIGHT-REFERENCE-IMPLEMENTATION.md). Dark and light modes share the same layout, widgets, data, and interactions; only the visual token layer changes.
