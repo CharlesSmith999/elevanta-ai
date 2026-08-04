@@ -230,7 +230,11 @@
   .admin-reference-brand { padding-bottom: 28px; }
   .admin-reference-sidebar nav { gap: 5px; }
   .admin-reference-nav { min-height: 44px; }
-  .admin-reference-sidebar-bottom { padding-bottom: 27px; }
-  .admin-reference-profile { width: 100%; border: 0; padding: 0; background: transparent; cursor: pointer; text-align: left; }
+  .admin-reference-sidebar-bottom { padding-bottom: 47px; }
+  .admin-reference-profile { width: 100%; margin-top: 80px; border: 0; padding: 0; background: transparent; cursor: pointer; text-align: left; }
   .admin-reference-select:first-child { min-width: 204px; }
+  .admin-reference-metric { min-height: 158px; }
+  .admin-work-now { padding-bottom: 20px; }
+  .admin-reference-section[aria-label="Performance"] { padding-bottom: 23px; }
+  .admin-reference-section[aria-label="Momentum and recognition"] { padding-bottom: 20px; }
 }
