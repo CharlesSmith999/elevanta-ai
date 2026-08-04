@@ -115,3 +115,11 @@ Milestones 1–3 are closed for the released safe-sample CRM foundation. The app
 - Marketing Manager includes the quality funnel, risks, source quality, routing/acceptance, and recognition. Sales Manager includes the team funnel, watchlist, loss/recovery, discipline rings, and recognition. Marketing Agent includes Add lead, quality queue, source-learning table, growth, and private recognition. Sales Agent includes the priority queue, execution, conversion, loss learning, growth, and private recognition.
 - GitHub Actions run 223 passed. Local API/web typechecks, 27 domain tests, production build, interaction checks, and light/dark visual comparisons passed.
 - No production workbook data or local reference images were published. No backend or database migration was required. Real lead-data migration remains Milestone 5 only.
+
+## 2026-08-04 role switching and navigation release record
+
+- Pull request [#26](https://github.com/CharlesSmith999/elevanta-ai/pull/26) restored one compact `View as` selector across the Admin, Marketing Manager, Sales Manager, Marketing Agent, and Sales Agent dashboards; it was squash-merged to `main` at `90f34a55c38a9558399036e923991d5133036c81`.
+- Every role change safely returns to the selected role's dashboard. Each role sidebar now contains only working, permission-appropriate destinations; irrelevant placeholder entries were removed.
+- GitHub Actions run 228 passed. Main-based API/web typechecks, 27 domain tests, production build, and local five-role interaction checks passed.
+- The Git-connected Vercel production site was live-verified after merge. All five role transitions passed with exactly one selector and no forbidden placeholder navigation labels.
+- No backend contract, database schema, production workbook data, or approved business decision changed. Real lead-data migration remains Milestone 5 only.
