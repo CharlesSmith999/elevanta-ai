@@ -2,7 +2,7 @@
 
 Status owner: Codex with Shariq  
 Last updated: 2026-08-04
-Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.5.md](./CRM-DECISIONS-v1.5.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
+Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.5.md](./CRM-DECISIONS-v1.5.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
 
 ## Current position
 
@@ -99,3 +99,19 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 ## Next milestone target
 
 Milestones 1–3 are closed for the released safe-sample CRM foundation. The approved Direction 1 dashboard and its live visual QA gate are complete. The next product milestone is Milestone 4: Xaviar development using synthetic/safe sample data. After Milestone 4, begin Milestone 5 production lead-data migration using staging, provenance, deterministic duplicate handling, and validation before any records enter active routing.
+
+## 2026-08-04 Admin reference release record
+
+- The Admin / Company Command Center was corrected to the approved [`111.png`](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md) visual reference through PR [#23](https://github.com/CharlesSmith999/elevanta-ai/pull/23), squash-merged to `main` at `20480ba2e2ef19da45d71f0197fb56e0fbc251c8`.
+- The release covers Admin only. It matches the approved compact sidebar, header controls, six Work now cards, four Performance widgets, and Momentum & Recognition panels. Other role dashboards were deliberately not changed.
+- QA passed: API/web typecheck, 27 domain tests, production build, period/source-filter controls, action navigation, and an exact `1487 × 1058` side-by-side comparison against the approved image. Full evidence is in [`design-qa.md`](./design-qa.md).
+- Vercel production was checked after merge at [elevanta-ai-pipeline.vercel.app](https://elevanta-ai-pipeline.vercel.app). The live Admin dashboard renders the approved widget contract using actual safe-workspace data, not copied screenshot values.
+- No approved business decision, backend contract, database schema, or real lead-data migration changed. Milestone 5 remains the only planned real-data migration stage.
+
+## 2026-08-04 all-role reference release record
+
+- Pull request [#25](https://github.com/CharlesSmith999/elevanta-ai/pull/25) completed the approved reference implementation for Marketing Manager, Sales Manager, Marketing Agent, and Sales Agent; it was squash-merged to `main` at `18e9b810a9656cd5ea64cc81f058b28c8e431c1a`.
+- Each role now has the approved light/dark screen structure. Manager dashboards include named evidence and sample sizes; individual dashboards keep recognition and comparison private.
+- Marketing Manager includes the quality funnel, risks, source quality, routing/acceptance, and recognition. Sales Manager includes the team funnel, watchlist, loss/recovery, discipline rings, and recognition. Marketing Agent includes Add lead, quality queue, source-learning table, growth, and private recognition. Sales Agent includes the priority queue, execution, conversion, loss learning, growth, and private recognition.
+- GitHub Actions run 223 passed. Local API/web typechecks, 27 domain tests, production build, interaction checks, and light/dark visual comparisons passed.
+- No production workbook data or local reference images were published. No backend or database migration was required. Real lead-data migration remains Milestone 5 only.
