@@ -1,8 +1,8 @@
 # Dashboard Completion Plan
 
-Status: In progress — closes the role-dashboard gap before Xaviar development
+Status: Direction 1 approved; implementation in progress under `DASHBOARD-REVAMP-IMPLEMENTATION-TASK.md`
 
-This plan supplements [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), and [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md). It does not change the approved lifecycle, access rules, source model, or benchmark-cohort decision.
+This plan supplements [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), and [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md). The released dashboard baseline is complete. The next visual and operating redesign is governed by [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md); it does not change the approved lifecycle, access rules, source model, or final benchmark-cohort decision.
 
 ## Goal
 
@@ -74,4 +74,7 @@ Xaviar development remains blocked until these gates and the existing readiness 
 
 ## Future wishlist (after the current dashboard scope)
 
-- **Lead scoring:** add a governed lead-score model to Lead Inbox using source-aware signals, qualification, engagement, follow-up behavior, and later conversion evidence. The current dashboard may show a clearly labeled visual preview only; it must not be treated as a production score until the scoring rules, audit trail, and Xaviar evaluation plan are approved.
+- **Lead scoring:** add a governed lead-score model to Lead Inbox using source-aware signals, qualification, engagement, follow-up behavior, and later conversion evidence. No score or preview is shown until the scoring rules, audit trail, and Xaviar evaluation plan are approved.
+- **Targets and goals:** allow Admin to set company and department targets, with Managers setting permitted team goals. No target may be silently hard-coded.
+- **Combined performance score:** consider only after transparent weighting, fair source cohorts, sufficient outcomes, and Xaviar evaluation.
+- **Recognition evolution:** begin with in-product recognition; consider formal rewards only through a later approved product decision.

@@ -61,6 +61,25 @@ Rules:
 
 Qualification is separate from lifecycle status. A lead can be Connected and MQL, or Qualified and SQL. Missing historical qualification remains `Not available`.
 
+### Qualification and sales-acceptance ownership
+
+- Marketing Agents and Marketing Managers may record MQL.
+- Sales Agents and Sales Managers may record SQL.
+- Managers and Admin may correct either decision with audit history.
+- Sales records one intake decision within one business day: `Accepted — working it`, `Needs more information`, `Not a fit`, `Duplicate`, or `Incorrect`.
+
+### Contact outcomes
+
+`No Answer` is a contact-attempt outcome, not a lifecycle status. Approved quick outcomes are: Connected, No Answer, Voicemail, Email Sent, Callback Requested, Not Interested, Meeting Booked, and Other. Selecting Not Interested also requires the corresponding terminal status and controlled reason.
+
+Every active opportunity must have a current status, next action, and follow-up due date. When a contact attempt is logged, it also has a latest contact outcome.
+
+### Project types and currency
+
+The Phase 1 controlled project-type values are Website Development, Mobile App, SEO, PPC, Social Media, Design / Branding, and Other. Dashboard reporting remains `Not available` until real project-type values exist.
+
+Phase 1 financial reporting uses USD (`$`) as the workspace default currency.
+
 ## 4. Date rules
 
 | Metric or event | Date used |
@@ -156,5 +175,7 @@ Flag records with:
 - Active opportunity with no next action
 - Invalid date order
 - Activity after a terminal status
+- Active opportunity without a next action or follow-up due date
+- Sales assignment without a sales-acceptance decision after one business day
 - Duplicate or incorrect review pending
 - Assignment without a valid owner
