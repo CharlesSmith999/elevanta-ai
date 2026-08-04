@@ -33,8 +33,8 @@ Combined score, lead-score preview, close prediction, universal cross-source ran
 - [x] Verify filters, Add lead, Lead inbox, leaderboard, watchlist, and drill-through actions in the existing component contracts.
 - [x] Run typecheck, build, and domain tests; record browser QA status in `design-qa.md`.
 - [x] Update `PROJECT-STATUS.md` and related dashboard documents with evidence.
-- [ ] Complete live browser visual QA after release.
-- [ ] Publish only after local checks pass and the release is reconciled with `CRM-PLAN.md` and the current decisions document.
+- [x] Complete live browser visual QA after release.
+- [x] Publish only after local checks pass and the release is reconciled with `CRM-PLAN.md` and the current decisions document.
 
 ## Change control
 

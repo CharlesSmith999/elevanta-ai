@@ -14,10 +14,14 @@
 
 ## Browser visual gate
 
-**Final result: pending live verification**
+**Final result: passed on the live Vercel deployment**
 
-The local preview server started successfully, but the connected in-app browser could not resolve the local preview host. This release will be checked against the ten approved reference screens on the live Vercel deployment before the visual gate is marked passed.
+- Admin, Marketing Manager view, Sales Manager, Marketing Agent, and Sales Agent were each checked in light and dark mode.
+- Each role retained the same role overview, scorecards, pipeline conversion graph, and role-performance graph section between themes.
+- The shared chart tokens change between modes; lower chart components no longer retain hard-coded light-only colors.
+- The live browser reported zero console errors.
+- The live view uses the safe test workspace only. No production workbook data was imported.
 
 ## Release decision
 
-The code is safe to deploy and automated checks are green. After the live visual check, update this report with the final result and any corrections made.
+**PASSED** — the approved Direction 1 dashboard is released with dark/light visual parity, role-appropriate content, and only the approved chart families.
