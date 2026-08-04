@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-04
 **Reference:** `docs/DASHBOARD-REVAMP-DESIGN-SET.md` (Direction 1)
-**Implementation:** `apps/web/src/App.tsx`, `apps/web/src/styles.css`
+**Implementation:** `apps/web/src/App.tsx`, `apps/web/src/RoleReferenceDashboards.tsx`, `apps/web/src/styles.css`
 
 ## Automated evidence
 
@@ -88,3 +88,38 @@
 ### Final result
 
 **PASSED** — the Admin light-mode dashboard matches the approved visual direction and is ready for production release.
+
+---
+
+## Marketing and Sales role reference implementation
+
+**Date:** 2026-08-04
+**Contract:** [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md)
+**Scope:** Marketing Manager, Sales Manager, Marketing Agent, and Sales Agent in light and dark modes.
+
+### Visual comparison
+
+- Each role implementation and its approved reference were reviewed at the same desktop viewport.
+- Marketing Manager preserves six Work now cards, the quality funnel/risk/source/trend row, and five detailed recognition cards.
+- Sales Manager preserves six Work now cards, team funnel, operating watchlist, loss/recovery, two discipline rings, and five detailed recognition cards.
+- Marketing Agent preserves Add lead, the quality queue, six quality cards, impact journey, source-learning table, routing/acceptance trend, growth, and private recognition.
+- Sales Agent preserves the priority queue, six execution cards, conversion path, loss learning, growth, and private recognition.
+- Light and dark modes use the same component tree and data. Only visual tokens change.
+- CRM values come from role-visible safe test records. Screenshot values are not copied.
+
+### Functional checks
+
+- Period and source filters: passed.
+- Marketing Agent Add lead opened the validated creation form: passed.
+- Sales Agent priority action opened the selected lead detail: passed.
+- Marketing Manager department visibility: passed by domain test.
+- Manager named-recognition and agent private-recognition separation: passed.
+- Light/dark element parity for all four role dashboards: passed.
+- API and web TypeScript checks: passed.
+- Domain and edge tests: 27 passed, 0 failed.
+- Production web and API builds: passed.
+- `git diff --check`: passed.
+
+### Final result
+
+**PASSED FOR RELEASE** — the four remaining role dashboards match their approved visual and role-information contracts. Production deployment verification is recorded in `PROJECT-STATUS.md` after the Git-connected Vercel release is Ready.

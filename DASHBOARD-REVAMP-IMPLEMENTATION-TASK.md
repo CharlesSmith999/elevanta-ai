@@ -4,7 +4,7 @@
 **Approved:** 2026-08-04
 **Source of truth:** `DASHBOARD-REVAMP-DECISIONS-v1.0.md`, `DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md`, and `docs/DASHBOARD-REVAMP-DESIGN-SET.md`
 
-**Admin visual override:** [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md) is the current visual source of truth for the Admin / Company dashboard. It intentionally replaces the earlier Admin visual interpretation while leaving all other role dashboards unchanged for now.
+**Approved visual implementation:** [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md) remains the Admin / Company source of truth. [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md) is the implementation contract for Marketing Manager, Sales Manager, Marketing Agent, and Sales Agent.
 
 ## Objective
 
