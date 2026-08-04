@@ -123,3 +123,28 @@
 ### Final result
 
 **PASSED FOR RELEASE** — the four remaining role dashboards match their approved visual and role-information contracts. Production deployment verification is recorded in `PROJECT-STATUS.md` after the Git-connected Vercel release is Ready.
+
+---
+
+## Shared role switcher and navigation simplification
+
+**Date:** 2026-08-04
+**Contract:** [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md) v1.1
+
+### Functional checks
+
+- Exactly one `View as` selector appears in the top bar for Admin, Marketing Manager, Sales Manager, Marketing Agent, and Sales Agent: passed.
+- Selector transitions returned the correct dashboard for all five role contexts: passed.
+- Each transition reset the view to that role's dashboard rather than retaining an inaccessible page: passed.
+- Admin navigation contains only working company actions: passed.
+- Marketing Manager and Sales Manager navigation contains only department-relevant working actions: passed.
+- Marketing Agent and Sales Agent navigation contains only personal-workspace actions: passed.
+- Irrelevant placeholder entries including Accounts, Contacts, Campaigns, Activities, generic Dashboards, Coaching, Team, Insights, Settings, and Help are absent: passed.
+- The Admin title remains a single line at the tested `1280 × 720` desktop viewport after adding the selector: passed.
+- API and web TypeScript checks: passed.
+- Domain and edge tests: 27 passed, 0 failed.
+- Production web build: passed; the existing non-blocking bundle-size warning remains.
+
+### Final result
+
+**PASSED FOR RELEASE** — role switching and role-safe navigation are consistent across the five approved dashboards.

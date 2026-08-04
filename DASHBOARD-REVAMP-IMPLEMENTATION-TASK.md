@@ -12,6 +12,8 @@ Implement the selected Direction 1 dashboard experience for all five current rol
 
 ## Approved scope
 
+- Keep one compact `View as` selector in the top bar of every safe test-workspace dashboard so all five approved role contexts can be inspected without leaving the dashboard.
+- Show only working, permission-appropriate destinations in each role sidebar; do not expose placeholder navigation items.
 - Roles: Admin, Marketing Manager, Sales Manager, Marketing Agent, Sales Agent.
 - Shared order: Work now → Performance → Improve → Recognition.
 - Shared controls: Today, Week, Month, Year, Lifetime, and Custom period; source/status filters; visible scope; drill-through actions.

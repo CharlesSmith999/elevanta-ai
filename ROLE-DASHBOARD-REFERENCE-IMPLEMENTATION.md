@@ -1,6 +1,6 @@
 # Role Dashboard Reference Implementation
 
-**Version:** v1.0
+**Version:** v1.1
 **Approved direction:** Direction 1
 **Date:** 2026-08-04
 **Parent plan:** [DASHBOARD-REVAMP-IMPLEMENTATION-TASK.md](./DASHBOARD-REVAMP-IMPLEMENTATION-TASK.md)
@@ -26,6 +26,8 @@ Admin remains governed by [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-
 - Dashboard values come from the role-visible CRM records. Approved design screenshots define composition and appearance; their fictitious numbers are never copied.
 - Missing evidence renders as `Not available` or `Not enough data`.
 - Named recognition is restricted to management roles. Agent recognition and benchmarks remain private.
+- Every dashboard top bar includes the safe `View as` selector so the test workspace can switch directly between Admin, both manager roles, Marketing Agents, and Sales Agents.
+- Each role sidebar contains only working, role-relevant destinations. Placeholder Accounts, Contacts, Campaigns, Activities, generic Dashboards, Coaching, Team, Insights, Settings, and Help entries are removed when they do not map to a usable role workflow.
 
 ## Role contracts
 
