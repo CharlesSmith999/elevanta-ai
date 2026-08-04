@@ -471,3 +471,23 @@
 @media (max-width: 860px) {
   .role-reference-dashboard { padding: 10px 13px 28px; }.role-reference-topbar,.role-reference-title,.admin-reference-controls { align-items: flex-start; flex-direction: column; }.role-reference-topbar { padding: 12px 2px; }.role-reference-title { gap: 10px; }.role-reference-title h1 { white-space: normal; }.role-reference-metrics,.marketing-manager-grid,.sales-manager-main-grid,.marketing-agent-insights,.sales-agent-insights,.role-recognition-grid,.marketing-agent-queue { grid-template-columns: 1fr; }.priority-table { overflow-x: auto; }.priority-row { min-width: 920px; }.impact-journey,.sales-path { overflow-x: auto; grid-template-columns: repeat(6, 90px); }.growth-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* Shared safe role switcher: identical control and behavior across every reference dashboard. */
+.role-view-switcher { display: inline-flex; flex: 0 0 210px; align-items: center; gap: 7px; min-width: 0; width: 210px; height: 40px; border: 1px solid #333963; border-radius: 5px; padding: 0 9px; color: #e8e4f7; background: #0e1331; }
+.role-view-switcher svg { flex: 0 0 auto; color: #b78aff; }
+.role-view-switcher > span { flex: 0 0 auto; color: #aaa4bd; font-size: 10px; white-space: nowrap; }
+.role-view-switcher select { min-width: 0; width: 100%; border: 0; outline: 0; color: #f6f2ff; background: transparent; font-size: 11px; font-weight: 650; }
+.theme-light .role-view-switcher { border-color: #d9d3e8; color: #302953; background: #fff; }
+.theme-light .role-view-switcher svg { color: #6237dc; }
+.theme-light .role-view-switcher > span { color: #746d89; }
+.theme-light .role-view-switcher select { color: #241d49; }
+@media (max-width: 1450px) and (min-width: 861px) {
+  .admin-reference-topbar { align-items: flex-start; }
+  .admin-reference-controls { flex-wrap: wrap; justify-content: flex-end; }
+  .admin-reference-topbar > h1,.role-reference-title h1 { font-size: 28px; white-space: nowrap; }
+  .role-view-switcher { flex-basis: 190px; width: 190px; }
+  .admin-reference-select { min-width: 150px; }
+}
+@media (max-width: 860px) {
+  .role-view-switcher { flex-basis: auto; width: 100%; }
+}
