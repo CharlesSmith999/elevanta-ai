@@ -224,3 +224,13 @@
   .admin-reference-performance-grid .admin-reference-panel { min-height: 284px; }
   .admin-reference-momentum-grid .admin-reference-panel { min-height: 306px; }
 }
+
+/* Desktop geometry measured from the approved 1487 × 1058 Admin image. */
+@media (min-width: 1241px) {
+  .admin-reference-brand { padding-bottom: 28px; }
+  .admin-reference-sidebar nav { gap: 5px; }
+  .admin-reference-nav { min-height: 44px; }
+  .admin-reference-sidebar-bottom { padding-bottom: 27px; }
+  .admin-reference-profile { width: 100%; border: 0; padding: 0; background: transparent; cursor: pointer; text-align: left; }
+  .admin-reference-select:first-child { min-width: 204px; }
+}
