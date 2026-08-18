@@ -100,6 +100,14 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 
 Milestones 1–3 are closed for the released safe-sample CRM foundation. Xaviar Milestone 4 implementation, automated/local browser validation, additive Supabase foundation, GitHub release, and Vercel production deployment are complete. The remaining Milestone 4 gate is to record Admin plus Manager approval. Only after that gate closes may Milestone 5 production lead-data migration begin using staging, provenance, deterministic duplicate handling, and validation before records enter active routing.
 
+## 2026-08-17 UI/UX remediation status
+
+- The post-Xaviar UI/UX audit is recorded in [`audit/uiux-2026-08-17/UI-UX-AUDIT.md`](./audit/uiux-2026-08-17/UI-UX-AUDIT.md).
+- Local remediation is complete: one role-aware shell now persists across dashboards and internal pages, compact navigation has a labelled drawer, active-page state is correct, internal pages use the approved theme system, wide tables become labelled phone cards, compact controls are larger, charts have accessible summaries, and Lead detail uses progressive disclosure.
+- The Admin `Improve` action now opens Xaviar.
+- Validation passed: 41 role/page navigation cases, 10 dashboard light/dark parity cases, all 46 automated CRM/permission/navigation/privacy/Xaviar tests, web TypeScript, and production build. No backend or database change was required.
+- Release status: local only. GitHub/Vercel publication and the final released-environment phone/tablet/laptop/wide-desktop screenshot matrix remain pending.
+
 ## 2026-08-04 Admin reference release record
 
 - The Admin / Company Command Center was corrected to the approved [`111.png`](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md) visual reference through PR [#23](https://github.com/CharlesSmith999/elevanta-ai/pull/23), squash-merged to `main` at `20480ba2e2ef19da45d71f0197fb56e0fbc251c8`.
