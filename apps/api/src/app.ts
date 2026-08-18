@@ -2,6 +2,7 @@ import cors from 'cors';
 import express, { NextFunction, Request, Response } from 'express';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { z, ZodError } from 'zod';
+import { buildApiXaviarReport, canRequestXaviar, opportunityBelongsToSubject, type XaviarOpportunity, type XaviarProfile } from './xaviar.js';
 
 type Profile = { id: string; workspace_id: string; role: 'admin' | 'manager' | 'sales_agent' | 'marketer'; full_name: string; manager_id: string | null; department?: 'marketing' | 'sales' | null; active: boolean };
 type AuthenticatedRequest = Request & { profile?: Profile; supabase?: SupabaseClient };
@@ -40,6 +41,10 @@ const updateUser = z.object({
   managerId: id.nullable().optional(),
   active: z.boolean().optional(),
 }).refine((value) => Object.keys(value).length > 0, { message: 'Provide at least one profile field to update.' });
+const xaviarFeedback = z.object({ state: z.enum(['acknowledged', 'deferred', 'completed', 'dismissed']), reason: z.string().trim().max(1000).optional() });
+const coachingPlan = z.object({ subjectUserId: id, title: z.string().trim().min(2).max(200), objective: z.string().trim().min(2).max(2000), periodStart: z.string().date(), periodEnd: z.string().date(), managerNotes: z.string().trim().max(3000).optional() }).refine((value) => value.periodEnd >= value.periodStart, { message: 'The coaching-plan end date must not be before its start date.' });
+const coachingPlanUpdate = z.object({ status: z.enum(['draft', 'active', 'completed', 'cancelled']).optional(), title: z.string().trim().min(2).max(200).optional(), objective: z.string().trim().min(2).max(2000).optional(), managerNotes: z.string().trim().max(3000).optional() }).refine((value) => Object.keys(value).length > 0, { message: 'Provide a coaching-plan change.' });
+const xaviarReleaseReview = z.object({ decision: z.enum(['approved', 'changes_required']), notes: z.string().trim().min(1).max(3000), releaseVersion: z.string().trim().min(1).max(100) });
 
 function configuredClient(token: string) {
   const url = process.env.SUPABASE_URL;
@@ -57,6 +62,54 @@ function serviceClient() {
 
 function parse(schema: z.ZodTypeAny, value: unknown) { return schema.parse(value); }
 function asyncRoute(handler: (request: AuthenticatedRequest, response: Response) => Promise<void>) { return (request: AuthenticatedRequest, response: Response, next: NextFunction) => { handler(request, response).catch(next); }; }
+
+async function persistXaviarReport(subject: XaviarProfile, report: ReturnType<typeof buildApiXaviarReport>) {
+  const admin = serviceClient();
+  const dayStart = new Date(report.generatedAt); dayStart.setUTCHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart); dayEnd.setUTCHours(23, 59, 59, 999);
+  const { error: snapshotError } = await admin.from('xaviar_performance_snapshots').upsert({
+    workspace_id: subject.workspace_id, subject_user_id: subject.id, period_start: dayStart.toISOString(), period_end: dayEnd.toISOString(),
+    metrics: { sampleSize: report.sampleSize, summary: report.summary }, evidence_count: report.sampleSize,
+    data_quality: { missingData: report.missingData }, model_version: report.reportVersion,
+  }, { onConflict: 'subject_user_id,period_start,period_end,model_version' });
+  if (snapshotError) throw snapshotError;
+
+  const storedIds = new Map<string, string>();
+  for (const recommendation of report.recommendations) {
+    const { data, error } = await admin.from('xaviar_recommendations').upsert({
+      workspace_id: subject.workspace_id, subject_user_id: subject.id, recommendation_key: recommendation.id,
+      opportunity_id: null, capability: recommendation.capability, title: recommendation.title, reason: recommendation.reason,
+      action: recommendation.action, confidence: recommendation.confidence, priority: recommendation.priority,
+      expires_at: recommendation.expiresAt, model_version: report.reportVersion, prompt_version: null,
+      evidence_version: 'structured-events-v1', updated_at: report.generatedAt,
+    }, { onConflict: 'subject_user_id,recommendation_key,model_version' }).select('id').single();
+    if (error) throw error;
+    storedIds.set(recommendation.id, data.id);
+    const { error: clearError } = await admin.from('xaviar_evidence').delete().eq('recommendation_id', data.id);
+    if (clearError) throw clearError;
+    if (recommendation.evidence.length) {
+      const { error: evidenceError } = await admin.from('xaviar_evidence').insert(recommendation.evidence.map((item) => ({
+        recommendation_id: data.id, evidence_type: item.kind, entity_id: item.opportunityId ?? null,
+        label: item.label, occurred_at: item.occurredAt ?? null,
+      })));
+      if (evidenceError) throw evidenceError;
+    }
+  }
+
+  const { data: existingPredictions, error: existingError } = await admin.from('xaviar_predictions').select('outcome_type').eq('subject_user_id', subject.id).eq('model_version', report.reportVersion).gte('predicted_at', dayStart.toISOString()).lte('predicted_at', dayEnd.toISOString());
+  if (existingError) throw existingError;
+  const existingOutcomes = new Set((existingPredictions ?? []).map((item) => item.outcome_type));
+  const newPredictions = report.predictions.filter((item) => item.status === 'available' && !existingOutcomes.has(item.outcome));
+  if (newPredictions.length) {
+    const { error: predictionError } = await admin.from('xaviar_predictions').insert(newPredictions.map((item) => ({
+      workspace_id: subject.workspace_id, subject_user_id: subject.id, outcome_type: item.outcome,
+      probability: item.probability === undefined ? null : item.probability / 100, confidence: item.confidence,
+      sample_size: item.sampleSize, model_version: item.modelVersion, predicted_at: item.predictedAt, expires_at: item.expiresAt,
+    })));
+    if (predictionError) throw predictionError;
+  }
+  return { ...report, recommendations: report.recommendations.map((item) => ({ ...item, id: storedIds.get(item.id) ?? item.id })) };
+}
 
 export function createApp() {
   const app = express();
@@ -221,7 +274,58 @@ export function createApp() {
   }));
   app.post('/v1/imports/validate', ...protectedRoute(async (_request, response) => { response.status(409).json({ message: 'Production Excel import is deferred until Milestone 5.' }); }));
   app.post('/v1/imports/commit', ...protectedRoute(async (_request, response) => { response.status(409).json({ message: 'Production Excel import is deferred until Milestone 5.' }); }));
-  app.get('/v1/coaching/:userId', ...protectedRoute(async (_request, response) => { response.status(409).json({ message: 'Xaviar coaching is deferred until the Milestone 4 evaluation gate.' }); }));
+  app.get('/v1/coaching/:userId', ...protectedRoute(async (request, response) => {
+    const targetId = parse(id, request.params.userId); const viewer = request.profile!;
+    const { data: subject, error: subjectError } = await request.supabase!.from('profiles').select('id, workspace_id, role, manager_id, department').eq('id', targetId).maybeSingle();
+    if (subjectError) throw subjectError;
+    if (!subject) { response.status(404).json({ message: 'Xaviar coaching subject not found.' }); return; }
+    if (!canRequestXaviar(viewer as XaviarProfile, subject as XaviarProfile)) { response.status(403).json({ message: 'Xaviar coaching is outside your permitted scope.' }); return; }
+    const { data: managed, error: managedError } = subject.role === 'manager'
+      ? await request.supabase!.from('profiles').select('id').eq('manager_id', subject.id).eq('active', true)
+      : { data: [], error: null };
+    if (managedError) throw managedError;
+    const { data, error } = await request.supabase!.from('opportunities').select('id,status,qualification,source,marketing_owner_id,created_at,updated_at,won_at,lost_reason,assignments(assigned_to,started_at,ended_at),follow_ups(id,owner_id,due_at,status),activities(id,type,actor_id,created_at,from_status,to_status)').order('updated_at', { ascending: false });
+    if (error) throw error;
+    const scoped = ((data ?? []) as XaviarOpportunity[]).filter((item) => opportunityBelongsToSubject(item, subject as XaviarProfile, (managed ?? []).map((profile) => profile.id)));
+    const report = buildApiXaviarReport(subject as XaviarProfile, scoped);
+    response.json({ report: await persistXaviarReport(subject as XaviarProfile, report) });
+  }));
+  app.post('/v1/xaviar/recommendations/:id/feedback', ...protectedRoute(async (request, response) => {
+    const recommendationId = parse(id, request.params.id); const value = parse(xaviarFeedback, request.body);
+    const { error } = await request.supabase!.rpc('record_xaviar_feedback', { p_recommendation_id: recommendationId, p_state: value.state, p_reason: value.reason ?? null });
+    if (error) throw error; response.status(204).end();
+  }));
+  app.post('/v1/xaviar/coaching-plans', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'admin' && request.profile!.role !== 'manager') { response.status(403).json({ message: 'Only Admin and Managers can create coaching plans.' }); return; }
+    const value = parse(coachingPlan, request.body); const admin = serviceClient();
+    const { data: subject, error: subjectError } = await admin.from('profiles').select('id,workspace_id,role,manager_id,department').eq('id', value.subjectUserId).maybeSingle();
+    if (subjectError) throw subjectError;
+    if (!subject || !canRequestXaviar(request.profile! as XaviarProfile, subject as XaviarProfile) || subject.id === request.profile!.id) { response.status(403).json({ message: 'Choose a permitted team member for this coaching plan.' }); return; }
+    const { data, error } = await admin.from('xaviar_coaching_plans').insert({ workspace_id: request.profile!.workspace_id, subject_user_id: subject.id, manager_id: request.profile!.id, title: value.title, objective: value.objective, period_start: value.periodStart, period_end: value.periodEnd, manager_notes: value.managerNotes ?? null }).select('*').single();
+    if (error) throw error;
+    await admin.from('audit_events').insert({ workspace_id: request.profile!.workspace_id, actor_id: request.profile!.id, entity_type: 'xaviar_coaching_plan', entity_id: data.id, action: 'xaviar_coaching_plan_created', before_json: null, after_json: data });
+    response.status(201).json({ plan: data });
+  }));
+  app.patch('/v1/xaviar/coaching-plans/:id', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'admin' && request.profile!.role !== 'manager') { response.status(403).json({ message: 'Only Admin and Managers can update coaching plans.' }); return; }
+    const planId = parse(id, request.params.id); const value = parse(coachingPlanUpdate, request.body); const admin = serviceClient();
+    const { data: before, error: beforeError } = await admin.from('xaviar_coaching_plans').select('*').eq('id', planId).maybeSingle();
+    if (beforeError) throw beforeError;
+    if (!before || before.workspace_id !== request.profile!.workspace_id || (request.profile!.role === 'manager' && before.manager_id !== request.profile!.id)) { response.status(404).json({ message: 'Coaching plan not found in your permitted scope.' }); return; }
+    const update = { ...(value.status ? { status: value.status } : {}), ...(value.title ? { title: value.title } : {}), ...(value.objective ? { objective: value.objective } : {}), ...(value.managerNotes !== undefined ? { manager_notes: value.managerNotes } : {}), updated_at: new Date().toISOString() };
+    const { data, error } = await admin.from('xaviar_coaching_plans').update(update).eq('id', planId).select('*').single();
+    if (error) throw error;
+    await admin.from('audit_events').insert({ workspace_id: request.profile!.workspace_id, actor_id: request.profile!.id, entity_type: 'xaviar_coaching_plan', entity_id: planId, action: 'xaviar_coaching_plan_updated', before_json: before, after_json: data });
+    response.json({ plan: data });
+  }));
+  app.post('/v1/xaviar/release-reviews', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'admin' && request.profile!.role !== 'manager') { response.status(403).json({ message: 'Only Admin and Managers can review a Xaviar release.' }); return; }
+    const value = parse(xaviarReleaseReview, request.body); const admin = serviceClient();
+    const { data, error } = await admin.from('xaviar_release_reviews').upsert({ workspace_id: request.profile!.workspace_id, reviewer_id: request.profile!.id, release_version: value.releaseVersion, decision: value.decision, notes: value.notes }, { onConflict: 'reviewer_id,release_version' }).select('*').single();
+    if (error) throw error;
+    await admin.from('audit_events').insert({ workspace_id: request.profile!.workspace_id, actor_id: request.profile!.id, entity_type: 'xaviar_release_review', entity_id: data.id, action: 'xaviar_release_review_recorded', before_json: null, after_json: data });
+    response.status(201).json({ review: data });
+  }));
   app.get('/v1/dashboards/:role', ...protectedRoute(async (request, response) => {
     const role = parse(dashboardRoles, request.params.role); const profile = request.profile!;
     const permitted = profile.role === 'admin' || (role === 'agent' && profile.role === 'sales_agent') || profile.role === role || (role === 'manager' && profile.role === 'manager');
