@@ -1,7 +1,7 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-08-04
+Last updated: 2026-08-17
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.5.md](./CRM-DECISIONS-v1.5.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
 
 ## Current position
@@ -36,7 +36,7 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 | 1 — Foundation | Complete | React/Vite web app, Node API, Supabase foundation tables, reconciled CRM control routines, role/manager model, audit-oriented workflow functions, protected lead actions, test accounts, GitHub CI workflow, Vercel catch-all API entry point, typed API contracts, role-safe dashboard routes, and Supabase email/password sign-in are released on `main`. Production build and signed-in smoke testing passed. | No product release work remains. Migration-ledger traceability is a documented follow-up before Milestone 5, not a reason to import data now. |
 | 2 — CRM core | Complete | Contact/opportunity views, assignment history, full-context/fresh-start handoff, statuses, notes, follow-ups, incorrect-review actions, role-aware visibility, and audited follow-up completion are implemented against the authenticated API. CI run 135, local 19-test suite, production build, and signed-in production smoke passed. | No Milestone 2 product work remains. Real Excel lead-data migration remains deferred until after Milestone 4. |
 | 3 — Controls and dashboards | Complete | Direction 1 role dashboards are released and live-verified: Admin, Marketing Manager view, Sales Manager, Marketing Agent, and Sales Agent all retain the approved elements in light and dark mode. Benchmark cohorts remain open for Xaviar evaluation. | No Milestone 3 product work remains. |
-| 4 — AI support | Planned phased build | Xaviar will be built and validated in sub-phases 4A–4H using synthetic or safe sample data: data contract, event foundation, explanations, recommendations, coaching, benchmarks, calibrated predictions, dashboard integration, and safety review. | Complete all sub-phases and obtain manager/admin sign-off; no live agent rollout occurs in this milestone. |
+| 4 — AI support | Implementation complete; release gate pending | Xaviar sub-phases 4A–4H are implemented using safe sample data: data contract, event foundation, explanations, recommendations, coaching, privacy-safe benchmarks, calibrated prediction controls, five-role dashboard integration, safety tests, and the verified additive Supabase foundation. | Release the tested code and record one Admin plus one Manager approval. No live agent rollout occurs in this milestone. |
 | 5 — Production data migration | Not started | Deliberately deferred until Milestones 2–4 and Xaviar safety review are complete. | Stage and validate the approved Excel data, preserve provenance, apply duplicate handling, reconcile dashboards, activate migrated records, and then begin live agent/marketer use. |
 | Phase 2 — Workflow automation | Not started | Scope is documented only. | Email, SMS, calendar, phone, digests, escalation, consent enforcement, and human approval gates. |
 | Phase 3 — SaaS product | Not started | Scope is documented only. | Multi-tenancy, billing, self-service administration, onboarding, limits, and product analytics. |
@@ -98,7 +98,7 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 
 ## Next milestone target
 
-Milestones 1–3 are closed for the released safe-sample CRM foundation. The approved Direction 1 dashboard and its live visual QA gate are complete. The next product milestone is Milestone 4: Xaviar development using synthetic/safe sample data. After Milestone 4, begin Milestone 5 production lead-data migration using staging, provenance, deterministic duplicate handling, and validation before any records enter active routing.
+Milestones 1–3 are closed for the released safe-sample CRM foundation. Xaviar Milestone 4 implementation, automated/local browser validation, and the additive Supabase foundation are complete. The remaining Milestone 4 release gate is to release the tested code and record Admin plus Manager approval. Only after that gate closes may Milestone 5 production lead-data migration begin using staging, provenance, deterministic duplicate handling, and validation before records enter active routing.
 
 ## 2026-08-04 Admin reference release record
 
@@ -116,10 +116,11 @@ Milestones 1–3 are closed for the released safe-sample CRM foundation. The app
 - GitHub Actions run 223 passed. Local API/web typechecks, 27 domain tests, production build, interaction checks, and light/dark visual comparisons passed.
 - No production workbook data or local reference images were published. No backend or database migration was required. Real lead-data migration remains Milestone 5 only.
 
-## 2026-08-04 role switching and navigation release record
+## 2026-08-17 Xaviar Milestone 4 implementation record
 
-- Pull request [#26](https://github.com/CharlesSmith999/elevanta-ai/pull/26) restored one compact `View as` selector across the Admin, Marketing Manager, Sales Manager, Marketing Agent, and Sales Agent dashboards; it was squash-merged to `main` at `90f34a55c38a9558399036e923991d5133036c81`.
-- Every role change safely returns to the selected role's dashboard. Each role sidebar now contains only working, permission-appropriate destinations; irrelevant placeholder entries were removed.
-- GitHub Actions run 228 passed. Main-based API/web typechecks, 27 domain tests, production build, and local five-role interaction checks passed.
-- The Git-connected Vercel production site was live-verified after merge. All five role transitions passed with exactly one selector and no forbidden placeholder navigation labels.
-- No backend contract, database schema, production workbook data, or approved business decision changed. Real lead-data migration remains Milestone 5 only.
+- Sub-phases 4A–4H are implemented locally under `XAVIAR-DATA-CONTRACT-v1.0.md`, `XAVIAR-EVALUATION-PLAN.md`, and `docs/XAVIAR-MILESTONE-4-TEST-CASES.md`.
+- Xaviar now provides role-aware daily, weekly, monthly, and lifetime explanations; evidence-backed priorities; follow-up, loss, routing, duplicate, and quality coaching; privacy-safe benchmark suppression; five versioned forecast types; evidence gaps; recommendation feedback; manager coaching-plan APIs; and Admin/Manager release-review records.
+- The additive migration `202608170001_xaviar_milestone4.sql` creates the permission-safe event stream, snapshots, recommendation/evidence/feedback ledger, predictions, coaching plans, release reviews, and audit-backed feedback workflow. It does not import or modify production lead data.
+- Validation passed: API and web TypeScript checks, production build, repository whitespace check, and 43 CRM/Xaviar domain, permission, privacy, prompt-injection, edge-case, and calibration tests. Local browser verification passed for Admin, Marketing Manager, Sales Manager, Marketing Agent, and Sales Agent, in light and dark modes, with no console errors.
+- The browser test identified and corrected the safe-workspace Shariq Admin/Marketing Manager identity alias so the Marketing Manager receives the approved marketing-team scope.
+- Supabase application and verification completed on 2026-08-17 in project `jayxyikgefnzitxcbdov`: all seven Xaviar tables, `xaviar_event_stream`, the feedback function, and all seven permission policies are present. The tested code release and the required Admin and Manager human approval records remain pending. Real lead-data migration remains Milestone 5 only.
