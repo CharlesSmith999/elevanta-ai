@@ -1,6 +1,6 @@
 # Xaviar Evaluation Plan
 
-Status: Draft evaluation baseline
+Status: Milestone 4 technical implementation and Supabase foundation complete; production release and human approval pending
 
 This document defines how Xaviar will be tested before, during, and after Milestone 4. It supplements [CRM-PLAN.md](./CRM-PLAN.md) and [CRM-DECISIONS-v1.3.md](./CRM-DECISIONS-v1.3.md). It is the focused reference for Xaviar development and evaluation work.
 
@@ -158,3 +158,17 @@ These are starting proposals and must be approved before production activation:
 - 0 rankings for users or cohorts below the minimum sample rule.
 - Every prediction displays confidence, evaluation period, and model/version metadata.
 
+## 10. Milestone 4 implementation evidence
+
+Implementation version: `xaviar-rules-1.0.0`
+
+- Gate A, Data contract: implemented in `XAVIAR-DATA-CONTRACT-v1.0.md`.
+- Gate B, Data foundation: additive Supabase migration, event stream, snapshots, recommendation/evidence/feedback ledger, predictions, coaching plans, release reviews, audit hooks, and permission policies are implemented in `202608170001_xaviar_milestone4.sql`.
+- Gate C, Explain: daily, weekly, monthly, and lifetime summaries disclose missing evidence and cite structured records.
+- Gate D, Recommend: role-aware actions include reason, action, confidence, priority, expiry, state, version, and evidence.
+- Gate E, Coach and benchmark: private comparisons, minimum samples, manager coaching-plan API, and feedback states are implemented.
+- Gate F, Predict: all five planned forecast types suppress probabilities below the provisional sample threshold and carry confidence, sample, version, prediction date, expiry, and calibration fields.
+- Gate G, Integrate: Xaviar is available to Admin, Marketing Manager, Sales Manager, Marketing Agent, and Sales Agent. The five-role local browser smoke test passed in light and dark themes with no console errors.
+- Gate H, Safety: 43 CRM/Xaviar tests passed, including permission boundaries, cross-workspace denial, prompt injection, contact-data leakage, small samples, reassignment safety, feedback immutability, and calibration math. API/web TypeScript checks and the production build passed.
+
+The additive Supabase migration was applied and verified in project `jayxyikgefnzitxcbdov` on 2026-08-17. Final Gate G human approval still requires one Admin and one Manager review recorded through the release-review endpoint. This is a release control, not unfinished Xaviar logic.
