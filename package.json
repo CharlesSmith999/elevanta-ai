@@ -9,6 +9,6 @@
     "dev:api": "pnpm --filter @elevanta/api dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "test:domain": "pnpm --filter @elevanta/api exec tsx --test ../web/src/domain.test.ts"
+    "test:domain": "pnpm --filter @elevanta/api exec tsx --test ../web/src/domain.test.ts ../web/src/xaviar.test.ts"
   }
 }
