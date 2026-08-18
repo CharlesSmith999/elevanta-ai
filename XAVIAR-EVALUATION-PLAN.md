@@ -1,6 +1,6 @@
 # Xaviar Evaluation Plan
 
-Status: Milestone 4 technical implementation and Supabase foundation complete; production release and human approval pending
+Status: Milestone 4 technical implementation, Supabase foundation, and production release complete; human approval pending
 
 This document defines how Xaviar will be tested before, during, and after Milestone 4. It supplements [CRM-PLAN.md](./CRM-PLAN.md) and [CRM-DECISIONS-v1.3.md](./CRM-DECISIONS-v1.3.md). It is the focused reference for Xaviar development and evaluation work.
 
