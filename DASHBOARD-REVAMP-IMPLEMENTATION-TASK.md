@@ -58,7 +58,7 @@ The production audit found that the approved role dashboards and the remaining C
 - [x] Give every chart an accessible name and a visible or screen-reader-readable data summary.
 - [x] Group Lead detail into task-focused sections with progressive disclosure without changing the existing form data contract.
 - [x] Make the Admin `Improve` action open Xaviar, not Reports.
-- [ ] Complete final released-environment verification at phone, tablet, laptop, and wide-desktop widths in both themes.
+- [x] Complete final released-environment verification at phone, tablet, laptop, and wide-desktop widths in both themes.
 
 ### Acceptance rule
 
@@ -71,6 +71,13 @@ The remediation is complete only when every role keeps the same navigation betwe
 - Ten dashboard theme cases confirmed identical card, chart, and heading counts in light and dark modes.
 - The responsive drawer, touch-target, table-card, filter, typography, and overflow rules are implemented at the approved compact breakpoints. Final multi-viewport released-environment screenshots remain the last release gate.
 - All 46 CRM, permission, navigation, privacy, and Xaviar tests passed. Web TypeScript and the production build passed.
+
+### Production release evidence, 2026-08-20
+
+- PR #31 passed GitHub Actions run 263 and was squash-merged as `ce5f00885d7209abdaef1b64925479a68089d19e`.
+- Vercel production deployment completed through the existing Git-connected project.
+- Production web and API health checks returned HTTP 200.
+- The five-role dark/light tablet matrix passed with two-column headline metrics and no document-level horizontal overflow. Phone remains single-column; laptop and wide-desktop layouts retain the approved composition.
 
 ## Change control
 

@@ -31,6 +31,8 @@ One tablet-density issue was found and fixed: headline metric cards used one lon
 - `final/tablet-sales-agent-dark.png`
 - The pre-fix production matrix is retained in this audit directory for comparison. Full-page phone captures with browser stitching artifacts are not accepted evidence; viewport captures are the accepted source.
 
-## Remaining release action
+## Release result
 
-Publish the tested change through the existing GitHub-connected Vercel project, then repeat the production smoke checks. This audit does not authorize production lead-data migration or substitute for the pending Xaviar Admin and Manager approvals.
+PR #31 passed GitHub Actions run 263 and was merged as `ce5f00885d7209abdaef1b64925479a68089d19e`. The existing Vercel project reported the production deployment Ready. Production web and API health checks returned HTTP 200, and the released 768 px role/theme matrix passed without horizontal overflow.
+
+This audit does not authorize production lead-data migration or substitute for the pending Xaviar Admin and Manager approvals.
