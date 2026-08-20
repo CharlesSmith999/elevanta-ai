@@ -1,0 +1,39 @@
+# Supabase Migration Traceability
+
+Status: Reconciled on 2026-08-20
+
+Project: `jayxyikgefnzitxcbdov`
+
+## Result
+
+The production Supabase project now has a canonical `supabase_migrations.schema_migrations` ledger containing all 10 committed migration versions.
+
+Before the ledger was created, each migration was checked against the live schema. That verification found one material mismatch: migration `202607290005_dashboard_completion_events.sql` had not completed because its loss-reason validation contained an invalid one-argument `nullif` call. The source SQL was corrected, the migration was applied, and all 10 migration-effect checks passed before any version was recorded.
+
+No lead records were imported, removed, or activated during this reconciliation.
+
+## Recorded versions
+
+| Version | Name |
+|---|---|
+| `202607280001` | `foundation` |
+| `202607280002` | `crm_core_controls` |
+| `202607290003` | `dashboard_data_definitions` |
+| `202607290004` | `opportunity_stage_history` |
+| `202607290005` | `dashboard_completion_events` |
+| `202607290006` | `reconcile_missing_controls` |
+| `202607300001` | `milestone2_core` |
+| `202607300002` | `admin_user_management` |
+| `202607300003` | `authenticated_read_access` |
+| `202608170001` | `xaviar_milestone4` |
+
+## Required process for future migrations
+
+1. Add one timestamped SQL file under `supabase/migrations/`.
+2. Review the SQL for additive and rollback-safe behaviour.
+3. Apply it through the approved Supabase migration workflow. Do not make an untracked dashboard-only schema change.
+4. Confirm the version appears in `supabase_migrations.schema_migrations`.
+5. Verify the intended tables, columns, functions, triggers, policies, and grants.
+6. Run the application test suite and production smoke checks before closing the release.
+
+If the live schema and migration ledger ever differ, verify the schema effects first. Never mark a migration applied only to silence a tooling warning.

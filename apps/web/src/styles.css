@@ -609,6 +609,10 @@
   .detail-panel { max-height: none; }
 }
 
+@media (min-width: 541px) and (max-width: 860px) {
+  .admin-reference-metrics,.role-reference-metrics,.marketing-agent-queue { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 540px) {
   .admin-reference-dashboard,.role-reference-dashboard { padding-right: 10px; padding-left: 10px; }
   .admin-reference-controls { gap: 8px; }

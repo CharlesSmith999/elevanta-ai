@@ -53,7 +53,7 @@ begin
   if v_old in ('won','lost','not_interested','incorrect','duplicate','do_not_contact') or p_status = 'new' then raise exception 'This status transition is not allowed'; end if;
   if p_status = 'won' and (p_total_project_cost is null or p_upfront_payment_amount is null) then raise exception 'Won opportunities require total project cost and upfront payment amount'; end if;
   if p_status = 'won' and (p_total_project_cost < 0 or p_upfront_payment_amount < 0 or p_upfront_payment_amount > p_total_project_cost) then raise exception 'Won financial values are invalid'; end if;
-  if p_status in ('lost','not_interested') and nullif(trim(coalesce(p_lost_reason, ''))) is null then raise exception 'Lost and Not Interested opportunities require a loss reason'; end if;
+  if p_status in ('lost','not_interested') and nullif(trim(coalesce(p_lost_reason, '')), '') is null then raise exception 'Lost and Not Interested opportunities require a loss reason'; end if;
   if p_lost_reason is not null and trim(p_lost_reason) not in ('Price or budget','No response','Timing or priority','Competitor selected','Not a fit','Proposal declined','Other') then raise exception 'Invalid loss reason'; end if;
 
   update public.opportunities set

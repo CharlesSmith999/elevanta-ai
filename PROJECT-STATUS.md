@@ -1,7 +1,7 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-08-17
+Last updated: 2026-08-20
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.5.md](./CRM-DECISIONS-v1.5.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
 
 ## Current position
@@ -45,7 +45,7 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 
 - Live preview: [elevanta-ai-pipeline.vercel.app](https://elevanta-ai-pipeline.vercel.app)
 - Hosting decision: Vercel for web/API, Supabase for database/auth/storage.
-- Supabase project: `elevanta-ai` is reachable and reports Healthy in the console. Direct SQL verification confirmed all seven foundation tables (`workspaces`, `profiles`, `contacts`, `opportunities`, `source_dictionary`, `opportunity_stage_history`, and `opportunity_stage_ownership_periods`) exist. A safe idempotent reconciliation has restored the three missing controls (`set_opportunity_status`, `validate_source_label`, and `touch_updated_at`); the expected public control routines are present. The internal migration ledger is absent (`to_regclass('supabase_migrations.schema_migrations')` returned `NULL`), so traceability is a follow-up to complete before Milestone 5. Only sample records are currently intended.
+- Supabase project: `elevanta-ai` is reachable and reports Healthy in the console. Direct SQL verification confirmed the foundation, CRM, dashboard, authenticated-read, and Xaviar migration effects. On 2026-08-20, the invalid loss-reason `nullif` expression in `202607290005_dashboard_completion_events.sql` was corrected, the three missing dashboard-event timestamps were applied, all 10 migration-effect checks passed, and the canonical Supabase migration ledger was created with all 10 committed versions. Details are in `docs/SUPABASE-MIGRATION-TRACEABILITY.md`. Only sample records are currently intended.
 - Production branch: `main`.
 - Production release commits: `61e7eff Complete dashboard readiness and API foundation`; `3511189 Fix Vercel API ESM loading`; `6d8ba91 Fix CRM API 404 on Vercel`.
 - Release PRs: [#5](https://github.com/CharlesSmith999/elevanta-ai/pull/5) released the foundation/authentication gate; [#6](https://github.com/CharlesSmith999/elevanta-ai/pull/6) fixed the production domain-model build. Both are merged to `main`.
@@ -134,3 +134,12 @@ Milestones 1–3 are closed for the released safe-sample CRM foundation. Xaviar 
 - Supabase application and verification completed on 2026-08-17 in project `jayxyikgefnzitxcbdov`: all seven Xaviar tables, `xaviar_event_stream`, the feedback function, and all seven permission policies are present.
 - PR #28 passed GitHub Actions workflow `Validate Elevanta AI`, run 248, and was squash-merged to `main` as commit `f5e2690`. Vercel reported the production deployment successful. Production returned HTTP 200 for both the web application and `/api/health`, and the deployed bundle contains the Xaviar coach, next-best-action, and uncertainty-aware forecast views.
 - The required Admin and Manager human approval records remain pending. Real lead-data migration remains Milestone 5 only.
+
+## 2026-08-20 release-candidate record
+
+- Final responsive QA covered Admin, Marketing Manager, Sales Manager, Marketing Agent, and Sales Agent at 390 px, 768 px, 1440 px, and 1920 px in dark and light modes.
+- Phone layouts remain single-column. Tablet headline metrics now use two columns to remove excessive vertical scrolling. Laptop and wide-desktop compositions remain unchanged.
+- All tested role/theme combinations preserved their approved headings, cards, sections, navigation, and theme parity without document-level horizontal overflow.
+- Validation passed: 46 automated CRM/permission/navigation/privacy/Xaviar tests, web/API TypeScript checks, production build, and repository whitespace check.
+- Supabase migration traceability is reconciled. All 10 committed versions are recorded only after their live schema effects passed verification.
+- Release publication and production smoke verification remain the final technical actions. Xaviar Admin and Manager approval records remain the only human gate before Milestone 5.

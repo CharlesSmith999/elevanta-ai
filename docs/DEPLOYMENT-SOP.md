@@ -1,7 +1,7 @@
 # Elevanta AI — Deployment Standard Operating Procedure
 
 Status: Required deployment reference  
-Last updated: 2026-07-29  
+Last updated: 2026-08-20
 Applies to: Phase 1  
 Product: Elevanta AI  
 Source of truth: [CRM-PLAN.md](../CRM-PLAN.md), [CRM-DECISIONS-v1.1.md](../CRM-DECISIONS-v1.1.md), and [PROJECT-STATUS.md](../PROJECT-STATUS.md)
@@ -65,7 +65,7 @@ Complete these once, in this order:
 1. Confirm the existing Vercel project is connected to `CharlesSmith999/elevanta-ai`.
 2. Set `main` as the production branch and verify pull-request branches create previews.
 3. Create or confirm the approved Supabase project.
-4. Apply the committed migrations in `supabase/migrations/` in filename order. Do not create untracked SQL changes in the Supabase dashboard.
+4. Apply the committed migrations in `supabase/migrations/` in filename order. Do not create untracked SQL changes in the Supabase dashboard. Confirm the applied versions in `supabase_migrations.schema_migrations` using [SUPABASE-MIGRATION-TRACEABILITY.md](./SUPABASE-MIGRATION-TRACEABILITY.md).
 5. Configure Supabase Auth for email/password only; disable providers that are not approved.
 6. Add the production web origin to Supabase Auth URL Configuration so password-reset links can safely return to the CRM (for example, `https://elevanta-ai-pipeline.vercel.app`).
 7. Add the first workspace, Shariq’s administrator profile, and approved test accounts using a reviewed bootstrap process.
@@ -130,14 +130,9 @@ Every production deployment must confirm:
 
 ## 10. Current known deployment gaps
 
-These must be resolved before Milestone 1 is marked complete:
-
-- The local branch must be authenticated and pushed to GitHub.
-- The GitHub CI workflow must complete one successful remote run.
-- The existing Vercel project’s Git connection, branch settings, and environment variables must be verified.
-- The new Vercel-compatible Node API catch-all entry point is committed at `api/[...path].ts`; it still needs one Git-connected preview deployment and a production health check.
-- The real Supabase project must have the committed migrations, Auth configuration, administrator bootstrap, and production permission checks applied.
-- The web app must change from browser-only sample data to real authenticated Supabase/API data in the next CRM-core milestone. This is intentionally not a full-workbook import yet.
+- The Xaviar technical release still needs one Admin and one Manager approval record.
+- Production workbook migration remains deliberately deferred to Milestone 5.
+- Every new database migration must be source-controlled and verified in the canonical Supabase migration ledger.
 
 ## 11. Deployment record template
 
