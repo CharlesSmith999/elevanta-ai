@@ -135,11 +135,14 @@ Milestones 1–3 are closed for the released safe-sample CRM foundation. Xaviar 
 - PR #28 passed GitHub Actions workflow `Validate Elevanta AI`, run 248, and was squash-merged to `main` as commit `f5e2690`. Vercel reported the production deployment successful. Production returned HTTP 200 for both the web application and `/api/health`, and the deployed bundle contains the Xaviar coach, next-best-action, and uncertainty-aware forecast views.
 - The required Admin and Manager human approval records remain pending. Real lead-data migration remains Milestone 5 only.
 
-## 2026-08-20 release-candidate record
+## 2026-08-20 responsive and migration-traceability release record
 
 - Final responsive QA covered Admin, Marketing Manager, Sales Manager, Marketing Agent, and Sales Agent at 390 px, 768 px, 1440 px, and 1920 px in dark and light modes.
 - Phone layouts remain single-column. Tablet headline metrics now use two columns to remove excessive vertical scrolling. Laptop and wide-desktop compositions remain unchanged.
 - All tested role/theme combinations preserved their approved headings, cards, sections, navigation, and theme parity without document-level horizontal overflow.
 - Validation passed: 46 automated CRM/permission/navigation/privacy/Xaviar tests, web/API TypeScript checks, production build, and repository whitespace check.
 - Supabase migration traceability is reconciled. All 10 committed versions are recorded only after their live schema effects passed verification.
-- Release publication and production smoke verification remain the final technical actions. Xaviar Admin and Manager approval records remain the only human gate before Milestone 5.
+- PR [#31](https://github.com/CharlesSmith999/elevanta-ai/pull/31) passed GitHub Actions run 263 and was squash-merged to `main` as commit `ce5f00885d7209abdaef1b64925479a68089d19e`.
+- The existing Git-connected Vercel project deployed the commit successfully. Production web and `/api/health` returned HTTP 200, and the API reported `status: ok`.
+- The released 768 px matrix passed for all five roles in dark and light modes with two-column headline metrics and no horizontal overflow. The previous CRM connection error was absent.
+- Xaviar Admin and Manager approval records remain the only human gate before Milestone 5.
