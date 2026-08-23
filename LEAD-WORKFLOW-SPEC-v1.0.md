@@ -1,6 +1,6 @@
 # Elevanta AI — Lead Workflow Specification v1.0
 
-Status: Approved documentation baseline; development not started
+Status: Released with safe sample data on 2026-08-23; real-data migration remains Milestone 5 only
 
 Decision authority: [CRM-DECISIONS-v1.6.md](./CRM-DECISIONS-v1.6.md)
 
