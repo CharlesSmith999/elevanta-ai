@@ -11,6 +11,7 @@ import { addRemoteFollowUp, addRemoteNote, completeRemoteFollowUp, createAdminUs
 import { RoleReferenceDashboard, RoleReferenceKind, RoleReferenceSidebar, RoleSwitcher } from './RoleReferenceDashboards';
 import { XaviarWorkspace } from './XaviarWorkspace';
 import { navigationFor } from './navigation';
+import { LeadWorkspace } from './LeadWorkspace';
 import type { Session } from '@supabase/supabase-js';
 
 const storageKey = 'elevanta-test-workspace-v1';
@@ -237,7 +238,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
         <div className="notice"><b>Functional test workspace</b><span>These records are safe test data. Every change is kept in this browser only, ready to be replaced by the final verified import.</span></div></>}
       {notice && <div className="toast" role="status">{notice}</div>}
       {adminReference ? <AdminCommandCenter viewer={viewer} viewers={workspaceUsers} leads={dashboardLeads} dashboard={filteredDashboard} period={dashboardPeriod} source={dashboardSource} theme={theme} onViewer={switchViewer} onPeriod={setDashboardPeriod} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} /> : roleReferenceDashboard && roleReferenceKind ? <RoleReferenceDashboard kind={roleReferenceKind} viewer={viewer} viewers={workspaceUsers} leads={dashboardLeads} period={dashboardPeriod} source={dashboardSource} theme={theme} onViewer={switchViewer} onPeriod={setDashboardPeriod} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} onCreate={() => setShowCreate(true)} onOpenLead={(leadId) => { setSelectedId(leadId); navigate('Lead inbox'); }} /> : <>
-      {page === 'Lead inbox' && <section className="inbox-layout"><LeadTable leads={visible} onSelect={select} onCreate={() => setShowCreate(true)} />{selected && <LeadDetail lead={selected} viewer={viewer} onStatus={updateStatus} onMarkWon={markWon} onQualification={updateQualification} onLostReason={updateLostReason} onAddNote={addNote} onAddFollowUp={addFollowUp} onCompleteFollowUp={completeFollowUp} onReassign={reassign} onReportIncorrect={reportIncorrect} onDecision={decideReview} />}</section>}
+      {page === 'Lead inbox' && (selected ? <LeadWorkspace lead={selected} viewer={viewer} session={session} onBack={() => setSelectedId(undefined)} onStatus={updateStatus} onQualification={updateQualification} onReassign={reassign} /> : <section className="inbox-layout"><LeadTable leads={visible} onSelect={select} onCreate={() => setShowCreate(true)} /></section>)}
       {page === 'Follow-ups' && <FollowUpList leads={visible} viewer={viewer} onSelect={select} onComplete={completeFollowUp} />}
       {page === 'Assignments' && <AssignmentList leads={visible} onSelect={select} />}
       {page === 'Review queue' && <ReviewQueue leads={leads.filter((lead) => lead.incorrectReview?.state === 'pending')} onSelect={select} />}

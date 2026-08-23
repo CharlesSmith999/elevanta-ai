@@ -17,6 +17,20 @@ const statusUpdate = z.object({ status: z.enum(['assigned', 'contacted', 'connec
 const assignment = z.object({ assignedTo: id, visibility: z.enum(['full_context', 'fresh_start']), reason: z.string().trim().min(1).max(1000) });
 const note = z.object({ body: z.string().trim().min(1).max(5000) });
 const followUp = z.object({ dueAt: z.string().datetime({ offset: true }), actionType: z.enum(['Call', 'Email', 'SMS', 'Task']) });
+const contactMethodType = z.enum(['phone', 'email']);
+const contactHealth = z.enum(['unverified', 'verified', 'incorrect', 'wrong_person', 'reception_gatekeeper', 'do_not_contact']);
+const addContactMethod = z.object({ methodType: contactMethodType, value: z.string().trim().min(3).max(254), label: z.string().trim().max(120).optional() });
+const assessContactMethod = z.object({ health: contactHealth, reason: z.string().trim().max(1000).optional() });
+const restoreContactMethod = z.object({ reason: z.string().trim().min(3).max(1000) });
+const salesActivity = z.object({
+  contactMethodId: id,
+  type: z.enum(['call', 'sms', 'email', 'meeting', 'note']),
+  outcome: z.enum(['connected', 'no_answer', 'voicemail', 'busy', 'callback_requested', 'email_sent', 'replied', 'meeting_booked', 'not_interested', 'other']),
+  body: z.string().trim().max(5000).optional(),
+  followUpAt: z.string().datetime({ offset: true }).optional(),
+  followUpAction: z.enum(['Call', 'Email', 'SMS', 'Task']).optional(),
+  followUpPurpose: z.string().trim().max(1000).optional(),
+});
 const incorrectReport = z.object({ reasonCode: z.enum(['Invalid contact information', 'Wrong person or business', 'Spam or fake request', 'Duplicate contact']), evidence: z.string().trim().max(3000).optional() });
 const reviewDecision = z.object({ decision: z.enum(['confirmed_incorrect', 'rejected', 'merge_duplicate']), reason: z.string().trim().max(3000).optional() });
 const dashboardQuery = z.object({ period: dashboardPeriods.default('lifetime'), source: z.enum(sourceOptions).optional(), start: z.string().date().optional(), end: z.string().date().optional() });
@@ -161,6 +175,20 @@ export function createApp() {
     const { data, error } = await request.supabase!.from('opportunities').select('*, contacts(*), assignments(*), activities(*), follow_ups(*), incorrect_reports(*), incorrect_reviews(*)').eq('id', opportunityId).maybeSingle();
     if (error) throw error; if (!data) { response.status(404).json({ message: 'Lead not found.' }); return; } response.json({ opportunity: data });
   }));
+  app.get('/v1/opportunities/:id/contact-methods', ...protectedRoute(async (request, response) => {
+    const opportunityId = parse(id, request.params.id);
+    const { data, error } = await request.supabase!.from('opportunity_contact_methods')
+      .select('id, health, focus, assessment_reason, last_assessed_at, last_assessed_by, contact_methods(id, method_type, value, label, globally_restricted), contact_method_events(id, event_type, reason, created_at, actor_id)')
+      .eq('opportunity_id', opportunityId).order('created_at', { ascending: true });
+    if (error) throw error; response.json({ contactMethods: data ?? [] });
+  }));
+  app.get('/v1/opportunities/:id/activity-history', ...protectedRoute(async (request, response) => {
+    const opportunityId = parse(id, request.params.id);
+    const { data, error } = await request.supabase!.from('activities')
+      .select('id, type, outcome, body, created_at, occurred_at, actor_id, assignment_id, contact_method_id, metadata, contact_methods(value, method_type)')
+      .eq('opportunity_id', opportunityId).order('occurred_at', { ascending: false });
+    if (error) throw error; response.json({ activities: data ?? [] });
+  }));
   app.patch('/v1/opportunities/:id', ...protectedRoute(async (request, response) => {
     const value = parse(statusUpdate.partial(), request.body); const opportunityId = parse(id, request.params.id);
     if (!value.status) { response.status(400).json({ message: 'Use a supported field update.' }); return; }
@@ -179,8 +207,24 @@ export function createApp() {
     const { error } = await request.supabase!.rpc('add_opportunity_note', { p_opportunity_id: opportunityId, p_body: value.body }); if (error) throw error; response.status(204).end();
   }));
   app.post('/v1/opportunities/:id/activities', ...protectedRoute(async (request, response) => {
-    const value = parse(note, request.body); const opportunityId = parse(id, request.params.id);
-    const { error } = await request.supabase!.rpc('add_opportunity_note', { p_opportunity_id: opportunityId, p_body: value.body }); if (error) throw error; response.status(204).end();
+    const value = parse(salesActivity, request.body); const opportunityId = parse(id, request.params.id);
+    const { data, error } = await request.supabase!.rpc('log_sales_activity', { p_opportunity_id: opportunityId, p_contact_method_id: value.contactMethodId, p_type: value.type, p_outcome: value.outcome, p_body: value.body ?? null, p_follow_up_at: value.followUpAt ?? null, p_follow_up_action: value.followUpAction ?? null, p_follow_up_purpose: value.followUpPurpose ?? null });
+    if (error) throw error; response.status(201).json({ activityId: data });
+  }));
+  app.post('/v1/opportunities/:id/contact-methods', ...protectedRoute(async (request, response) => {
+    const value = parse(addContactMethod, request.body); const opportunityId = parse(id, request.params.id);
+    const { data, error } = await request.supabase!.rpc('add_opportunity_contact_method', { p_opportunity_id: opportunityId, p_method_type: value.methodType, p_value: value.value, p_label: value.label ?? null });
+    if (error) throw error; response.status(201).json({ contactMethodId: data });
+  }));
+  app.patch('/v1/opportunities/:id/contact-methods/:contactMethodId', ...protectedRoute(async (request, response) => {
+    const value = parse(assessContactMethod, request.body); const opportunityId = parse(id, request.params.id); const contactMethodId = parse(id, request.params.contactMethodId);
+    const { error } = await request.supabase!.rpc('assess_opportunity_contact_method', { p_opportunity_id: opportunityId, p_contact_method_id: contactMethodId, p_health: value.health, p_reason: value.reason ?? null });
+    if (error) throw error; response.status(204).end();
+  }));
+  app.post('/v1/opportunities/:id/contact-methods/:contactMethodId/restore', ...protectedRoute(async (request, response) => {
+    const value = parse(restoreContactMethod, request.body); const opportunityId = parse(id, request.params.id); const contactMethodId = parse(id, request.params.contactMethodId);
+    const { error } = await request.supabase!.rpc('restore_opportunity_contact_method', { p_opportunity_id: opportunityId, p_contact_method_id: contactMethodId, p_reason: value.reason });
+    if (error) throw error; response.status(204).end();
   }));
   app.post('/v1/opportunities/:id/follow-ups', ...protectedRoute(async (request, response) => {
     const value = parse(followUp, request.body); const opportunityId = parse(id, request.params.id);
@@ -284,7 +328,7 @@ export function createApp() {
       ? await request.supabase!.from('profiles').select('id').eq('manager_id', subject.id).eq('active', true)
       : { data: [], error: null };
     if (managedError) throw managedError;
-    const { data, error } = await request.supabase!.from('opportunities').select('id,status,qualification,source,marketing_owner_id,created_at,updated_at,won_at,lost_reason,assignments(assigned_to,started_at,ended_at),follow_ups(id,owner_id,due_at,status),activities(id,type,actor_id,created_at,from_status,to_status)').order('updated_at', { ascending: false });
+    const { data, error } = await request.supabase!.from('opportunities').select('id,status,qualification,source,marketing_owner_id,created_at,updated_at,won_at,lost_reason,assignments(assigned_to,started_at,ended_at),follow_ups(id,owner_id,due_at,status),activities(id,type,actor_id,created_at,occurred_at,from_status,to_status,outcome,contact_method_id),opportunity_contact_methods(health,focus,contact_method_id)').order('updated_at', { ascending: false });
     if (error) throw error;
     const scoped = ((data ?? []) as XaviarOpportunity[]).filter((item) => opportunityBelongsToSubject(item, subject as XaviarProfile, (managed ?? []).map((profile) => profile.id)));
     const report = buildApiXaviarReport(subject as XaviarProfile, scoped);

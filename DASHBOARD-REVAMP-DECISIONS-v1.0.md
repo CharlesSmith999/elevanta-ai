@@ -2,7 +2,7 @@
 
 Status: Approved by product owner on 2026-08-04
 
-This is the governing decision record for the next dashboard redesign. It supplements [CRM-PLAN.md](./CRM-PLAN.md), [CRM-DECISIONS-v1.5.md](./CRM-DECISIONS-v1.5.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md). It does not authorize dashboard code changes by itself; the role-by-role screen specification is the next required planning output.
+This is the historical governing decision record for the 2026-08-04 dashboard redesign. The later approved [CRM-DECISIONS-v1.6.md](./CRM-DECISIONS-v1.6.md) specifically supersedes its manual Sales Acceptance rule with derived First Worked, Connected, SQL, and Sales Engagement evidence. All other non-conflicting decisions remain valid.
 
 ## 1. Approved operating decisions
 

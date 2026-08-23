@@ -4,6 +4,8 @@
 **Approved:** 2026-08-04; responsive remediation approved 2026-08-17
 **Source of truth:** `DASHBOARD-REVAMP-DECISIONS-v1.0.md`, `DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md`, `docs/DASHBOARD-REVAMP-DESIGN-SET.md`, and `audit/uiux-2026-08-17/UI-UX-AUDIT.md`
 
+**Later approved lead-flow delta:** `CRM-DECISIONS-v1.6.md` and `LEAD-WORKFLOW-SPEC-v1.0.md` supersede manual Sales Acceptance and require a separate implementation/test release. This completed dashboard task remains the historical visual baseline.
+
 **Approved visual implementation:** [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md) remains the Admin / Company source of truth. [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md) is the implementation contract for Marketing Manager, Sales Manager, Marketing Agent, and Sales Agent.
 
 ## Objective
@@ -19,7 +21,7 @@ Implement the selected Direction 1 dashboard experience for all five current rol
 - Shared order: Work now → Performance → Improve → Recognition.
 - Shared controls: Today, Week, Month, Year, Lifetime, and Custom period; source/status filters; visible scope; drill-through actions.
 - Admin: business pulse, operating risks, company funnel, source quality, sales execution, and recognition.
-- Marketing Manager: team quality pulse, quality-risk queue, routing/acceptance funnel, source quality, coaching, and named direct-report recognition.
+- Marketing Manager: the released baseline contains routing/acceptance; the v1.6 delta will replace acceptance with first Sales work, Sales Engagement, and SQL evidence.
 - Sales Manager: execution pulse, operating watchlist, sales funnel, workload/follow-up discipline, loss/recovery, and named direct-report recognition.
 - Marketing Agent: prominent Add lead action, quality queue, quality cards, source learning, private growth, and private recognition.
 - Sales Agent: today priority queue, execution cards, conversion path, loss learning, personal growth, and private recognition.

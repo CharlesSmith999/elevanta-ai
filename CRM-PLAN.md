@@ -4,7 +4,7 @@ Status: Planning baseline, approved from stakeholder answers
 
 Branding: The product is named **Elevanta AI**. Its embedded AI sales companion is named **Xaviar**. Xaviar is advisory in Phase 1 and supports lead analysis, follow-up guidance, agent and marketer coaching, and performance reporting. Autonomous outbound communication remains deferred to Phase 2.
 
-CRM readiness reference: [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md). Shared dashboard definitions are in [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), the released dashboard baseline is in [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), the approved redesign decisions are in [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), and the pending screen specification is in [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md). Xaviar evaluation reference: [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md).
+CRM readiness reference: [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md). Shared dashboard definitions are in [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), the released dashboard baseline is in [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), and the approved redesign decisions are in [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md). The current lead-workflow authority is [CRM-DECISIONS-v1.6.md](./CRM-DECISIONS-v1.6.md), with its full role, screen, data, API, security, and Xaviar contract in [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md). Xaviar evaluation reference: [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md).
 
 ## 1. Product vision
 
@@ -16,9 +16,9 @@ Phase 1 is an internal operating system. Phase 2 adds workflow automation and AI
 
 | Role | Scope | Core capabilities |
 |---|---|---|
-| Sales agent | Assigned leads only | Work assigned leads, update status, add notes, schedule follow-ups, report incorrect leads |
-| Manager | All leads assigned to managed agents | Reassign leads, inspect history, monitor pipeline and performance, review coaching |
-| Marketer | Leads created or owned by marketing | Create/import leads, route leads, see complete background, review marketing quality |
+| Sales agent | Assigned leads only | Work assigned leads, manage multiple contact methods, log structured activities, set SQL/sales stages, schedule follow-ups, report incorrect leads |
+| Manager | Leads inside department/direct-report scope | Reassign in scope, inspect contact/activity history, restore eligible methods, monitor pipeline and performance, review coaching |
+| Marketer | Leads created or owned by marketing | Create/import and immediately route leads, set MQL, see complete background/contact quality, restore eligible methods, and reassign |
 | Admin | Entire workspace | User/team setup, all data, policy decisions, incorrect-lead approval, dashboards, exports |
 
 Agents do not see unassigned or other agents' contact details. Managers see the leads of agents tagged to them. Marketers, managers, and admins always see the complete lead background.
@@ -34,9 +34,13 @@ An assignment is a time-bounded ownership event, not an overwrite. Every assignm
 - `workspace`: future SaaS tenant boundary; one internal workspace in Phase 1.
 - `user`: authenticated person with role and manager relationship.
 - `contact`: normalized name, phone, email, source identity, duplicate keys, and consent flags.
+- `contact_method`: one normalized phone or email for a contact, including global restriction state.
+- `opportunity_contact_method`: the method's health and active/secondary/removed focus for one opportunity.
+- `contact_method_event`: immutable assessment, removal, restoration, and DNC history.
 - `opportunity`: project type, description, budget/timeline signals, current status, and qualification fields.
 - `assignment`: routing history and current assignee.
-- `activity`: calls, emails, SMS, notes, status changes, contact outcomes, reminders, sales-acceptance decisions, and system events.
+- `assignment_contact_method_decision`: per-method keep-removed/restore choice for a new assignment.
+- `activity`: calls, emails, SMS, meetings, notes, structured outcomes, status/qualification changes, reminders, and system events.
 - `follow_up`: next action, due time, completion, escalation state.
 - `incorrect_report`: agent's incorrect classification with reason and evidence.
 - `incorrect_review`: admin decision after the three-agent threshold.
@@ -53,13 +57,17 @@ Status changes require actor, timestamp, previous status, new status, and option
 
 ## 5. Routing and history rules
 
-1. Marketing creates/imports a lead and may assign it to an initial agent.
+1. Marketing creates/imports a lead and may assign it to an initial agent. The assignment is active immediately; Sales does not accept or reject it.
 2. A manager, marketer, or admin can reassign it.
 3. Reassignment offers two views to the receiving agent:
    - `full_context`: prior notes, statuses, calls, and outcomes are visible;
    - `fresh_start`: the agent sees a clean work queue, while the full history remains available to marketer/manager/admin.
 4. The selected visibility mode is recorded on the assignment.
 5. The system must show the reassignment chain and the reason for each handoff.
+6. Reassignment also shows every contact method removed by a prior Sales Agent. The assigner chooses whether each eligible method remains removed or is restored for the new owner; keep-removed is the default.
+7. Fresh-start visibility never reactivates an incorrect, wrong-person, or DNC method.
+
+Manual `Sales Acceptance` is retired. The CRM records `First Worked At` from the first eligible sales activity and derives `Sales Engaged At` from the earliest successful `Connected` outcome or SQL transition. A failed attempt counts as first work but not Sales Engagement.
 
 ## 6. Incorrect-lead control
 
@@ -100,7 +108,7 @@ When three different agents report the same contact/opportunity as incorrect:
 
 ### Agent workspace
 
-Top cards: assigned open leads, due today, overdue, connected rate. Main area: sortable lead queue with status, next action, due date, source, and priority. Detail drawer: contact, opportunity, current assignment, visible history, notes, and one-click follow-up.
+Top cards: assigned open leads, due today, overdue, connected rate. Main area: sortable lead queue with status, next action, due date, source, and priority. The approved lead workspace uses a sparse Overview, on-demand Log Activity drawer, separate Activity History, Add/Edit Contact modal, active/secondary/removed contact groups, and one-click follow-up creation as defined in [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md).
 
 ### Manager dashboard
 
@@ -112,7 +120,7 @@ Workspace health: total contacts, duplicate candidates, missing contact fields, 
 
 ### Marketer dashboard
 
-Lead volume by source/campaign, lead quality, duplicate rate, incorrect rate, routing speed, and downstream conversion. Includes a lead-import validation report before records enter the active queue.
+Lead volume by source/campaign, actionable-contact yield, duplicate rate, incorrect/wrong-person rate, routing speed, time to first Sales work, Sales Engagement, SQL, and downstream conversion. Includes a lead-import validation report before records enter the active queue and a contact-quality/reassignment workspace after routing.
 
 ### Approved dashboard-revamp direction
 
@@ -161,16 +169,22 @@ Role-specific coaching:
 
 Xaviar must retain the advice, the evidence behind it, whether it was followed, and the resulting outcome so coaching can be measured over time. Benchmarks must be permission-aware and privacy-safe; agents receive useful patterns without exposing another person’s private contact data.
 
+Xaviar must keep contact health separate from activity outcomes. Contact-method additions, assessments, removals, restorations, DNC restrictions, Sales activities, first-work, Connected, SQL, Sales Engagement, and reassignment contact decisions become explainable evidence events. Xaviar never treats No Answer, Busy, or Voicemail as permanent invalidity and never treats a removed method as deleted.
+
 ## 10. Supabase database schema (baseline)
 
 ```sql
 workspaces(id, name, created_at)
 users(id, workspace_id, role, manager_id, name, email, active, created_at)
 contacts(id, workspace_id, name, normalized_phone, normalized_email, source, source_external_id, do_not_contact, created_at, updated_at)
+contact_methods(id, workspace_id, contact_id, method_type, normalized_value, display_value, label, global_restriction, created_by, created_at, updated_at)
+opportunity_contact_methods(id, opportunity_id, contact_method_id, health_status, focus_state, current_reason_code, last_assessed_by, last_assessed_at, version)
+contact_method_events(id, workspace_id, opportunity_id, assignment_id, contact_method_id, actor_id, event_type, from_health, to_health, from_focus, to_focus, reason_code, note, related_activity_id, created_at)
 opportunities(id, workspace_id, contact_id, project_type, description, budget_band, timeline_band, source, status, priority, total_project_cost, upfront_payment_amount, won_at, created_at, updated_at)
 assignments(id, opportunity_id, assigned_to, assigned_by, visibility_mode, reason, started_at, ended_at)
-activities(id, opportunity_id, actor_id, type, body, from_status, to_status, metadata, created_at)
-follow_ups(id, opportunity_id, owner_id, due_at, action_type, status, completed_at, escalated_at, created_at)
+assignment_contact_method_decisions(id, assignment_id, contact_method_id, decision, prior_focus_state, resulting_focus_state, decided_by, reason, created_at)
+activities(id, opportunity_id, assignment_id, actor_id, type, outcome, contact_method_id, body, occurred_at, from_status, to_status, metadata, created_at)
+follow_ups(id, opportunity_id, owner_id, source_activity_id, due_at, action_type, channel, purpose, timezone, status, completed_at, escalated_at, created_at)
 incorrect_reports(id, opportunity_id, reporter_id, reason_code, evidence, created_at)
 incorrect_reviews(id, opportunity_id, threshold_reached_at, reviewer_id, decision, decision_reason, decided_at)
 ai_evaluations(id, workspace_id, subject_user_id, subject_type, period_start, period_end, metrics_json, recommendations_json, generated_at, reviewed_by)
@@ -179,6 +193,8 @@ audit_events(id, workspace_id, actor_id, entity_type, entity_id, action, before_
 ```
 
 Required constraints/indexes: unique normalized email/phone within workspace where present; one active assignment per opportunity; unique incorrect report per opportunity/reporter; indexes on workspace, status, assignee, source, due date, and created date. Use import provenance to identify historical records and CRM form creation to identify new records; do not require a user-maintained origin field. Use Supabase Row Level Security for role and manager-scope enforcement.
+
+The detailed additive migration, compatibility, concurrency, DNC, audit, and RLS requirements are governed by [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md). Existing single phone/email columns remain only as a temporary migration compatibility layer until canonical contact methods are populated and verified.
 
 ## 11. Node.js/React architecture
 
@@ -196,6 +212,12 @@ Initial REST resources:
 - `GET/PATCH /opportunities/:id`
 - `POST /opportunities/:id/assignments`
 - `POST /opportunities/:id/activities`
+- `GET/POST/PATCH /opportunities/:id/contact-methods`
+- `POST /opportunities/:id/contact-methods/:methodId/assess`
+- `POST /opportunities/:id/contact-methods/:methodId/restore`
+- `GET /opportunities/:id/activity-history`
+- `POST /opportunities/:id/reassignments/preview`
+- `POST /opportunities/:id/reassignments/commit`
 - `POST /opportunities/:id/follow-ups`
 - `POST /opportunities/:id/incorrect-reports`
 - `GET /admin/incorrect-reviews`
@@ -279,6 +301,10 @@ Stage and import the approved Excel lead data, preserve workbook/tab/row provena
 
 After activation, newly recorded CRM work becomes Xaviar’s primary source for personalized coaching. Imported historical data is labeled as historical context and is used only when its provenance and quality are sufficient.
 
+### Lead workflow v1.6 implementation gate
+
+Before Milestone 5 activation, implement and validate [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md) with safe sample data. This gate replaces manual Sales Acceptance with derived First Worked, Connected, SQL, and Sales Engagement evidence; adds multiple contact methods and immutable contact-quality history; and completes the Sales, Marketing, Manager, Admin, database/API, and Xaviar changes. No real Excel data is imported during this gate.
+
 ### Phase 2 — workflow automation
 
 Track whether Xaviar recommendations are followed, send in-app reminders and escalations, provide daily task guidance, and add email/SMS/calendar/phone connectors with consent enforcement, templates, and human approval gates. Any outbound action requires explicit approval until autonomous operation is separately approved.
@@ -293,6 +319,10 @@ Multi-tenancy hardening, billing, self-service administration, onboarding, usage
 - An agent cannot read another agent's unassigned contact details.
 - Managers see only their managed agents' leads; admins see all.
 - Reassignment preserves the complete audit chain and supports full-context/fresh-start visibility.
+- Assignment is immediate and never waits for a Sales accept/reject action.
+- First Worked and Sales Engagement reconcile to structured activity/SQL evidence.
+- Multiple contact methods preserve immutable assessment, removal, restoration, and DNC history.
+- Fresh-start reassignment never reactivates suppressed contact methods.
 - Three distinct incorrect reports create exactly one admin review item and pause assignment.
 - Status, follow-up, and assignment changes are auditable.
 - Dashboards reconcile to the underlying opportunity table.
@@ -303,6 +333,6 @@ Multi-tenancy hardening, billing, self-service administration, onboarding, usage
 
 1. Confirm the first import sample and the admin responsible for deduplication review during Milestone 5.
 2. Decide the final benchmark cohort and agent-visibility rules after Xaviar evaluation, using actual CRM evidence.
-3. Approve the role-by-role dashboard screen specification before the dashboard revamp is implemented.
+3. Approve final Lead Generator and reassignment visual references before lead-workflow v1.6 development begins.
 
-Approved dashboard and operating decisions are recorded in [CRM-DECISIONS-v1.5.md](./CRM-DECISIONS-v1.5.md) and [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md).
+Approved dashboard and operating decisions are recorded in [CRM-DECISIONS-v1.5.md](./CRM-DECISIONS-v1.5.md), [CRM-DECISIONS-v1.6.md](./CRM-DECISIONS-v1.6.md), and [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md).

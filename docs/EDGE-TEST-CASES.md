@@ -4,6 +4,8 @@ Status: Test plan created; execution in progress
 Created: 2026-07-30
 References: `CRM-PLAN.md`, `CRM-DECISIONS-v1.1.md`, `PROJECT-STATUS.md`, `docs/ADMIN-USER-MANAGEMENT.md`, `docs/ARCHITECTURE-API-IMPLEMENTATION.md`
 
+The released baseline cases in this file remain valid. The approved, not-yet-implemented lead-workflow v1.6 additions are specified separately in [LEAD-WORKFLOW-EDGE-TEST-CASES-v1.0.md](./LEAD-WORKFLOW-EDGE-TEST-CASES-v1.0.md) and must be added to the executable suite during that development phase.
+
 ## Purpose
 
 This is the standing edge-case checklist for the functionality delivered before Xaviar development. It protects the approved rules for authentication, role visibility, lead lifecycle, assignments, follow-ups, incorrect/duplicate review, dashboards, data quality, and deployment. Production Excel migration remains out of scope until Milestone 5.

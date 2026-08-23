@@ -148,3 +148,44 @@
 ### Final result
 
 **PASSED FOR RELEASE** — role switching and role-safe navigation are consistent across the five approved dashboards.
+
+---
+
+## Lead Workflow v1.6 local visual QA
+
+**Date:** 2026-08-23
+**Source visual truth:** the approved written Lead Workflow specification and role-specific interaction rules.
+**Implementation:** `apps/web/src/LeadWorkspace.tsx`, `apps/web/src/leadWorkflow.ts`, `apps/web/src/styles.css`
+**Rendered evidence:** in-app browser capture of `http://127.0.0.1:4173/`, Sales Agent view, safe sample lead Olivia Grant, captured during this QA run.
+**Viewport:** default desktop for functional visual review; a separate `390 × 844` responsive check was completed. The browser capture used the local Vite app and safe sample data only.
+
+**Findings**
+
+- [Resolved] Dense one-screen workflow
+  Evidence: the approved flow requires contact details first, with activity logging only on demand. The implementation keeps Active, Secondary, and Removed methods on Overview and moves the full history to its own tab.
+  Fix: implemented `Overview` / `Activity history` tabs and a separate activity drawer.
+
+- [Resolved] Risk of destructive contact handling
+  Evidence: Removed contacts must remain auditable and recoverable.
+  Fix: the implementation uses a collapsed Removed group, health labels, and role-limited restoration. No delete control is exposed.
+
+- [Resolved] Sales speed versus Lead Gen control
+  Evidence: Sales needs a fast log flow, while Lead Gen needs quality and reassignment control without Sales-stage authority.
+  Fix: Sales receives Log controls and the activity drawer; Lead Gen receives contact-quality, restoration, MQL, and handoff controls. The API/migration rules enforce the same split.
+
+**Required fidelity surfaces**
+
+- Fonts and typography: uses the existing Elevanta type scale and role-shell hierarchy. Headline, section label, field label, and method-detail levels remain distinct.
+- Spacing and layout rhythm: desktop uses a primary work area and compact next-action rail; phone collapses to one column. The 390 px check returned `scrollWidth = clientWidth = 390`.
+- Colors and visual tokens: the component uses existing theme variables and semantic health colors. It remains compatible with the existing dark/light theme system.
+- Image quality and asset fidelity: the approved workflow uses standard UI icons, not custom imagery. The implementation uses the established Tabler icon library and does not replace a logo or generated illustration with CSS art.
+- Copy and content: copy follows the approved terms: Active, Secondary, Removed, Unverified, Verified, Wrong person, Reception / gatekeeper, Do not contact, and Activity history.
+
+**Interaction checks**
+
+- Admin/Lead Gen view showed contact groups, Add contact, method-health controls, and reassignment context.
+- Sales view showed per-method Log actions and the Log sales activity drawer with contact method, activity, outcome, notes, and Save controls.
+- Phone-width render completed without horizontal overflow.
+- Browser console was checked during the local run; no application error was observed.
+
+**Final result:** passed

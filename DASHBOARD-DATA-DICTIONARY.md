@@ -2,7 +2,7 @@
 
 Status: Step 1 of dashboard redesign — working baseline
 
-This document locks the shared definitions used by every dashboard. It supports [CRM-PLAN.md](./CRM-PLAN.md) and [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md). No dashboard may calculate the same metric differently by role.
+This document locks the shared definitions used by every dashboard. It supports [CRM-PLAN.md](./CRM-PLAN.md), [CRM-DECISIONS-v1.6.md](./CRM-DECISIONS-v1.6.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), and [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md). No dashboard may calculate the same metric differently by role.
 
 ## 1. Source values
 
@@ -30,6 +30,10 @@ Approved starting values:
 - **Qualified at:** first recorded Qualified event. It is used for qualification-period reporting.
 - **Proposal sent at:** first recorded Proposal Sent event. It is used for proposal conversion.
 - **First sales assignment:** first assignment history event. It is used for routing speed.
+- **First worked at:** first eligible Sales activity during the current ownership interval.
+- **Connected at:** first successful Connected outcome during the ownership interval.
+- **SQL entered at:** first SQL transition during the ownership interval.
+- **Sales engaged at:** earliest Connected at or SQL entered at. A failed attempt never creates Sales Engagement.
 
 For historical data, absent evidence remains `Not available`; it is not inferred.
 
@@ -61,16 +65,19 @@ Rules:
 
 Qualification is separate from lifecycle status. A lead can be Connected and MQL, or Qualified and SQL. Missing historical qualification remains `Not available`.
 
-### Qualification and sales-acceptance ownership
+### Qualification and Sales Engagement ownership
 
 - Marketing Agents and Marketing Managers may record MQL.
 - Sales Agents and Sales Managers may record SQL.
 - Managers and Admin may correct either decision with audit history.
-- Sales records one intake decision within one business day: `Accepted — working it`, `Needs more information`, `Not a fit`, `Duplicate`, or `Incorrect`.
+- Sales does not accept or reject an assignment. Assignment is immediate.
+- Sales records structured work. First Worked, Connected, SQL, and Sales Engagement are derived from auditable events.
 
 ### Contact outcomes
 
-`No Answer` is a contact-attempt outcome, not a lifecycle status. Approved quick outcomes are: Connected, No Answer, Voicemail, Email Sent, Callback Requested, Not Interested, Meeting Booked, and Other. Selecting Not Interested also requires the corresponding terminal status and controlled reason.
+`No Answer` is a contact-attempt outcome, not a lifecycle or contact-health status. Approved quick outcomes are: Connected, No Answer, Voicemail, Busy, Callback Requested, Email Sent, Replied, Meeting Booked, Not Interested, and Other. Selecting Not Interested also requires the corresponding terminal status and controlled reason.
+
+Contact health is separate: Unverified, Verified, Incorrect, Wrong Person, Reception / Gatekeeper, and Do Not Contact. Incorrect/Wrong Person methods move to Removed Contacts, Reception/Gatekeeper moves to Secondary Contacts, and Do Not Contact becomes globally restricted. Removed methods are never deleted.
 
 Every active opportunity must have a current status, next action, and follow-up due date. When a contact attempt is logged, it also has a latest contact outcome.
 
@@ -88,6 +95,8 @@ Phase 1 financial reporting uses USD (`$`) as the workspace default currency.
 | MQL or SQL volume | Date the qualification was recorded |
 | Contact/connection rate | Date the relevant contact/connection event occurred |
 | Response speed | Assignment time to first recorded contact |
+| First Sales work | Assignment time to first eligible Sales activity |
+| Sales Engagement | Earliest Connected activity or SQL transition |
 | Follow-up performance | Follow-up due date and completion date |
 | Stage aging | Stage entered date through stage exit/current date |
 | Proposal conversion | Proposal sent date and later outcome date |
@@ -113,7 +122,9 @@ Every dashboard supports daily, weekly, monthly, yearly, lifetime, and custom da
 - **SQL rate:** SQL opportunities ÷ opportunities with a recorded qualification decision.
 - **Incorrect rate:** confirmed incorrect opportunities ÷ opportunities reviewed or routed, with the denominator shown.
 - **Duplicate rate:** duplicate candidates/confirmed duplicates ÷ opportunities reviewed or routed, with the denominator shown.
-- **Sales acceptance rate:** opportunities progressed by Sales beyond intake ÷ opportunities routed to Sales.
+- **Sales Engagement rate:** opportunities with Connected or SQL evidence ÷ eligible assigned opportunities.
+- **Assigned-but-unworked rate:** active assignments with no eligible Sales activity ÷ active assignments.
+- **Time to first Sales activity:** median First Worked At minus assignment start; show missing work separately rather than as zero.
 
 ### Sales performance
 
@@ -127,9 +138,11 @@ Every dashboard supports daily, weekly, monthly, yearly, lifetime, and custom da
 
 ### Marketing yield
 
-- **Actionable Lead Yield:** opportunities progressing beyond intake into Contacted, Connected, MQL, SQL, Proposal Sent, or Won ÷ valid opportunities created.
+- **Actionable Lead Yield:** opportunities with at least one active non-DNC contact method and valid routing data ÷ valid opportunities created.
 - **Non-Actionable Lead Rate:** opportunities confirmed Incorrect, Duplicate, unusable, permanently unreachable, or never progressing beyond intake ÷ valid opportunities created.
 - **Routing speed:** time from lead creation to first valid sales assignment.
+- **Contact removal rate:** methods moved to Removed Contacts ÷ methods supplied, with counts and reason breakdown.
+- **Restoration success:** restored methods later producing Connected or Replied ÷ restored methods with sufficient observation time.
 
 ### Financial metrics
 
@@ -176,6 +189,9 @@ Flag records with:
 - Invalid date order
 - Activity after a terminal status
 - Active opportunity without a next action or follow-up due date
-- Sales assignment without a sales-acceptance decision after one business day
+- Sales assignment without an eligible first Sales activity after the configured working-time threshold
+- Opportunity with no active non-DNC contact method
+- DNC method restored by an unauthorized role
+- Contact method state without a matching immutable event
 - Duplicate or incorrect review pending
 - Assignment without a valid owner

@@ -1,14 +1,16 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-08-20
-Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.5.md](./CRM-DECISIONS-v1.5.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
+Last updated: 2026-08-23
+Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.6.md](./CRM-DECISIONS-v1.6.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
 
 ## Current position
 
 Elevanta AI has a working Phase 1 CRM foundation released on `main`. Production authentication and the safe sample-data workspace are live and verified; real lead-data migration remains deferred to Milestone 5.
 
 The full Excel workbook has **not** been imported into the active CRM yet, by deliberate decision. The current public preview uses safe sample data in the browser so the workflow can be tested without exposing private lead data. **Real lead-data migration is a Milestone 5 activity only, after Xaviar development and safety review; it is not a Milestone 1 release requirement and must not be requested again during Milestones 1–4.**
+
+On 2026-08-23, Shariq approved a lead-workflow revision that removes manual Sales Acceptance. Assignment is immediate, while First Worked, Connected, SQL, and derived Sales Engagement provide evidence of Sales action. The v1.6 implementation is complete with safe sample data: multiple phone/email methods, contact-health/focus history, removal/restoration rules, role-specific Lead Gen/Sales screens, activity history, guarded API routes, additive migrations, and Xaviar v1.1 event-stream input. Migrations `202608230001` through `202608230003` are applied and verified in Supabase; the application release is pending the existing GitHub and Vercel pipeline. No production lead data has been touched.
 
 Step 2 dashboard data-model implementation is complete and verified: approved source labels, source validation, Won financial fields, automatic won dates, source filters groundwork, and form validation are implemented. Migration `202607290003_dashboard_data_definitions.sql` is applied and verified in Supabase project `jayxyikgefnzitxcbdov`.
 
@@ -37,6 +39,7 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 | 2 — CRM core | Complete | Contact/opportunity views, assignment history, full-context/fresh-start handoff, statuses, notes, follow-ups, incorrect-review actions, role-aware visibility, and audited follow-up completion are implemented against the authenticated API. CI run 135, local 19-test suite, production build, and signed-in production smoke passed. | No Milestone 2 product work remains. Real Excel lead-data migration remains deferred until after Milestone 4. |
 | 3 — Controls and dashboards | Complete | Direction 1 role dashboards are released and live-verified: Admin, Marketing Manager view, Sales Manager, Marketing Agent, and Sales Agent all retain the approved elements in light and dark mode. Benchmark cohorts remain open for Xaviar evaluation. | No Milestone 3 product work remains. |
 | 4 — AI support | Technical release complete; human approval pending | Xaviar sub-phases 4A–4H are released using safe sample data: data contract, event foundation, explanations, recommendations, coaching, privacy-safe benchmarks, calibrated prediction controls, five-role dashboard integration, safety tests, and the verified additive Supabase foundation. | Record one Admin plus one Manager approval. No live agent rollout occurs in this milestone. |
+| Lead workflow v1.6 refinement | Database complete; application release pending | Immediate assignment, derived Sales Engagement, multi-method contact quality, Sales/Lead Gen screens, activity history, role guards, protected API routes, additive migrations, Xaviar v1.1 event stream, 50 passing automated tests, type checks, production build, desktop workflow interaction, 390 px no-overflow check, and live Supabase migration/security verification are complete. | Publish the validated application through GitHub and the existing Vercel project, then perform production smoke checks. |
 | 5 — Production data migration | Not started | Deliberately deferred until Milestones 2–4 and Xaviar safety review are complete. | Stage and validate the approved Excel data, preserve provenance, apply duplicate handling, reconcile dashboards, activate migrated records, and then begin live agent/marketer use. |
 | Phase 2 — Workflow automation | Not started | Scope is documented only. | Email, SMS, calendar, phone, digests, escalation, consent enforcement, and human approval gates. |
 | Phase 3 — SaaS product | Not started | Scope is documented only. | Multi-tenancy, billing, self-service administration, onboarding, limits, and product analytics. |
@@ -96,9 +99,29 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 - The implementation matches the approved Direction 1 screen specification. No new backend or database migration was needed because existing APIs and Supabase fields already support the approved dashboard data.
 - No approved decision changed and no real lead data was imported. Milestone 5 remains the only planned data-migration stage.
 
+## 2026-08-23 lead-workflow v1.6 implementation record
+
+- Implemented migrations: `202608230001_lead_workflow_v16.sql`, `202608230002_xaviar_lead_workflow_v11.sql`, and `202608230003_status_guard_v16.sql`.
+- The schema introduces contact methods, opportunity-scoped health/focus state, durable contact-method events, reassignment contact decisions, assignment-aware activities, follow-up method context, and derived Sales Engagement timings.
+- The API adds contact-method read/add/assess/restore routes, activity-history retrieval, and an atomic Sales activity route. Status permissions now enforce that Sales cannot set MQL and Lead Gen cannot set SQL or Sales lifecycle stages.
+- The UI adds a focused Lead Workspace with separate Overview and Activity History views, a log-activity drawer, add-contact modal, active/secondary/removed contact groups, auditable restore actions, and a Lead Gen reassignment view.
+- Validation: 50 automated domain, navigation, Xaviar, privacy, and lead-workflow tests passed; API and web TypeScript checks passed; web production build passed; `git diff --check` passed; desktop interaction and 390 px responsive browser checks passed with no horizontal overflow.
+- Supabase application completed in project `jayxyikgefnzitxcbdov`: migrations `202608230001_lead_workflow_v16`, `202608230002_xaviar_lead_workflow_v11`, and `202608230003_status_guard_v16` are recorded in the canonical migration ledger. SQL verification confirmed all new tables, guarded RPCs, the future-opportunity contact-method trigger, the four RLS policies, and all three ledger entries.
+- No real lead records were added, edited, or activated. The GitHub/Vercel application release remains the final pending release step.
+
 ## Next milestone target
 
-Milestones 1–3 are closed for the released safe-sample CRM foundation. Xaviar Milestone 4 implementation, automated/local browser validation, additive Supabase foundation, GitHub release, and Vercel production deployment are complete. The remaining Milestone 4 gate is to record Admin plus Manager approval. Only after that gate closes may Milestone 5 production lead-data migration begin using staging, provenance, deterministic duplicate handling, and validation before records enter active routing.
+Milestones 1–3 are closed for the released safe-sample CRM foundation. Xaviar Milestone 4 implementation is released, with Admin plus Manager human approval still pending. Before Milestone 5, the newly approved lead-workflow v1.6 must complete its final GitHub/Vercel application release and production smoke checks using safe sample data. Only after both human approval and the lead-workflow gate close may Milestone 5 production lead-data migration begin.
+
+## 2026-08-23 lead-workflow documentation record
+
+- `CRM-DECISIONS-v1.6.md` supersedes manual Sales Acceptance with immediate assignment and derived First Worked, Connected, SQL, and Sales Engagement evidence.
+- `LEAD-WORKFLOW-SPEC-v1.0.md` defines the complete role flow, Sales screens, Lead Generator screens, Manager/Admin oversight, multiple contact methods, removal/restoration/DNC rules, reassignment decisions, database/API delta, Xaviar events, and development sequence.
+- `XAVIAR-DATA-CONTRACT-v1.1.md` defines the planned advisory event/reasoning delta; v1.0 remains the released implementation until development and evaluation pass.
+- `docs/LEAD-WORKFLOW-EDGE-TEST-CASES-v1.0.md` defines assignment, permission, contact method, activity, follow-up, Sales Engagement, reassignment, incorrect-review, Xaviar, responsive, and accessibility release tests.
+- The written workflow specification records the approved Sales states plus the Lead Generator Contact Quality and Reassignment views. Removed Contacts must never use delete behavior.
+- CRM plan, dashboard role specification, data dictionary, dashboard completion plan, architecture/API record, Xaviar evaluation plan, and version-history notes were reconciled to the new decision.
+- The documentation baseline was followed by local source code and additive migration implementation. Supabase application, Vercel deployment, and real lead-data migration were not performed.
 
 ## 2026-08-17 UI/UX remediation status
 
@@ -106,7 +129,7 @@ Milestones 1–3 are closed for the released safe-sample CRM foundation. Xaviar 
 - Local remediation is complete: one role-aware shell now persists across dashboards and internal pages, compact navigation has a labelled drawer, active-page state is correct, internal pages use the approved theme system, wide tables become labelled phone cards, compact controls are larger, charts have accessible summaries, and Lead detail uses progressive disclosure.
 - The Admin `Improve` action now opens Xaviar.
 - Validation passed: 41 role/page navigation cases, 10 dashboard light/dark parity cases, all 46 automated CRM/permission/navigation/privacy/Xaviar tests, web TypeScript, and production build. No backend or database change was required.
-- Release status: local only. GitHub/Vercel publication and the final released-environment phone/tablet/laptop/wide-desktop screenshot matrix remain pending.
+- Release status: PR #30 passed `Validate Elevanta AI` run 257 and was squash-merged to `main` as commit `41eb2f37a508dd0c01fe1a4827e39e62056500ec`. Vercel reported the production deployment successful. Production `/api/health` returned HTTP 200, all five role dashboards loaded with their approved role navigation, the shared shell and mobile-navigation control were present, and internal-page navigation preserved the correct active state. The final released-environment phone/tablet/laptop/wide-desktop screenshot matrix remains pending.
 
 ## 2026-08-04 Admin reference release record
 
@@ -139,10 +162,9 @@ Milestones 1–3 are closed for the released safe-sample CRM foundation. Xaviar 
 
 - Final responsive QA covered Admin, Marketing Manager, Sales Manager, Marketing Agent, and Sales Agent at 390 px, 768 px, 1440 px, and 1920 px in dark and light modes.
 - Phone layouts remain single-column. Tablet headline metrics now use two columns to remove excessive vertical scrolling. Laptop and wide-desktop compositions remain unchanged.
-- All tested role/theme combinations preserved their approved headings, cards, sections, navigation, and theme parity without document-level horizontal overflow.
 - Validation passed: 46 automated CRM/permission/navigation/privacy/Xaviar tests, web/API TypeScript checks, production build, and repository whitespace check.
 - Supabase migration traceability is reconciled. All 10 committed versions are recorded only after their live schema effects passed verification.
-- PR [#31](https://github.com/CharlesSmith999/elevanta-ai/pull/31) passed GitHub Actions run 263 and was squash-merged to `main` as commit `ce5f00885d7209abdaef1b64925479a68089d19e`.
-- The existing Git-connected Vercel project deployed the commit successfully. Production web and `/api/health` returned HTTP 200, and the API reported `status: ok`.
-- The released 768 px matrix passed for all five roles in dark and light modes with two-column headline metrics and no horizontal overflow. The previous CRM connection error was absent.
+- PR #31 passed GitHub Actions run 263 and was squash-merged to `main` as commit `ce5f00885d7209abdaef1b64925479a68089d19e`.
+- The existing Git-connected Vercel project deployed successfully. Production web and `/api/health` returned HTTP 200, and the released five-role dark/light tablet matrix passed without horizontal overflow.
+- PR #32 recorded this final status on `main` as commit `426cfbc88be0469adee14f4ad66d28316992872f`.
 - Xaviar Admin and Manager approval records remain the only human gate before Milestone 5.

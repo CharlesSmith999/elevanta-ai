@@ -2,7 +2,7 @@
 
 Status: Milestone 4 technical implementation, Supabase foundation, and production release complete; human approval pending
 
-This document defines how Xaviar will be tested before, during, and after Milestone 4. It supplements [CRM-PLAN.md](./CRM-PLAN.md) and [CRM-DECISIONS-v1.3.md](./CRM-DECISIONS-v1.3.md). It is the focused reference for Xaviar development and evaluation work.
+This document defines how Xaviar will be tested before, during, and after Milestone 4. It supplements [CRM-PLAN.md](./CRM-PLAN.md), [CRM-DECISIONS-v1.3.md](./CRM-DECISIONS-v1.3.md), and the later lead-workflow authority [CRM-DECISIONS-v1.6.md](./CRM-DECISIONS-v1.6.md). The current implementation contract is v1.0; the approved pending lead-workflow delta is [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md).
 
 ## 1. Evaluation goal
 
@@ -26,7 +26,7 @@ Xaviar is evaluated in layers. A later layer cannot pass if an earlier layer fai
 
 ### Synthetic fixtures
 
-Known cases for repeatable tests: clean leads, missing fields, duplicates, three-agent incorrect reports, reassignment, fresh-start handoff, multiple opportunities, overdue follow-ups, lost proposals, delayed outcomes, and small samples.
+Known cases for repeatable tests: clean leads, missing fields, duplicates, multiple contact methods, contact removal/restoration/DNC, first-work and Sales Engagement derivation, three-agent incorrect reports, reassignment with per-method decisions, fresh-start handoff, multiple opportunities, overdue follow-ups, lost proposals, delayed outcomes, and small samples.
 
 ### Safe sample workspace
 
@@ -63,6 +63,8 @@ A time-separated set of completed outcomes is kept aside so predictions and reco
 - New users and low-volume users are not ranked prematurely.
 - Approved leave, unavailable periods, and missing integrations are not treated as poor behavior.
 - Marketer quality is not confused with sales execution, and sales execution is not blamed for poor source quality.
+- A removed contact method is not treated as deleted, and a failed contact attempt is not treated as permanent invalidity.
+- Derived Sales Engagement identifies whether Connected or SQL created the signal.
 
 ### Prediction quality
 
@@ -83,19 +85,19 @@ A time-separated set of completed outcomes is kept aside so predictions and reco
 
 ### Sales agent
 
-Test prioritization, next-action guidance, follow-up coaching, MQL/SQL guidance, loss analysis, conversion coaching, and personal improvement tracking.
+Test prioritization, next-action guidance, contact-method focus safety, first-work/connection/SQL evidence, follow-up coaching, SQL guidance, loss analysis, conversion coaching, and personal improvement tracking.
 
 ### Marketer
 
-Test source-quality analysis, duplicate prevention, incorrect-lead patterns, routing speed, targeting recommendations, and downstream conversion quality.
+Test actionable-contact yield, contact removal/restoration patterns, source-quality analysis, duplicate prevention, incorrect-lead patterns, routing speed, first Sales work, Sales Engagement, targeting recommendations, and downstream conversion quality.
 
 ### Manager
 
-Test team comparisons, skill-based best-practice patterns, coaching plans, risk alerts, review/annotation, and improvement tracking.
+Test team comparisons, contact-quality versus Sales-execution separation, skill-based best-practice patterns, coaching plans, assigned-but-unworked alerts, restoration anomalies, review/annotation, and improvement tracking.
 
 ### Admin
 
-Test organization-wide trends, data-quality risks, forecasts, audit evidence, exports, policy controls, and visibility across the workspace.
+Test organization-wide trends, contact/DNC/restoration policy, data-quality risks, forecasts, audit evidence, exports, policy controls, and visibility across the workspace.
 
 ## 6. Milestone 4 release gates
 
@@ -172,3 +174,7 @@ Implementation version: `xaviar-rules-1.0.0`
 - Gate H, Safety: 43 CRM/Xaviar tests passed, including permission boundaries, cross-workspace denial, prompt injection, contact-data leakage, small samples, reassignment safety, feedback immutability, and calibration math. API/web TypeScript checks and the production build passed.
 
 The additive Supabase migration was applied and verified in project `jayxyikgefnzitxcbdov` on 2026-08-17. Final Gate G human approval still requires one Admin and one Manager review recorded through the release-review endpoint. This is a release control, not unfinished Xaviar logic.
+
+## 11. Lead workflow v1.1 evaluation delta
+
+The approved v1.1 contract is documentation-only until the lead-workflow implementation begins. Its release requires all applicable cases in [docs/LEAD-WORKFLOW-EDGE-TEST-CASES-v1.0.md](./docs/LEAD-WORKFLOW-EDGE-TEST-CASES-v1.0.md), plus regression of the existing Xaviar permission, privacy, prompt-injection, fairness, evidence, and calibration suite. Manual Sales Acceptance must not appear in v1.1 evidence or coaching. The current v1.0 release remains active until this delta passes and receives the required Manager/Admin human review.
