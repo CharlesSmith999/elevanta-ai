@@ -1,6 +1,6 @@
 # Supabase Migration Traceability
 
-Status: Reconciled on 2026-08-20
+Status: Reconciled on 2026-08-23
 
 Project: `jayxyikgefnzitxcbdov`
 
@@ -26,6 +26,13 @@ No lead records were imported, removed, or activated during this reconciliation.
 | `202607300002` | `admin_user_management` |
 | `202607300003` | `authenticated_read_access` |
 | `202608170001` | `xaviar_milestone4` |
+| `202608230001` | `lead_workflow_v16` |
+| `202608230002` | `xaviar_lead_workflow_v11` |
+| `202608230003` | `status_guard_v16` |
+
+## 2026-08-23 lead workflow verification
+
+The three v1.6 migrations were applied in filename order using the approved Supabase workflow. The release verification confirmed the four new workflow tables, guarded contact-method and activity routines, the automatic contact-method trigger for newly created opportunities, four RLS policies, and all three migration-ledger entries. No real lead data was imported or changed.
 
 ## Required process for future migrations
 

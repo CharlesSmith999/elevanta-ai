@@ -2,7 +2,7 @@
 
 Status: Approved for implementation — Direction 1 selected by Shariq on 2026-08-04
 
-This specification converts [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md) into screens. The selected visual target is recorded in [DASHBOARD-REVAMP-DESIGN-SET.md](./docs/DASHBOARD-REVAMP-DESIGN-SET.md). It is the mandatory approval gate before dashboard-revamp code begins. It does not change the data model, permissions, or Xaviar scope.
+This specification converts [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md) into screens. The selected visual target is recorded in [DASHBOARD-REVAMP-DESIGN-SET.md](./docs/DASHBOARD-REVAMP-DESIGN-SET.md). It is the mandatory approval gate before dashboard-revamp code begins. The later approved [CRM-DECISIONS-v1.6.md](./CRM-DECISIONS-v1.6.md) replaces manual Sales Acceptance with derived Sales Engagement; the related lead-workspace and role details are in [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md).
 
 ## 1. Shared experience rules
 
@@ -41,9 +41,9 @@ Help leadership decide whether growth is limited by marketing quality, sales exe
 |---|---|---|
 | Company command bar | Company / Marketing / Sales context, period, source, status, permitted person filter | Change scope without leaving the page |
 | Business pulse | Leads, MQL, SQL, Won, open pipeline, total won value, upfront value | Open the relevant filtered records |
-| Operating risks | Overdue follow-ups, stalled opportunities, unaccepted sales handoffs, Incorrect/Duplicate review, assignment imbalance, data-quality exceptions | Resolve or delegate risk |
+| Operating risks | Overdue follow-ups, stalled opportunities, assigned-but-unworked leads, Incorrect/Duplicate review, assignment imbalance, data-quality exceptions | Resolve or delegate risk |
 | Growth journey | Company funnel: Created → MQL → SQL → Proposal → Won | Diagnose conversion loss |
-| Marketing quality | Source quality table: valid leads, acceptance, MQL, SQL, Incorrect/Duplicate, downstream Won | Choose source/process intervention |
+| Marketing quality | Source quality table: actionable contacts, first Sales work, Sales Engagement, MQL, SQL, Incorrect/Duplicate, downstream Won | Choose source/process intervention |
 | Sales execution | Response-speed trend, follow-up completion, proposal-to-won, loss reasons, stage aging | Choose sales intervention |
 | Recognition and comparison | Named permitted recognition boards: Highest Result, Most Improved, Quality Champion, Consistency Champion | Recognize performance; never punish from this view |
 
@@ -65,10 +65,10 @@ Help the Marketing Manager improve the quality, completeness, routing speed, and
 
 | Area | Content | Primary action |
 |---|---|---|
-| Team quality pulse | Leads created, Actionable Lead Yield, MQL, SQL, sales acceptance, routing speed, Incorrect/Duplicate rate | Open affected source or agent records |
+| Team quality pulse | Leads created, Actionable Lead Yield, MQL, first Sales work, Sales Engagement, SQL, routing speed, Incorrect/Duplicate rate | Open affected source or agent records |
 | Quality-risk queue | Missing source, missing contact details, duplicate candidates, repeated incorrect reports, sales requests for more information, slow routing | Fix or coach before more leads are routed |
-| Lead-quality journey | Created → Routed → Accepted → MQL → SQL → Won | Find the weak step |
-| Source quality | Source/campaign comparison with count, acceptance, SQL yield, downstream Won | Improve targeting or source investment |
+| Lead-quality journey | Created → MQL → Routed → First Worked → Connected → SQL → Won | Find the weak step |
+| Source quality | Source/campaign comparison with count, actionable contacts, first Sales work, Sales Engagement, SQL yield, downstream Won | Improve targeting or source investment |
 | Team improvement | Agent comparison: quality yield, clean-data rate, routing speed, trend against prior period | Coach a specific skill |
 | Recognition | Named direct-report Quality Builder, Sales-Ready Creator, Clean Data Champion, Fast Router, Most Improved | Recognize quality work |
 
@@ -91,9 +91,9 @@ Help the Marketing Agent create complete, clean, sales-useful leads and see how 
 | Area | Content | Primary action |
 |---|---|---|
 | Primary action | Prominent `Add lead` button plus an import/validation shortcut when enabled | Create a complete lead |
-| My quality pulse | Leads created, Actionable Lead Yield, MQL, SQL, sales acceptance, routing speed, clean-data rate | Review the underlying leads |
+| My quality pulse | Leads created, Actionable Lead Yield, MQL, first Sales work, Sales Engagement, SQL, routing speed, clean-data rate | Review the underlying leads |
 | My quality queue | Leads missing required intake details, duplicate candidates, Sales requests for information, unrouted leads | Repair before routing or rework |
-| My impact journey | Created → Routed → Accepted → MQL → SQL → Won | Understand downstream impact |
+| My impact journey | Created → MQL → Routed → First Worked → Connected → SQL → Won | Understand downstream impact |
 | Source learning | Personal source mix and quality outcome by source | Repeat good targeting; stop weak patterns |
 | My growth | Prior-period comparison, strongest habit, one improvement focus, private anonymized team benchmark | Improve the next controllable habit |
 
@@ -112,7 +112,7 @@ Help the Sales Manager protect pipeline health, distribute work fairly, coach ag
 | Area | Content | Primary action |
 |---|---|---|
 | Team execution pulse | Open opportunities, due today, overdue, median response speed, connection rate, proposal-to-won, total won and upfront value | Open team work or conversion detail |
-| Operating watchlist | Unaccepted handoffs, uncontacted new assignments, overdue follow-ups, stalled proposals, aging opportunities, overloaded agents | Reassign, coach, or intervene |
+| Operating watchlist | Assigned-but-unworked leads, uncontacted new assignments, overdue follow-ups, stalled proposals, aging opportunities, overloaded agents | Reassign, coach, or intervene |
 | Team funnel | Assigned → Contacted → Connected → SQL → Proposal → Won | Locate the stage bottleneck |
 | Workload and discipline | Agent workload, follow-up completion, response speed, aging distribution | Balance work and coach habits |
 | Loss and recovery | Loss reasons, lost stage, source context, opportunities suitable for later reactivation | Improve process and scripts |
@@ -157,7 +157,8 @@ Help the Sales Agent decide whom to work now, complete follow-ups, move qualifie
 |---|---|
 | Response speed | Assignment timestamp and first contact activity |
 | Follow-up reliability | Follow-up due date and completion timestamp |
-| Sales acceptance | Approved intake decision within one business day |
+| First Sales work | Assignment timestamp and first eligible Sales activity in the same ownership interval |
+| Sales Engagement | Earliest Connected activity or SQL transition in the ownership interval |
 | Marketing quality | Marketing owner, source, qualification, acceptance, downstream outcome |
 | Loss learning | Lost/Not Interested status, controlled reason, stage and source |
 | Financial outcome | Won status/date, total project cost, upfront payment, USD currency |

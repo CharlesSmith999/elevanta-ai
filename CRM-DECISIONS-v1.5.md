@@ -2,7 +2,7 @@
 
 Status: Approved by product owner on 2026-08-04
 
-This version extends [CRM-DECISIONS-v1.4.md](./CRM-DECISIONS-v1.4.md). It records the approved dashboard and operating decisions made before the dashboard revamp. Where this file conflicts with an earlier decision record, this file governs the dashboard-revamp scope.
+This version extends [CRM-DECISIONS-v1.4.md](./CRM-DECISIONS-v1.4.md). It records the approved dashboard and operating decisions made before the dashboard revamp. The later [CRM-DECISIONS-v1.6.md](./CRM-DECISIONS-v1.6.md) specifically supersedes the manual Sales Acceptance row and adds the approved lead-workspace/contact-quality flow. All other non-conflicting decisions remain valid.
 
 | Decision | Approved rule |
 |---|---|

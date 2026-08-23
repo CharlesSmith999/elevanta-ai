@@ -2,7 +2,7 @@
 
 Status: Step 11–12 local implementation complete; publish/deployment pending the agreed combined release.
 
-This record implements Sections 11 and 12 of `CRM-PLAN.md`. It is subordinate to `CRM-DECISIONS-v1.1.md` and the later approved decision versions.
+This record implements the released Sections 11 and 12 baseline of `CRM-PLAN.md`. It is subordinate to `CRM-DECISIONS-v1.1.md` and later approved decision versions. The planned, not-yet-implemented lead-workflow delta is governed by [CRM-DECISIONS-v1.6.md](../CRM-DECISIONS-v1.6.md) and [LEAD-WORKFLOW-SPEC-v1.0.md](../LEAD-WORKFLOW-SPEC-v1.0.md).
 
 ## Architecture boundary
 
@@ -42,3 +42,19 @@ All routes are under `/v1` and require `Authorization: Bearer <Supabase access t
 ## Release gate
 
 Before publishing this local batch, run workspace typecheck, domain/API contract tests, production build, Supabase migration verification, and the Vercel `/api/health` smoke test. Do not create a second deployment instance.
+
+## Approved lead-workflow v1.6 delta, development pending
+
+The current released schema stores one normalized phone and one normalized email on `contacts` and uses a generic activity body. That is insufficient for the approved multiple-contact-method workflow. The next implementation must be additive and preserve compatibility until Milestone 5 migration.
+
+Planned changes:
+
+- canonical `contact_methods`, opportunity method-state links, immutable method events, and assignment contact decisions;
+- structured activity type, outcome, contact-method reference, occurred time, and optional transactional follow-up;
+- immediate assignment with no Sales accept/reject state;
+- derived First Worked, Connected, SQL, and Sales Engagement evidence;
+- role-safe assessment, restoration, reassignment preview/commit, and DNC enforcement endpoints;
+- expanded RLS, optimistic state versioning, idempotency, atomic operations, and audit writes;
+- Xaviar event-stream v1.1 integration without CRM mutation authority.
+
+The full table/API contract, role rules, transaction boundaries, and edge cases are defined in [LEAD-WORKFLOW-SPEC-v1.0.md](../LEAD-WORKFLOW-SPEC-v1.0.md). Required release tests are in [LEAD-WORKFLOW-EDGE-TEST-CASES-v1.0.md](./LEAD-WORKFLOW-EDGE-TEST-CASES-v1.0.md). No migration, endpoint, UI code, or production data change has been made by this documentation update.

@@ -1,5 +1,6 @@
 import type { Session } from '@supabase/supabase-js';
 import type { Activity, Assignment, FollowUp, IncorrectReport, Lead, OpportunityStatus, Qualification, StageHistory } from './domain';
+import type { ContactFocus, ContactHealth, ContactMethodType } from './leadWorkflow';
 
 /**
  * Production is a single Vercel deployment, so API calls must stay on the
@@ -43,6 +44,31 @@ export type ManagedUser = {
   active: boolean;
   created_at: string;
   last_sign_in_at: string | null;
+};
+
+export type RemoteContactMethod = {
+  id: string;
+  health: ContactHealth;
+  focus: ContactFocus;
+  assessment_reason?: string | null;
+  last_assessed_at?: string | null;
+  contact_methods?: {
+    id: string;
+    method_type: ContactMethodType;
+    value: string;
+    label?: string | null;
+    globally_restricted?: boolean;
+  } | null;
+};
+
+export type RemoteActivity = {
+  id: string;
+  type: string;
+  outcome?: string | null;
+  body?: string | null;
+  occurred_at?: string | null;
+  created_at: string;
+  contact_methods?: { value: string; method_type: ContactMethodType } | null;
 };
 
 async function request<T>(session: Session, path: string, init?: RequestInit): Promise<T> {
@@ -106,3 +132,9 @@ export const decideRemoteReview = (session: Session, id: string, body: unknown) 
 export const loadAdminUsers = (session: Session) => request<{ users: ManagedUser[] }>(session, '/v1/admin/users');
 export const createAdminUser = (session: Session, body: unknown) => request<{ user: ManagedUser }>(session, '/v1/admin/users', { method: 'POST', body: JSON.stringify(body) });
 export const updateAdminUser = (session: Session, id: string, body: unknown) => request<{ user: ManagedUser }>(session, `/v1/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+export const loadRemoteContactMethods = (session: Session, id: string) => request<{ contactMethods: RemoteContactMethod[] }>(session, `/v1/opportunities/${id}/contact-methods`);
+export const loadRemoteActivityHistory = (session: Session, id: string) => request<{ activities: RemoteActivity[] }>(session, `/v1/opportunities/${id}/activity-history`);
+export const addRemoteContactMethod = (session: Session, id: string, body: unknown) => request<{ contactMethodId: string }>(session, `/v1/opportunities/${id}/contact-methods`, { method: 'POST', body: JSON.stringify(body) });
+export const assessRemoteContactMethod = (session: Session, id: string, contactMethodId: string, body: unknown) => request<void>(session, `/v1/opportunities/${id}/contact-methods/${contactMethodId}`, { method: 'PATCH', body: JSON.stringify(body) });
+export const restoreRemoteContactMethod = (session: Session, id: string, contactMethodId: string, body: unknown) => request<void>(session, `/v1/opportunities/${id}/contact-methods/${contactMethodId}/restore`, { method: 'POST', body: JSON.stringify(body) });
+export const logRemoteSalesActivity = (session: Session, id: string, body: unknown) => request<{ activityId: string }>(session, `/v1/opportunities/${id}/activities`, { method: 'POST', body: JSON.stringify(body) });

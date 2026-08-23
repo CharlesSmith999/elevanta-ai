@@ -6,8 +6,11 @@ Product name: **Elevanta AI**
 AI companion: **Xaviar**
 
 - [CRM-PLAN.md](./CRM-PLAN.md) — product specification, permissions, workflows, data model, dashboards, AI coaching, API plan, import rules, security, and roadmap.
-- [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) — approved deployment, authentication, hierarchy, role, and review-admin decisions.
+- [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.6.md](./CRM-DECISIONS-v1.6.md) — approved versioned product decisions. v1.6 governs the current lead workflow.
+- [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md) — approved role flow, screen contract, data/API delta, security rules, Xaviar evidence, and development sequence.
+- [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md) — planned lead-workflow evidence and reasoning delta for Xaviar.
+- [docs/LEAD-WORKFLOW-EDGE-TEST-CASES-v1.0.md](./docs/LEAD-WORKFLOW-EDGE-TEST-CASES-v1.0.md) — required edge, permission, security, responsive, and accessibility release tests.
 - [PROJECT-STATUS.md](./PROJECT-STATUS.md) — current milestone progress, validation results, and next target.
 - [docs/DEPLOYMENT-SOP.md](./docs/DEPLOYMENT-SOP.md) — required GitHub, Vercel, and Supabase deployment procedure.
 
-The initial foundation decisions are confirmed. Milestone 1 implementation can now begin.
+The released CRM/Xaviar foundation is documented in `PROJECT-STATUS.md`. Lead-workflow v1.6 documentation is complete; final Lead Generator/reassignment visual approval and implementation remain pending. Real production data migration remains Milestone 5 only.
