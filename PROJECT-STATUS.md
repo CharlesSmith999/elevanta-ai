@@ -1,8 +1,8 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-08-23
-Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.6.md](./CRM-DECISIONS-v1.6.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
+Last updated: 2026-08-25
+Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.7.md](./CRM-DECISIONS-v1.7.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
 
 ## Current position
 
@@ -40,6 +40,7 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 | 3 — Controls and dashboards | Complete | Direction 1 role dashboards are released and live-verified: Admin, Marketing Manager view, Sales Manager, Marketing Agent, and Sales Agent all retain the approved elements in light and dark mode. Benchmark cohorts remain open for Xaviar evaluation. | No Milestone 3 product work remains. |
 | 4 — AI support | Technical release complete; human approval pending | Xaviar sub-phases 4A–4H are released using safe sample data: data contract, event foundation, explanations, recommendations, coaching, privacy-safe benchmarks, calibrated prediction controls, five-role dashboard integration, safety tests, and the verified additive Supabase foundation. | Record one Admin plus one Manager approval. No live agent rollout occurs in this milestone. |
 | Lead workflow v1.6 refinement | Release complete | Immediate assignment, derived Sales Engagement, multi-method contact quality, Sales/Lead Gen screens, activity history, role guards, protected API routes, additive migrations, Xaviar v1.1 event stream, 50 passing automated tests, type checks, production build, database migration/security verification, Vercel preview, production build, live CRM application, and API-health checks are complete. | No release work remains. Admin and Manager Xaviar approval is still required before Milestone 5. |
+| Lead details and reporting v1.7 | Local implementation complete; release pending | Approved categories were reconciled with the workbook. Description, scoped Marketing-side editing, type-aware phone/email entry, contact-method-only removal, explicit whole-lead flags, and the Sales-only three-agent threshold are implemented in the database migration, API, UI, and permission model. | Complete final validation, then obtain explicit authorization before applying the migration, publishing, and deploying. No real data migration. |
 | 5 — Production data migration | Not started | Deliberately deferred until Milestones 2–4 and Xaviar safety review are complete. | Stage and validate the approved Excel data, preserve provenance, apply duplicate handling, reconcile dashboards, activate migrated records, and then begin live agent/marketer use. |
 | Phase 2 — Workflow automation | Not started | Scope is documented only. | Email, SMS, calendar, phone, digests, escalation, consent enforcement, and human approval gates. |
 | Phase 3 — SaaS product | Not started | Scope is documented only. | Multi-tenancy, billing, self-service administration, onboarding, limits, and product analytics. |
@@ -61,6 +62,7 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 
 - TypeScript checks pass.
 - Production web build passes.
+- Lead details and reporting v1.7 local validation passed on 2026-08-25: 55 automated domain, permission, privacy, Xaviar, category, contact-entry, and incorrect-threshold tests; API and web TypeScript checks; API build; production web build; repository whitespace check; desktop workflow checks; and a 390 px responsive check with no horizontal overflow. The existing web bundle-size warning remains non-blocking.
 - Domain tests were previously verified successfully for the CRM rules.
 - Step 2 Supabase verification passed: all 10 approved source labels exist in `source_dictionary`; `opportunities` contains `total_project_cost`, `upfront_payment_amount`, and `won_at`; the foundational CRM tables are present.
 - Steps 6–10 local readiness verification passed: 16 domain/permission/reconciliation tests, TypeScript checks, and production build.
@@ -111,7 +113,7 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 
 ## Next milestone target
 
-Milestones 1–3 are closed for the released safe-sample CRM foundation. Xaviar Milestone 4 implementation is released, with Admin plus Manager human approval still pending. Before Milestone 5, the newly approved lead-workflow v1.6 must complete its final GitHub/Vercel application release and production smoke checks using safe sample data. Only after both human approval and the lead-workflow gate close may Milestone 5 production lead-data migration begin.
+Milestones 1–3 and lead workflow v1.6 are released. Xaviar Milestone 4 implementation is released, with Admin plus Manager human approval still pending. Lead details and reporting v1.7 is implemented locally and must pass its final validation and release gate before publication. Only after Xaviar human approval and the v1.7 release gate close may Milestone 5 production lead-data migration begin.
 
 ## 2026-08-23 lead-workflow documentation record
 
@@ -130,6 +132,18 @@ Milestones 1–3 are closed for the released safe-sample CRM foundation. Xaviar 
 - Supabase migrations `202608230001` through `202608230003` are applied and recorded in the canonical ledger. Tables, permissions, trigger, guarded workflow functions, and the no-real-data boundary were verified.
 - Validation passed: API and web TypeScript checks, production build, 50 automated domain, permission, privacy, Xaviar, and lead-workflow tests, preview smoke checks, production application smoke check, and production API health check.
 - No real lead data, credentials, or private design-image assets were published.
+
+## 2026-08-25 lead details and reporting v1.7 local implementation record
+
+- `CRM-DECISIONS-v1.7.md` records the approved description, category, editing, contact-entry, and incorrect-reporting rules.
+- Lead creation and scoped editing now support Description and the exact workbook categories: App, Game, SEO, SMM, Web, and Not available.
+- Admin, the owning Marketing Agent, and the responsible Marketing Manager may edit Marketing-owned lead details. Sales roles cannot edit those fields.
+- Add Contact now validates phone and email according to the selected method, rejects duplicates, and preserves audit history.
+- Contact-method health remains separate from opportunity state. Marking one phone or email Incorrect removes only that method from active focus.
+- Any authorized viewer may submit one explicit whole-lead flag. Only three distinct Sales Agent flags create the Admin review item and pause routing.
+- The additive migration is `202608250001_lead_details_reporting_v17.sql`. It is not applied or recorded in Supabase yet.
+- Local validation passed: 55 automated tests, API and web TypeScript checks, API build, production web build, repository whitespace check, desktop interaction checks, and a 390 px responsive check. The existing bundle-size warning is non-blocking.
+- Publication, Supabase application, and Vercel deployment remain pending explicit release authorization. No real lead data or credentials were added.
 
 ## 2026-08-17 UI/UX remediation status
 

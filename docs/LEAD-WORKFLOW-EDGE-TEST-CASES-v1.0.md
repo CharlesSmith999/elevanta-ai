@@ -1,7 +1,7 @@
 # Lead Workflow Edge and Security Test Cases v1.0
-Status: Approved test specification; execution pending development
+Status: v1.6 release baseline passed; v1.7 additions passed locally on 2026-08-25 and await release verification
 
-References: [CRM-DECISIONS-v1.6.md](../CRM-DECISIONS-v1.6.md), [LEAD-WORKFLOW-SPEC-v1.0.md](../LEAD-WORKFLOW-SPEC-v1.0.md), and [XAVIAR-DATA-CONTRACT-v1.1.md](../XAVIAR-DATA-CONTRACT-v1.1.md).
+References: [CRM-DECISIONS-v1.7.md](../CRM-DECISIONS-v1.7.md), [CRM-DECISIONS-v1.6.md](../CRM-DECISIONS-v1.6.md), [LEAD-WORKFLOW-SPEC-v1.0.md](../LEAD-WORKFLOW-SPEC-v1.0.md), and [XAVIAR-DATA-CONTRACT-v1.1.md](../XAVIAR-DATA-CONTRACT-v1.1.md).
 
 ## Acceptance rule
 
@@ -81,9 +81,22 @@ Every case must pass at database/RLS, API, domain, and relevant UI level before 
 |---|---|---|
 | LW-100 | Agent removes every contact method | No opportunity-level incorrect report is created automatically |
 | LW-101 | Same agent reports incorrect twice | Second report denied and threshold count stays one |
-| LW-102 | Three distinct agents report | Exactly one Admin review item is created and routing pauses |
+| LW-102 | Three distinct Sales Agents report | Exactly one Admin review item is created and routing pauses |
 | LW-103 | Admin rejects review | Routing resumes; reports/events remain immutable |
 | LW-104 | Admin confirms Incorrect or Duplicate | Opportunity is sidelined with decision reason and audit evidence |
+| LW-105 | Marketing, Manager, or Admin flags the lead | Flag is recorded but the automatic Sales threshold remains unchanged |
+| LW-106 | One phone or email becomes Incorrect | Only that method leaves active focus; lead status does not change |
+
+## Lead details and contact entry
+
+| ID | Case | Expected result |
+|---|---|---|
+| LW-110 | Create lead with description and each approved category | Description persists and only the six workbook categories are accepted |
+| LW-111 | Historical lead has no category | API and UI return `Not available` |
+| LW-112 | Admin, Marketing Manager, and owning Marketing Agent edit details | Changes persist, are audited, and stay within permitted scope |
+| LW-113 | Sales Agent or Sales Manager edits Marketing-owned details | Request is rejected and no value changes |
+| LW-114 | Add a valid email from Add Contact | Email is accepted, normalized, displayed, and auditable |
+| LW-115 | Add malformed email or short phone | Dialog and API reject the value without changing the lead |
 
 ## Xaviar safety
 

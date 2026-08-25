@@ -43,13 +43,16 @@ export const lostReasonOptions = [
   'Other',
 ] as const;
 export type LostReason = typeof lostReasonOptions[number];
+export const leadCategoryOptions = ['app', 'game', 'seo', 'smm', 'web', 'not_available'] as const;
+export type LeadCategory = typeof leadCategoryOptions[number];
+export const leadCategoryLabels: Record<LeadCategory, string> = { app: 'App', game: 'Game', seo: 'SEO', smm: 'SMM', web: 'Web', not_available: 'Not available' };
 
 export type User = { id: string; name: string; role: Role; managerId?: string; department: 'marketing' | 'sales' };
 export type Assignment = { id: string; ownerId: string; assignedBy: string; at: string; visibility: VisibilityMode; reason: string; endedAt?: string };
 export type Activity = { id: string; at: string; actorId: string; kind: 'note' | 'status' | 'assignment' | 'follow_up' | 'incorrect_report' | 'system'; body: string };
 export type StageHistory = { id: string; fromStatus?: OpportunityStatus; toStatus: OpportunityStatus; enteredAt: string; exitedAt?: string; actorId?: string; reason: string };
 export type FollowUp = { id: string; ownerId: string; dueAt: string; action: 'Call' | 'Email' | 'SMS' | 'Task'; status: FollowUpStatus };
-export type IncorrectReport = { reporterId: string; reason: string; evidence?: string; at: string };
+export type IncorrectReport = { reporterId: string; reporterRole?: Role; reason: string; evidence?: string; at: string };
 export type IncorrectReview = { state: 'pending' | 'confirmed_incorrect' | 'rejected' | 'merge_duplicate'; reason?: string; reviewerId?: string; decidedAt?: string };
 export type Lead = {
   id: string;
@@ -57,6 +60,8 @@ export type Lead = {
   phone?: string;
   email?: string;
   source: string;
+  category?: LeadCategory;
+  description?: string;
   marketingOwnerId: string;
   sourceDate: string;
   status: OpportunityStatus;
@@ -100,6 +105,10 @@ export function canViewLead(user: User, lead: Lead, allUsers = users): boolean {
   if (user.role === 'marketer') return lead.marketingOwnerId === user.id;
   const owner = ownerId(lead);
   if (user.role === 'sales_agent') return owner === user.id;
+  if (user.department === 'marketing') {
+    const managerIds = new Set([user.id, ...allUsers.filter((candidate) => candidate.name.toLowerCase() === user.name.toLowerCase()).map((candidate) => candidate.id)]);
+    return managerIds.has(allUsers.find((candidate) => candidate.id === lead.marketingOwnerId)?.managerId ?? '');
+  }
   const ownerUser = allUsers.find((candidate) => candidate.id === owner);
   return ownerUser?.managerId === user.id;
 }
@@ -116,6 +125,19 @@ export function canUpdateLead(user: User, lead: Lead, allUsers = users): boolean
   return user.role === 'admin' || (user.role === 'marketer' && lead.marketingOwnerId === user.id) || ownerId(lead) === user.id || (user.role === 'manager' && canViewLead(user, lead, allUsers));
 }
 
+export function canEditLeadDetails(user: User, lead: Lead, allUsers = users): boolean {
+  if (user.role === 'admin') return true;
+  if (user.role === 'marketer') return lead.marketingOwnerId === user.id;
+  if (user.role !== 'manager' || user.department !== 'marketing') return false;
+  const managerIds = new Set([user.id, ...allUsers.filter((candidate) => candidate.name.toLowerCase() === user.name.toLowerCase()).map((candidate) => candidate.id)]);
+  return managerIds.has(allUsers.find((candidate) => candidate.id === lead.marketingOwnerId)?.managerId ?? '');
+}
+
+export function canFlagIncorrectLead(user: User, lead: Lead, allUsers = users): boolean {
+  if (!canViewLead(user, lead, allUsers)) return false;
+  return user.role !== 'sales_agent' || ownerId(lead) === user.id;
+}
+
 export const canViewManagementBoards = (user: User) => user.role === 'admin' || user.role === 'manager';
 export const canViewDataQualityBoard = (user: User) => user.role === 'admin';
 export const canViewNamedLeaderboard = (user: User) => user.role === 'admin' || user.role === 'manager';
@@ -129,8 +151,12 @@ export function validStatusTransition(from: OpportunityStatus, to: OpportunitySt
 
 export function incorrectReviewState(reports: IncorrectReport[], existing?: IncorrectReview): IncorrectReview | undefined {
   if (existing) return existing;
-  const uniqueReporters = new Set(reports.map((report) => report.reporterId));
+  const uniqueReporters = new Set(reports.filter((report) => report.reporterRole === 'sales_agent' || users.find((user) => user.id === report.reporterId)?.role === 'sales_agent').map((report) => report.reporterId));
   return uniqueReporters.size >= 3 ? { state: 'pending' } : undefined;
+}
+
+export function salesIncorrectReportCount(reports: IncorrectReport[]): number {
+  return new Set(reports.filter((report) => report.reporterRole === 'sales_agent' || users.find((user) => user.id === report.reporterId)?.role === 'sales_agent').map((report) => report.reporterId)).size;
 }
 
 export function duplicateMatches(leads: Lead[]): Array<{ leadId: string; matches: string[] }> {

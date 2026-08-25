@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { benchmarkBySource, canReassign, canUpdateLead, canViewDataQualityBoard, canViewLead, canViewManagementBoards, canViewNamedLeaderboard, dashboardDateRange, dashboardFor, dashboardReconciliation, dataQualityIssues, duplicateMatches, dueToday, filterDashboardLeads, financialMetrics, incorrectReviewState, isLeadIdentity, leaderboardForMarketing, leaderboardForSales, lossReasonBreakdown, overdue, responseHours, routingHours, seedLeads, sourceOptions, stageOwnershipSegments, transitionStage, users, validStatusTransition, validWonFinancials } from './domain.js';
+import { benchmarkBySource, canEditLeadDetails, canFlagIncorrectLead, canReassign, canUpdateLead, canViewDataQualityBoard, canViewLead, canViewManagementBoards, canViewNamedLeaderboard, dashboardDateRange, dashboardFor, dashboardReconciliation, dataQualityIssues, duplicateMatches, dueToday, filterDashboardLeads, financialMetrics, incorrectReviewState, isLeadIdentity, leadCategoryLabels, leadCategoryOptions, leaderboardForMarketing, leaderboardForSales, lossReasonBreakdown, overdue, responseHours, routingHours, salesIncorrectReportCount, seedLeads, sourceOptions, stageOwnershipSegments, transitionStage, users, validStatusTransition, validWonFinancials } from './domain.js';
 
 const user = (id: string) => users.find((candidate) => candidate.id === id)!;
 
@@ -45,6 +45,20 @@ test('follow-up metrics distinguish a due-today task from an overdue task', () =
 
 test('source dictionary contains the approved dashboard source labels', () => {
   assert.deepEqual(sourceOptions, ['Bark Paid', 'Bark Stalk', 'Thumbtack', 'SEO', 'Social Media', 'Clutch', 'Email Marketing', 'LinkedIn', 'PPC', 'Other']);
+});
+
+test('lead categories match the approved workbook dropdown exactly', () => {
+  assert.deepEqual(leadCategoryOptions.map((category) => leadCategoryLabels[category]), ['App', 'Game', 'SEO', 'SMM', 'Web', 'Not available']);
+});
+
+test('lead details are editable only by Admin and permitted Marketing roles', () => {
+  const lead = seedLeads.find((candidate) => candidate.marketingOwnerId === 'hamza')!;
+  const marketingManager = { id: 'shariq-marketing-manager', name: 'Shariq', role: 'manager' as const, department: 'marketing' as const };
+  assert.equal(canEditLeadDetails(user('shariq'), lead), true);
+  assert.equal(canEditLeadDetails(user('hamza'), lead), true);
+  assert.equal(canEditLeadDetails(marketingManager, lead), true);
+  assert.equal(canEditLeadDetails(user('ali'), lead), false);
+  assert.equal(canEditLeadDetails(user('asad'), lead), false);
 });
 
 test('won financial values require non-negative total and upfront payment within total', () => {
@@ -162,6 +176,26 @@ test('incorrect threshold counts distinct reporters only', () => {
   ];
   assert.equal(incorrectReviewState(reports), undefined);
   assert.equal(incorrectReviewState([...reports, { reporterId: 'obaid', reason: 'Spam', at: '2026-07-01T12:00:00.000Z' }])?.state, 'pending');
+});
+
+test('non-Sales flags are evidence but do not increase the automatic threshold', () => {
+  const reports = [
+    { reporterId: 'owais', reporterRole: 'sales_agent' as const, reason: 'Invalid', at: '2026-07-01T09:00:00.000Z' },
+    { reporterId: 'asad', reporterRole: 'sales_agent' as const, reason: 'Invalid', at: '2026-07-01T10:00:00.000Z' },
+    { reporterId: 'hamza', reporterRole: 'marketer' as const, reason: 'Poor data', at: '2026-07-01T11:00:00.000Z' },
+    { reporterId: 'shariq', reporterRole: 'admin' as const, reason: 'Review', at: '2026-07-01T12:00:00.000Z' },
+  ];
+  assert.equal(salesIncorrectReportCount(reports), 2);
+  assert.equal(incorrectReviewState(reports), undefined);
+  assert.equal(incorrectReviewState([...reports, { reporterId: 'obaid', reporterRole: 'sales_agent', reason: 'Invalid', at: '2026-07-01T13:00:00.000Z' }])?.state, 'pending');
+});
+
+test('authorized viewers may flag but Sales must be the current owner', () => {
+  const lead = seedLeads.find((candidate) => candidate.marketingOwnerId === 'hamza' && candidate.assignments.length)!;
+  assert.equal(canFlagIncorrectLead(user('shariq'), lead), true);
+  assert.equal(canFlagIncorrectLead(user('hamza'), lead), true);
+  assert.equal(canFlagIncorrectLead(user('owais'), lead), lead.assignments.some((assignment) => !assignment.endedAt && assignment.ownerId === 'owais'));
+  assert.equal(canFlagIncorrectLead(user('mustabeen'), lead), lead.assignments.some((assignment) => !assignment.endedAt && assignment.ownerId === 'mustabeen'));
 });
 
 test('completed or cancelled follow-ups never remain due or overdue', () => {

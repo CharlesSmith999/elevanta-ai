@@ -2,7 +2,7 @@
 
 Status: Released with safe sample data on 2026-08-23; real-data migration remains Milestone 5 only
 
-Decision authority: [CRM-DECISIONS-v1.6.md](./CRM-DECISIONS-v1.6.md)
+Decision authority: [CRM-DECISIONS-v1.7.md](./CRM-DECISIONS-v1.7.md), extending [CRM-DECISIONS-v1.6.md](./CRM-DECISIONS-v1.6.md)
 
 This is the implementation-facing source of truth for lead creation, immediate assignment, Sales working, contact-quality management, activity logging, follow-ups, reassignment, role visibility, Admin review, and Xaviar evidence. It uses safe sample data until the separately controlled Milestone 5 migration.
 
@@ -27,6 +27,7 @@ The interface must separate:
 | Capability | Marketing Agent / Lead Generator | Sales Agent | Marketing Manager | Sales Manager | Admin |
 |---|---:|---:|---:|---:|---:|
 | Create lead | Own leads | No | Team scope | No | Yes |
+| Edit name, source, category, and description | Own leads | No | Marketing-team scope | No | Yes |
 | Set MQL | Own leads | No | Team scope | No | Yes |
 | Assign/reassign Sales owner | Own leads | No | Team scope | Direct-report scope | Yes |
 | View complete assignment/contact-quality history | Own leads | Assigned, permission-filtered | Team scope | Direct-report scope | Yes |
@@ -37,7 +38,7 @@ The interface must separate:
 | Remove method from active focus | No | Current assignment | No | In-scope correction | Yes |
 | Restore Incorrect/Wrong Person method | Own leads | Immediate Undo only | Team scope | Direct-report scope | Yes |
 | Restore Do Not Contact | No | No | In-scope manager only | In-scope manager only | Yes |
-| Submit incorrect-lead report | No | Current assignment, once | No | No | No |
+| Submit incorrect-lead flag | Own/visible lead, once | Current assignment, once; counts toward threshold | Visible lead, once; does not count | Visible lead, once; does not count | Visible lead, once; does not count |
 | Decide three-agent incorrect review | No | No | No | No | Yes |
 
 All Manager and Admin corrections create an audit event. Department scope and one-direct-manager rules remain unchanged.
@@ -46,7 +47,9 @@ All Manager and Admin corrections create an audit event. Department scope and on
 
 ### 3.1 Marketing creates and assigns
 
-1. Marketing enters the lead's identity, description, source, project type, and one or more phone/email methods.
+1. Marketing enters the lead's identity, description, source, controlled lead category, and one or more phone/email methods.
+   - Categories are `App`, `Game`, `SEO`, `SMM`, `Web`, and `Not available`.
+   - Historical or uncategorized records use `Not available`.
 2. Existing duplicate checks run on normalized phone and email values.
 3. Marketing may set MQL.
 4. Marketing selects one Sales Agent and submits.
@@ -75,7 +78,7 @@ Each phone/email method has a current health and focus state.
 
 Marking `Incorrect` or `Wrong Person` immediately removes the method from the Sales working list and offers a short Undo message. `Reception / Gatekeeper` moves to Secondary Contacts. `Do Not Contact` requires confirmation and becomes globally restricted.
 
-`No Answer`, `Busy`, and `Voicemail` are not contact-health values. They are activity outcomes and leave the method active.
+`No Answer`, `Busy`, and `Voicemail` are not contact-health values. They are activity outcomes and leave the method active. Marking one or several individual methods Incorrect never changes the complete lead status automatically.
 
 ### 3.4 Sales logs activity
 
@@ -127,7 +130,7 @@ Fresh-start visibility affects conversation history only. It never clears contac
 
 ### 3.8 Incorrect-lead review
 
-If all useful methods fail, the current Sales Agent may explicitly report the opportunity as incorrect with a required controlled reason. Contact-method removal alone does not create this report. One reporter counts once. Three distinct Sales Agents create exactly one Admin review item and pause further assignment until Admin decides `Confirm Incorrect`, `Reject`, or `Merge/Duplicate`.
+If all useful methods fail, or the user has other clear evidence, any authorized viewer may explicitly flag the opportunity as incorrect with a required controlled reason. Contact-method removal alone does not create this flag. One reporter counts once. Only Sales Agent flags count toward the automatic threshold. Three distinct Sales Agents create exactly one Admin review item and pause further assignment until Admin decides `Confirm Incorrect`, `Reject`, or `Merge/Duplicate`. Marketing, Manager, and Admin flags remain visible evidence but do not increase the automatic threshold.
 
 ## 4. Role-specific screen contract
 

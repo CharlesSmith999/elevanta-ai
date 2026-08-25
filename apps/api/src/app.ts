@@ -7,11 +7,13 @@ import { buildApiXaviarReport, canRequestXaviar, opportunityBelongsToSubject, ty
 type Profile = { id: string; workspace_id: string; role: 'admin' | 'manager' | 'sales_agent' | 'marketer'; full_name: string; manager_id: string | null; department?: 'marketing' | 'sales' | null; active: boolean };
 type AuthenticatedRequest = Request & { profile?: Profile; supabase?: SupabaseClient };
 const sourceOptions = ['Bark Paid', 'Bark Stalk', 'Thumbtack', 'SEO', 'Social Media', 'Clutch', 'Email Marketing', 'LinkedIn', 'PPC', 'Other'] as const;
+const leadCategories = ['app', 'game', 'seo', 'smm', 'web', 'not_available'] as const;
 const dashboardRoles = z.enum(['agent', 'manager', 'admin', 'marketer']);
 const dashboardPeriods = z.enum(['daily', 'weekly', 'monthly', 'yearly', 'lifetime', 'custom']);
 
 const id = z.string().uuid();
-const newLead = z.object({ name: z.string().trim().min(1).max(160), phone: z.string().trim().max(60).optional(), email: z.string().trim().email().max(254).optional(), source: z.enum(sourceOptions).default('Other'), marketingOwnerId: id.optional(), salesOwnerId: id.optional(), description: z.string().trim().max(4000).optional() }).refine((value) => Boolean(value.phone || value.email), { message: 'A lead needs a phone number or email address.' });
+const newLead = z.object({ name: z.string().trim().min(1).max(160), phone: z.string().trim().max(60).optional(), email: z.string().trim().email().max(254).optional(), source: z.enum(sourceOptions).default('Other'), category: z.enum(leadCategories).default('not_available'), marketingOwnerId: id.optional(), salesOwnerId: id.optional(), description: z.string().trim().max(4000).optional() }).refine((value) => Boolean(value.phone || value.email), { message: 'A lead needs a phone number or email address.' });
+const leadDetailsUpdate = z.object({ name: z.string().trim().min(1).max(160), source: z.enum(sourceOptions), category: z.enum(leadCategories), description: z.string().trim().max(4000).default('') });
 const lostReasonOptions = ['Price or budget', 'No response', 'Timing or priority', 'Competitor selected', 'Not a fit', 'Proposal declined', 'Other'] as const;
 const statusUpdate = z.object({ status: z.enum(['assigned', 'contacted', 'connected', 'follow_up_required', 'qualified', 'proposal_sent', 'won', 'lost', 'not_interested', 'incorrect', 'duplicate', 'do_not_contact']), qualification: z.enum(['mql', 'sql', 'not_available']).optional(), totalProjectCost: z.number().nonnegative().optional(), upfrontPaymentAmount: z.number().nonnegative().optional(), lostReason: z.enum(lostReasonOptions).optional() });
 const assignment = z.object({ assignedTo: id, visibility: z.enum(['full_context', 'fresh_start']), reason: z.string().trim().min(1).max(1000) });
@@ -19,7 +21,13 @@ const note = z.object({ body: z.string().trim().min(1).max(5000) });
 const followUp = z.object({ dueAt: z.string().datetime({ offset: true }), actionType: z.enum(['Call', 'Email', 'SMS', 'Task']) });
 const contactMethodType = z.enum(['phone', 'email']);
 const contactHealth = z.enum(['unverified', 'verified', 'incorrect', 'wrong_person', 'reception_gatekeeper', 'do_not_contact']);
-const addContactMethod = z.object({ methodType: contactMethodType, value: z.string().trim().min(3).max(254), label: z.string().trim().max(120).optional() });
+const addContactMethod = z.object({ methodType: contactMethodType, value: z.string().trim().min(3).max(254), label: z.string().trim().max(120).optional() }).superRefine((value, ctx) => {
+  if (value.methodType === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.value)) ctx.addIssue({ code: 'custom', path: ['value'], message: 'Enter a valid email address.' });
+  if (value.methodType === 'phone') {
+    const digits = value.value.replace(/\D/g, '');
+    if (digits.length < 7 || digits.length > 15) ctx.addIssue({ code: 'custom', path: ['value'], message: 'Enter a valid phone number with 7 to 15 digits.' });
+  }
+});
 const assessContactMethod = z.object({ health: contactHealth, reason: z.string().trim().max(1000).optional() });
 const restoreContactMethod = z.object({ reason: z.string().trim().min(3).max(1000) });
 const salesActivity = z.object({
@@ -167,7 +175,7 @@ export function createApp() {
   }));
   app.post('/v1/opportunities', ...protectedRoute(async (request, response) => {
     const value = parse(newLead, request.body);
-    const { data, error } = await request.supabase!.rpc('create_opportunity', { p_name: value.name, p_phone: value.phone ?? null, p_email: value.email ?? null, p_source: value.source ?? null, p_marketing_owner_id: value.marketingOwnerId ?? null, p_sales_owner_id: value.salesOwnerId ?? null, p_description: value.description ?? null });
+    const { data, error } = await request.supabase!.rpc('create_opportunity_v17', { p_name: value.name, p_phone: value.phone ?? null, p_email: value.email ?? null, p_source: value.source ?? null, p_marketing_owner_id: value.marketingOwnerId ?? null, p_sales_owner_id: value.salesOwnerId ?? null, p_description: value.description ?? null, p_lead_category: value.category });
     if (error) throw error; response.status(201).json({ opportunityId: data });
   }));
   app.get('/v1/opportunities/:id', ...protectedRoute(async (request, response) => {
@@ -193,6 +201,11 @@ export function createApp() {
     const value = parse(statusUpdate.partial(), request.body); const opportunityId = parse(id, request.params.id);
     if (!value.status) { response.status(400).json({ message: 'Use a supported field update.' }); return; }
     const { error } = await request.supabase!.rpc('set_opportunity_status', { p_opportunity_id: opportunityId, p_status: value.status, p_qualification: value.qualification ?? null, p_total_project_cost: value.totalProjectCost ?? null, p_upfront_payment_amount: value.upfrontPaymentAmount ?? null, p_lost_reason: value.lostReason ?? null }); if (error) throw error; response.status(204).end();
+  }));
+  app.patch('/v1/opportunities/:id/details', ...protectedRoute(async (request, response) => {
+    const value = parse(leadDetailsUpdate, request.body); const opportunityId = parse(id, request.params.id);
+    const { error } = await request.supabase!.rpc('update_lead_details', { p_opportunity_id: opportunityId, p_name: value.name, p_source: value.source, p_description: value.description, p_lead_category: value.category });
+    if (error) throw error; response.status(204).end();
   }));
   app.post('/v1/opportunities/:id/status', ...protectedRoute(async (request, response) => {
     const value = parse(statusUpdate, request.body); const opportunityId = parse(id, request.params.id);

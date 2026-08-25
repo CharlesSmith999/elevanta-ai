@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
-import type { Activity, Assignment, FollowUp, IncorrectReport, Lead, OpportunityStatus, Qualification, StageHistory } from './domain';
+import type { Activity, Assignment, FollowUp, IncorrectReport, Lead, LeadCategory, OpportunityStatus, Qualification, Role, StageHistory } from './domain';
 import type { ContactFocus, ContactHealth, ContactMethodType } from './leadWorkflow';
 
 /**
@@ -16,6 +16,7 @@ type OpportunityRecord = {
   status: OpportunityStatus;
   qualification: Qualification;
   source?: string;
+  lead_category?: LeadCategory | null;
   marketing_owner_id?: string | null;
   description?: string;
   created_at: string;
@@ -24,7 +25,7 @@ type OpportunityRecord = {
   assignments?: Array<{ id: string; assigned_to: string; assigned_by: string; visibility_mode: 'full_context' | 'fresh_start'; reason?: string | null; started_at: string; ended_at?: string | null }>;
   activities?: Array<{ id: string; actor_id?: string | null; type: string; body?: string | null; from_status?: OpportunityStatus | null; to_status?: OpportunityStatus | null; created_at: string }>;
   follow_ups?: Array<{ id: string; owner_id: string; due_at: string; action_type: FollowUp['action']; status: FollowUp['status']; completed_at?: string | null }>;
-  incorrect_reports?: Array<{ id: string; reporter_id: string; reason_code: string; evidence?: string | null; created_at: string }>;
+  incorrect_reports?: Array<{ id: string; reporter_id: string; reporter_role?: Role | null; reason_code: string; evidence?: string | null; created_at: string }>;
   incorrect_reviews?: Array<{ id: string; decision?: 'confirmed_incorrect' | 'rejected' | 'merge_duplicate' | null; reviewer_id?: string | null; decision_reason?: string | null; decided_at?: string | null }>;
 };
 
@@ -88,7 +89,7 @@ function mapOpportunity(record: OpportunityRecord): Lead {
   const assignments: Assignment[] = (record.assignments ?? []).map((item) => ({ id: item.id, ownerId: item.assigned_to, assignedBy: item.assigned_by, at: item.started_at, endedAt: item.ended_at ?? undefined, visibility: item.visibility_mode, reason: item.reason ?? 'CRM assignment' }));
   const activities: Activity[] = (record.activities ?? []).map((item) => ({ id: item.id, actorId: item.actor_id ?? 'system', at: item.created_at, kind: item.type === 'note' ? 'note' : item.type === 'assignment' ? 'assignment' : item.type === 'follow_up' ? 'follow_up' : item.type === 'incorrect_report' ? 'incorrect_report' : item.type === 'status_change' ? 'status' : 'system', body: item.body ?? 'CRM activity' }));
   const followUps: FollowUp[] = (record.follow_ups ?? []).map((item) => ({ id: item.id, ownerId: item.owner_id, dueAt: item.due_at, action: item.action_type, status: item.status }));
-  const incorrectReports: IncorrectReport[] = (record.incorrect_reports ?? []).map((item) => ({ reporterId: item.reporter_id, reason: item.reason_code, evidence: item.evidence ?? undefined, at: item.created_at }));
+  const incorrectReports: IncorrectReport[] = (record.incorrect_reports ?? []).map((item) => ({ reporterId: item.reporter_id, reporterRole: item.reporter_role ?? undefined, reason: item.reason_code, evidence: item.evidence ?? undefined, at: item.created_at }));
   const review = record.incorrect_reviews?.[0];
   const stageHistory: StageHistory[] = (record.activities ?? []).filter((item) => item.type === 'status_change' && item.to_status).map((item) => ({ id: item.id, fromStatus: item.from_status ?? undefined, toStatus: item.to_status!, enteredAt: item.created_at, actorId: item.actor_id ?? undefined, reason: item.body ?? 'Status updated' }));
   const currentOwner = assignments.find((item) => !item.endedAt)?.ownerId;
@@ -98,6 +99,8 @@ function mapOpportunity(record: OpportunityRecord): Lead {
     phone: record.contacts?.normalized_phone ?? undefined,
     email: record.contacts?.normalized_email ?? undefined,
     source: record.source ?? 'Other',
+    category: record.lead_category ?? 'not_available',
+    description: record.description ?? undefined,
     marketingOwnerId: record.marketing_owner_id ?? 'shariq',
     sourceDate: record.created_at,
     status: record.status,
@@ -122,6 +125,7 @@ export async function loadRemoteLeads(session: Session): Promise<Lead[]> {
 }
 
 export const createRemoteLead = (session: Session, body: unknown) => request<{ opportunityId: string }>(session, '/v1/opportunities', { method: 'POST', body: JSON.stringify(body) });
+export const updateRemoteLeadDetails = (session: Session, id: string, body: unknown) => request<void>(session, `/v1/opportunities/${id}/details`, { method: 'PATCH', body: JSON.stringify(body) });
 export const updateRemoteStatus = (session: Session, id: string, body: unknown) => request<void>(session, `/v1/opportunities/${id}/status`, { method: 'POST', body: JSON.stringify(body) });
 export const addRemoteNote = (session: Session, id: string, body: unknown) => request<void>(session, `/v1/opportunities/${id}/notes`, { method: 'POST', body: JSON.stringify(body) });
 export const addRemoteFollowUp = (session: Session, id: string, body: unknown) => request<void>(session, `/v1/opportunities/${id}/follow-ups`, { method: 'POST', body: JSON.stringify(body) });

@@ -26,3 +26,10 @@ export function isCallable(method: LeadContactMethod): boolean {
 export function isEmailable(method: LeadContactMethod): boolean {
   return method.type === 'email' && method.focus !== 'removed' && !method.restricted;
 }
+
+export function validateContactMethod(type: ContactMethodType, value: string): string | undefined {
+  const trimmed = value.trim();
+  if (type === 'email') return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed) ? undefined : 'Enter a valid email address.';
+  const digits = trimmed.replace(/\D/g, '');
+  return digits.length >= 7 && digits.length <= 15 ? undefined : 'Enter a valid phone number with 7 to 15 digits.';
+}
