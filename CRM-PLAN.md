@@ -4,7 +4,7 @@ Status: Planning baseline, approved from stakeholder answers
 
 Branding: The product is named **Elevanta AI**. Its embedded AI sales companion is named **Xaviar**. Xaviar is advisory in Phase 1 and supports lead analysis, follow-up guidance, agent and marketer coaching, and performance reporting. Autonomous outbound communication remains deferred to Phase 2.
 
-CRM readiness reference: [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md). Shared dashboard definitions are in [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), the released dashboard baseline is in [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), and the approved redesign decisions are in [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md). The current lead-workflow authority is [CRM-DECISIONS-v1.6.md](./CRM-DECISIONS-v1.6.md), with its full role, screen, data, API, security, and Xaviar contract in [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md). Xaviar evaluation reference: [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md).
+CRM readiness reference: [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md). Shared dashboard definitions are in [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), the released dashboard baseline is in [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), and the approved redesign decisions are in [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md). The current lead-workflow authority is [CRM-DECISIONS-v1.7.md](./CRM-DECISIONS-v1.7.md), extending [CRM-DECISIONS-v1.6.md](./CRM-DECISIONS-v1.6.md), with its full role, screen, data, API, security, and Xaviar contract in [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md). Xaviar evaluation reference: [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md).
 
 ## 1. Product vision
 
@@ -323,7 +323,7 @@ Multi-tenancy hardening, billing, self-service administration, onboarding, usage
 - First Worked and Sales Engagement reconcile to structured activity/SQL evidence.
 - Multiple contact methods preserve immutable assessment, removal, restoration, and DNC history.
 - Fresh-start reassignment never reactivates suppressed contact methods.
-- Three distinct incorrect reports create exactly one admin review item and pause assignment.
+- Three distinct Sales Agent incorrect reports create exactly one admin review item and pause assignment. Authorized Marketing, Manager, and Admin flags remain visible evidence but do not increase the automatic threshold.
 - Status, follow-up, and assignment changes are auditable.
 - Dashboards reconcile to the underlying opportunity table.
 - AI reports identify evidence, trend, and actions without autonomous outbound communication.

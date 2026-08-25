@@ -1,12 +1,12 @@
 # Supabase Migration Traceability
 
-Status: Reconciled on 2026-08-23
+Status: Reconciled through v1.6 on 2026-08-23; v1.7 migration pending release
 
 Project: `jayxyikgefnzitxcbdov`
 
 ## Result
 
-The production Supabase project now has a canonical `supabase_migrations.schema_migrations` ledger containing all 10 committed migration versions.
+The production Supabase project has a canonical `supabase_migrations.schema_migrations` ledger containing all 13 migrations released through lead workflow v1.6.
 
 Before the ledger was created, each migration was checked against the live schema. That verification found one material mismatch: migration `202607290005_dashboard_completion_events.sql` had not completed because its loss-reason validation contained an invalid one-argument `nullif` call. The source SQL was corrected, the migration was applied, and all 10 migration-effect checks passed before any version was recorded.
 
@@ -33,6 +33,10 @@ No lead records were imported, removed, or activated during this reconciliation.
 ## 2026-08-23 lead workflow verification
 
 The three v1.6 migrations were applied in filename order using the approved Supabase workflow. The release verification confirmed the four new workflow tables, guarded contact-method and activity routines, the automatic contact-method trigger for newly created opportunities, four RLS policies, and all three migration-ledger entries. No real lead data was imported or changed.
+
+## Pending v1.7 migration
+
+`202608250001_lead_details_reporting_v17.sql` is implemented locally but has not been applied to Supabase or recorded in the migration ledger. It adds the controlled lead category, scoped lead-detail editing, type-safe contact-method entry, reporter-role evidence, and the rule that only three distinct Sales Agent reports trigger Admin review. It does not import or modify real lead records.
 
 ## Required process for future migrations
 

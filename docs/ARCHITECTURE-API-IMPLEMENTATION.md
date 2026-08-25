@@ -1,8 +1,8 @@
 # Elevanta AI — Architecture and API Implementation Record
 
-Status: Step 11–12 local implementation complete; publish/deployment pending the agreed combined release.
+Status: Released through lead workflow v1.6; v1.7 local implementation pending release.
 
-This record implements the released Sections 11 and 12 baseline of `CRM-PLAN.md`. It is subordinate to `CRM-DECISIONS-v1.1.md` and later approved decision versions. The planned, not-yet-implemented lead-workflow delta is governed by [CRM-DECISIONS-v1.6.md](../CRM-DECISIONS-v1.6.md) and [LEAD-WORKFLOW-SPEC-v1.0.md](../LEAD-WORKFLOW-SPEC-v1.0.md).
+This record implements the released Sections 11 and 12 baseline of `CRM-PLAN.md`. It is subordinate to `CRM-DECISIONS-v1.1.md` and later approved decision versions. Lead workflow v1.6 is released. The current local v1.7 delta is governed by [CRM-DECISIONS-v1.7.md](../CRM-DECISIONS-v1.7.md) and [LEAD-WORKFLOW-SPEC-v1.0.md](../LEAD-WORKFLOW-SPEC-v1.0.md).
 
 ## Architecture boundary
 
@@ -20,7 +20,8 @@ All routes are under `/v1` and require `Authorization: Bearer <Supabase access t
 |---|---|---|
 | Session | `GET /me` | Implemented |
 | Contacts | `GET /contacts`, `POST /opportunities` as the contact-plus-opportunity creation path | Implemented |
-| Opportunities | `GET /opportunities`, `GET /opportunities/:id`, `PATCH /opportunities/:id` | Implemented with validation and RLS |
+| Opportunities | `GET /opportunities`, `GET /opportunities/:id`, `POST /opportunities`, `PATCH /opportunities/:id`, `PATCH /opportunities/:id/details` | Implemented with validation and RLS; v1.7 detail route pending release |
+| Contact methods | `GET/POST /opportunities/:id/contact-methods`, assessment and restore routes | v1.6 released; v1.7 type-aware validation pending release |
 | Assignments | `POST /opportunities/:id/assignments` | Implemented; records reassignment history |
 | Activities | `POST /opportunities/:id/activities` | Implemented as an audited note path |
 | Follow-ups | `POST /opportunities/:id/follow-ups` | Implemented; future dates required |
@@ -31,7 +32,10 @@ All routes are under `/v1` and require `Authorization: Bearer <Supabase access t
 
 ## Contract and safety rules
 
-- Lead creation requires a name plus phone or email and uses an approved source; an unknown source is `Other`.
+- Lead creation requires a name plus phone or email, an approved source, a controlled category, and supports a description.
+- Lead-detail editing is limited to Admin, the owning Marketing Agent, and the Marketing Manager responsible for that agent.
+- A phone or email health assessment changes only that contact method. It never marks the whole lead incorrect.
+- Any authorized viewer may submit one explicit whole-lead flag, but only three distinct Sales Agent reports trigger the Admin review queue.
 - Won status requires total project cost and upfront payment, with upfront payment no greater than total.
 - Status, assignment, note, follow-up, incorrect-report, and Admin-review mutations are validated before calling Supabase RPCs.
 - Dashboard role access is checked in the API and again by database RLS; agents cannot request manager/admin views.
@@ -43,18 +47,8 @@ All routes are under `/v1` and require `Authorization: Bearer <Supabase access t
 
 Before publishing this local batch, run workspace typecheck, domain/API contract tests, production build, Supabase migration verification, and the Vercel `/api/health` smoke test. Do not create a second deployment instance.
 
-## Approved lead-workflow v1.6 delta, development pending
+## Current implementation boundary
 
-The current released schema stores one normalized phone and one normalized email on `contacts` and uses a generic activity body. That is insufficient for the approved multiple-contact-method workflow. The next implementation must be additive and preserve compatibility until Milestone 5 migration.
+Lead workflow v1.6 already provides canonical contact methods, opportunity-scoped health and focus, immutable method events, structured activity history, immediate assignment, Sales Engagement evidence, restoration controls, and Xaviar event-stream v1.1 input.
 
-Planned changes:
-
-- canonical `contact_methods`, opportunity method-state links, immutable method events, and assignment contact decisions;
-- structured activity type, outcome, contact-method reference, occurred time, and optional transactional follow-up;
-- immediate assignment with no Sales accept/reject state;
-- derived First Worked, Connected, SQL, and Sales Engagement evidence;
-- role-safe assessment, restoration, reassignment preview/commit, and DNC enforcement endpoints;
-- expanded RLS, optimistic state versioning, idempotency, atomic operations, and audit writes;
-- Xaviar event-stream v1.1 integration without CRM mutation authority.
-
-The full table/API contract, role rules, transaction boundaries, and edge cases are defined in [LEAD-WORKFLOW-SPEC-v1.0.md](../LEAD-WORKFLOW-SPEC-v1.0.md). Required release tests are in [LEAD-WORKFLOW-EDGE-TEST-CASES-v1.0.md](./LEAD-WORKFLOW-EDGE-TEST-CASES-v1.0.md). No migration, endpoint, UI code, or production data change has been made by this documentation update.
+The additive v1.7 implementation adds controlled categories, description capture, scoped lead-detail editing, corrected email/phone entry, and role-separated incorrect reporting. Migration `202608250001_lead_details_reporting_v17.sql` remains unapplied until the approved release process is authorized. Real lead-data migration remains deferred to Milestone 5.
