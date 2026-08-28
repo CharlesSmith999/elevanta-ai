@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { canRestore, focusForHealth, isCallable, validateContactMethod, type LeadContactMethod } from './leadWorkflow';
+import { canRestore, focusForHealth, isCallable, isRemoteCrmId, validateContactMethod, type LeadContactMethod } from './leadWorkflow';
 
 const phone = (overrides: Partial<LeadContactMethod> = {}): LeadContactMethod => ({ id: 'phone-1', type: 'phone', value: '+1 555 100 2000', health: 'unverified', focus: 'active', ...overrides });
 
@@ -33,4 +33,10 @@ test('Add Contact validates phone and email according to the selected type', () 
   assert.equal(validateContactMethod('email', 'not-an-email'), 'Enter a valid email address.');
   assert.equal(validateContactMethod('phone', '+1 (555) 123-4567'), undefined);
   assert.equal(validateContactMethod('phone', '123'), 'Enter a valid phone number with 7 to 15 digits.');
+});
+
+test('remote CRM requests are limited to database UUID records', () => {
+  assert.equal(isRemoteCrmId('e77a0ac8-8cdd-4f91-9526-7dc469e65db4'), true);
+  assert.equal(isRemoteCrmId('lead-ronald-fowler'), false);
+  assert.equal(isRemoteCrmId('ronald@example.test'), false);
 });
