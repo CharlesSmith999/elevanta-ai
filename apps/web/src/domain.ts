@@ -385,8 +385,8 @@ export function dashboardReconciliation(leads: Lead[], range: DashboardDateRange
 
 export const isLeadIdentity = (name: string, phone?: string, email?: string) => Boolean(name.trim() && (phone?.trim() || email?.trim()));
 
-export function dashboardFor(user: User, leads: Lead[], now = new Date()) {
-  const visible = leads.filter((lead) => canViewLead(user, lead));
+export function dashboardFor(user: User, leads: Lead[], now = new Date(), allUsers = users) {
+  const visible = leads.filter((lead) => canViewLead(user, lead, allUsers));
   const open = visible.filter((lead) => !['won', 'lost', 'not_interested', 'incorrect', 'duplicate', 'do_not_contact'].includes(lead.status));
   const followUps = visible.flatMap((lead) => lead.followUps);
   const won = visible.filter((lead) => lead.status === 'won').length;

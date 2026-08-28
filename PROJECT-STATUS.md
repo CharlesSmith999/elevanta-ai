@@ -192,3 +192,14 @@ Milestones 1–3, lead workflow v1.6, and lead details/reporting v1.7 are releas
 - The existing Git-connected Vercel project deployed successfully. Production web and `/api/health` returned HTTP 200, and the released five-role dark/light tablet matrix passed without horizontal overflow.
 - PR #32 recorded this final status on `main` as commit `426cfbc88be0469adee14f4ad66d28316992872f`.
 - Xaviar Admin and Manager approval records remain the only human gate before Milestone 5.
+
+## 2026-08-28 live lead-assignment persistence correction
+
+- Production investigation reproduced the reported flow and separated two behaviors: demo role switching could display the new lead in the same browser, but the lead was not persisted for another signed-in user.
+- Root cause: lead creation and reassignment dropdowns used old demo aliases such as `mustabeen`, while the production API and Supabase assignments require the active user profile UUID. The web screen also updated browser state before the API confirmed the save, which could display a false success.
+- The CRM now loads the active workspace directory from a protected API endpoint and uses the real profile UUID for assignment, visibility, manager scope, and owner labels.
+- Signed-in non-Admin users are fixed to their own role view. Admin retains the approved role-testing switcher, while Supabase remains the final permission boundary.
+- A lead created in a connected workspace is shown as successful only after Supabase confirms the create and the web app reloads the saved opportunity. If the CRM connection is unavailable, operational creation is blocked instead of silently saving browser-only data.
+- Expired access tokens receive one safe Supabase session refresh and one request retry. A continuing authentication failure is shown as a failed save.
+- Local validation passed: 57 automated domain, permission, privacy, Xaviar, lead-workflow, and live-UUID assignment tests; web and API TypeScript checks; web production build; and repository whitespace validation.
+- GitHub and production deployment verification are pending for this correction. No real lead data, credentials, schema migration, or private design assets are included.

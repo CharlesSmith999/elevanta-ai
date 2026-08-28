@@ -7,7 +7,7 @@ import {
   leadCategoryLabels, leadCategoryOptions, ownerId, qualificationLabels, responseHours, routingHours, seedLeads, sourceOptions, stageAgeLabel, statusLabels, transitionStage, users, validStatusTransition, validWonFinancials,
 } from './domain';
 import { authEnabled, supabase, type AuthState } from './auth';
-import { addRemoteFollowUp, addRemoteNote, completeRemoteFollowUp, createAdminUser, createRemoteLead, decideRemoteReview, loadAdminUsers, loadRemoteLeads, reassignRemoteLead, reportRemoteIncorrect, updateAdminUser, updateRemoteLeadDetails, updateRemoteStatus, type ManagedUser } from './api';
+import { addRemoteFollowUp, addRemoteNote, completeRemoteFollowUp, createAdminUser, createRemoteLead, decideRemoteReview, loadAdminUsers, loadRemoteLeads, loadWorkspaceMembers, reassignRemoteLead, reportRemoteIncorrect, updateAdminUser, updateRemoteLeadDetails, updateRemoteStatus, type ManagedUser } from './api';
 import { RoleReferenceDashboard, RoleReferenceKind, RoleReferenceSidebar, RoleSwitcher } from './RoleReferenceDashboards';
 import { XaviarWorkspace } from './XaviarWorkspace';
 import { navigationFor } from './navigation';
@@ -46,7 +46,8 @@ function leadActivity(actorId: string, kind: Activity['kind'], body: string): Ac
 function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?: Session }) {
   const [leads, setLeads] = useState<Lead[]>(safeLeadData);
   const [remoteLoaded, setRemoteLoaded] = useState(false);
-  const [viewerId, setViewerId] = useState('shariq');
+  const [workspaceDirectory, setWorkspaceDirectory] = useState<User[]>(workspaceUsers);
+  const [viewerId, setViewerId] = useState(session?.user.id ?? 'shariq');
   const [page, setPage] = useState('Dashboard');
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [showCreate, setShowCreate] = useState(false);
@@ -60,19 +61,21 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   const [dashboardScope, setDashboardScope] = useState<DashboardScope>('company');
   const [theme, setTheme] = useState<'light' | 'dark'>(() => localStorage.getItem(themeStorageKey) === 'dark' ? 'dark' : 'light');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const viewer = workspaceUsers.find((user) => user.id === viewerId)!;
+  const viewer = workspaceDirectory.find((user) => user.id === viewerId) ?? workspaceDirectory[0] ?? workspaceUsers[0];
+  const signedInUser = session ? workspaceDirectory.find((user) => user.id === session.user.id) : undefined;
+  const switchableUsers = signedInUser && signedInUser.role !== 'admin' ? [signedInUser] : workspaceDirectory;
   const dashboard = useMemo(() => viewer.role === 'manager' && viewer.department === 'marketing'
-    ? dashboardFor({ ...viewer, role: 'admin' }, leads.filter((lead) => users.find((user) => user.id === lead.marketingOwnerId)?.department === 'marketing'))
-    : dashboardFor(viewer, leads), [viewer, leads]);
+    ? dashboardFor({ ...viewer, role: 'admin' }, leads.filter((lead) => workspaceDirectory.find((user) => user.id === lead.marketingOwnerId)?.managerId === viewer.id), new Date(), workspaceDirectory)
+    : dashboardFor(viewer, leads, new Date(), workspaceDirectory), [viewer, leads, workspaceDirectory]);
   const selected = leads.find((lead) => lead.id === selectedId);
   const visible = dashboard.visible;
   const selectedRange = useMemo(() => dashboardDateRange(dashboardPeriod, new Date(), { start: customStart || undefined, end: customEnd || undefined }), [dashboardPeriod, customStart, customEnd]);
   const scopedDashboardLeads = useMemo(() => {
     if (viewer.role !== 'admin') return visible;
-    if (dashboardScope === 'marketing') return visible.filter((lead) => users.find((user) => user.id === lead.marketingOwnerId)?.department === 'marketing');
-    if (dashboardScope === 'sales') return visible.filter((lead) => users.find((user) => user.id === ownerId(lead))?.department === 'sales');
+    if (dashboardScope === 'marketing') return visible.filter((lead) => workspaceDirectory.find((user) => user.id === lead.marketingOwnerId)?.department === 'marketing');
+    if (dashboardScope === 'sales') return visible.filter((lead) => workspaceDirectory.find((user) => user.id === ownerId(lead))?.department === 'sales');
     return visible;
-  }, [viewer, visible, dashboardScope]);
+  }, [viewer, visible, dashboardScope, workspaceDirectory]);
   const dashboardLeads = useMemo(() => {
     const dateSourceAndStatus = filterDashboardLeads(scopedDashboardLeads, selectedRange, dashboardSource, dashboardStatus);
     if (dashboardTeamMember === 'all') return dateSourceAndStatus;
@@ -82,7 +85,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
       return lead.marketingOwnerId === dashboardTeamMember || ownerId(lead) === dashboardTeamMember;
     });
   }, [scopedDashboardLeads, selectedRange, dashboardSource, dashboardStatus, dashboardTeamMember, dashboardScope]);
-  const filteredDashboard = useMemo(() => dashboardFor(viewer.role === 'manager' && viewer.department === 'marketing' ? { ...viewer, role: 'admin' } : viewer, dashboardLeads), [viewer, dashboardLeads]);
+  const filteredDashboard = useMemo(() => dashboardFor(viewer.role === 'manager' && viewer.department === 'marketing' ? { ...viewer, role: 'admin' } : viewer, dashboardLeads, new Date(), workspaceDirectory), [viewer, dashboardLeads, workspaceDirectory]);
   const duplicateCount = useMemo(() => duplicateMatches(leads).length, [leads]);
 
   useEffect(() => { localStorage.setItem(storageKey, JSON.stringify(leads)); }, [leads]);
@@ -91,12 +94,21 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   useEffect(() => {
     if (!session) return;
     let active = true;
-    loadRemoteLeads(session).then((remoteLeads) => { if (active) { setLeads(remoteLeads); setRemoteLoaded(true); setNotice('Connected to the CRM workspace.'); } }).catch((error: unknown) => { if (active) { setRemoteLoaded(false); setNotice(error instanceof Error ? `CRM connection unavailable: ${error.message}` : 'CRM connection unavailable; safe sample data remains active.'); } });
+    Promise.all([loadRemoteLeads(session), loadWorkspaceMembers(session)]).then(([remoteLeads, members]) => {
+      if (!active) return;
+      const directory: User[] = members.map((member) => ({ id: member.id, name: member.full_name, role: member.role, managerId: member.manager_id ?? undefined, department: member.department ?? 'marketing' }));
+      setLeads(remoteLeads);
+      if (directory.length) setWorkspaceDirectory(directory);
+      setViewerId(directory.some((member) => member.id === session.user.id) ? session.user.id : directory[0]?.id ?? 'shariq');
+      setRemoteLoaded(true);
+      setNotice('Connected to the CRM workspace.');
+    }).catch((error: unknown) => { if (active) { setRemoteLoaded(false); setNotice(error instanceof Error ? `CRM connection unavailable: ${error.message}` : 'CRM connection unavailable. Sign in again before making changes.'); } });
     return () => { active = false; };
   }, [session]);
 
   function persist(action: (activeSession: Session) => Promise<unknown>, success?: string) {
-    if (!session || !remoteLoaded) return;
+    if (session && !remoteLoaded) { setNotice('This change was not saved because the CRM connection is unavailable. Sign in again and retry.'); return; }
+    if (!session) return;
     void action(session).then(() => { if (success) setNotice(success); }).catch((error: unknown) => setNotice(error instanceof Error ? error.message : 'The CRM could not save this change.'));
   }
 
@@ -106,7 +118,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   function updateStatus(lead: Lead, next: OpportunityStatus) {
     if (next === 'won') return setNotice('Use the Won financial details form to record total project cost and upfront payment.');
     if ((next === 'lost' || next === 'not_interested') && !lead.lostReason) return setNotice('Choose a loss reason before closing this opportunity.');
-    if (!canUpdateLead(viewer, lead) || !validStatusTransition(lead.status, next)) return setNotice('This status change is not allowed for your role or for a closed lead.');
+    if (!canUpdateLead(viewer, lead, workspaceDirectory) || !validStatusTransition(lead.status, next)) return setNotice('This status change is not allowed for your role or for a closed lead.');
     mutateLead(lead.id, (current) => ({ ...current, status: next, stageHistory: transitionStage(current.stageHistory, next, viewer.id, new Date().toISOString(), `Status changed from ${statusLabels[current.status]} to ${statusLabels[next]}.`), activities: [...current.activities, leadActivity(viewer.id, 'status', `Status changed from ${statusLabels[current.status]} to ${statusLabels[next]}.`)] }));
     persist((activeSession) => updateRemoteStatus(activeSession, lead.id, { status: next }), 'Status saved to the CRM.');
     setNotice('Status saved and added to the permanent history.');
@@ -114,7 +126,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
 
   function markWon(lead: Lead, event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canUpdateLead(viewer, lead) || !validStatusTransition(lead.status, 'won')) return setNotice('This opportunity cannot be marked Won by your role or from its current status.');
+    if (!canUpdateLead(viewer, lead, workspaceDirectory) || !validStatusTransition(lead.status, 'won')) return setNotice('This opportunity cannot be marked Won by your role or from its current status.');
     const form = new FormData(event.currentTarget);
     const total = Number(form.get('totalProjectCost'));
     const upfront = Number(form.get('upfrontPaymentAmount'));
@@ -125,13 +137,13 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   }
 
   function updateQualification(lead: Lead, qualification: Qualification) {
-    if (!canUpdateLead(viewer, lead)) return setNotice('You do not have permission to update qualification.');
+    if (!canUpdateLead(viewer, lead, workspaceDirectory)) return setNotice('You do not have permission to update qualification.');
     mutateLead(lead.id, (current) => ({ ...current, qualification, activities: [...current.activities, leadActivity(viewer.id, 'system', `Qualification set to ${qualificationLabels[qualification]}.`)] }));
     persist((activeSession) => updateRemoteStatus(activeSession, lead.id, { status: lead.status, qualification }), 'Qualification saved to the CRM.');
   }
 
   function updateLostReason(lead: Lead, lostReason: Lead['lostReason']) {
-    if (!canUpdateLead(viewer, lead)) return setNotice('You do not have permission to update the loss reason.');
+    if (!canUpdateLead(viewer, lead, workspaceDirectory)) return setNotice('You do not have permission to update the loss reason.');
     mutateLead(lead.id, (current) => ({ ...current, lostReason, activities: [...current.activities, leadActivity(viewer.id, 'system', `Loss reason set to ${lostReason ?? 'Not available'}.`)] }));
   }
 
@@ -140,7 +152,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
     const form = new FormData(event.currentTarget);
     const body = String(form.get('note') ?? '').trim();
     if (!body) return;
-    if (!canUpdateLead(viewer, lead)) return setNotice('You cannot add a note to this lead.');
+    if (!canUpdateLead(viewer, lead, workspaceDirectory)) return setNotice('You cannot add a note to this lead.');
     mutateLead(lead.id, (current) => ({ ...current, activities: [...current.activities, leadActivity(viewer.id, 'note', body)] }));
     persist((activeSession) => addRemoteNote(activeSession, lead.id, { body }), 'Note saved to the CRM.');
     event.currentTarget.reset(); setNotice('Note saved.');
@@ -148,7 +160,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
 
   function addFollowUp(lead: Lead, event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canUpdateLead(viewer, lead)) return setNotice('You cannot schedule a follow-up for this lead.');
+    if (!canUpdateLead(viewer, lead, workspaceDirectory)) return setNotice('You cannot schedule a follow-up for this lead.');
     const form = new FormData(event.currentTarget); const due = String(form.get('dueAt') ?? ''); const action = String(form.get('action') ?? 'Call') as FollowUp['action'];
     if (!due) return setNotice('Choose a date and time for the follow-up.');
     const owner = ownerId(lead); if (!owner) return setNotice('Assign this lead before creating a follow-up.');
@@ -158,7 +170,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   }
 
   function completeFollowUp(lead: Lead, followUpId: string) {
-    if (!canUpdateLead(viewer, lead)) return setNotice('You cannot complete this follow-up.');
+    if (!canUpdateLead(viewer, lead, workspaceDirectory)) return setNotice('You cannot complete this follow-up.');
     mutateLead(lead.id, (current) => ({ ...current, followUps: current.followUps.map((followUp) => followUp.id === followUpId ? { ...followUp, status: 'completed' } : followUp), activities: [...current.activities, leadActivity(viewer.id, 'follow_up', 'Follow-up completed.')] }));
     persist((activeSession) => completeRemoteFollowUp(activeSession, followUpId), 'Follow-up completed in the CRM.');
   }
@@ -166,16 +178,17 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   function reassign(lead: Lead, event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = new FormData(event.currentTarget); const nextOwnerId = String(form.get('owner') ?? ''); const visibility = String(form.get('visibility') ?? 'full_context') as 'full_context' | 'fresh_start'; const reason = String(form.get('reason') ?? '').trim();
     if (!reason) return setNotice('A reason is required for every handoff.');
-    if (!canReassign(viewer, lead, nextOwnerId)) return setNotice(lead.routingPaused ? 'Assignment is paused while the Incorrect Review is pending.' : 'You can only assign leads within your permitted scope.');
+    if (!canReassign(viewer, lead, nextOwnerId, workspaceDirectory)) return setNotice(lead.routingPaused ? 'Assignment is paused while the Incorrect Review is pending.' : 'You can only assign leads within your permitted scope.');
     const old = currentAssignment(lead);
-    mutateLead(lead.id, (current) => { const at = new Date().toISOString(); const nextStatus = current.status === 'new' ? 'assigned' : current.status; return { ...current, status: nextStatus, stageHistory: nextStatus === current.status ? current.stageHistory : transitionStage(current.stageHistory, nextStatus, viewer.id, at, 'Initial sales assignment'), assignments: current.assignments.map((assignment) => assignment.id === old?.id ? { ...assignment, endedAt: at } : assignment).concat({ id: makeId('assignment'), ownerId: nextOwnerId, assignedBy: viewer.id, at, visibility, reason }), activities: [...current.activities, leadActivity(viewer.id, 'assignment', `Assigned to ${nameFor(nextOwnerId)} with ${visibility === 'full_context' ? 'full context' : 'a fresh working view'}: ${reason}`)] }; });
+    const nextOwnerName = workspaceDirectory.find((user) => user.id === nextOwnerId)?.name ?? 'the selected Sales Agent';
+    mutateLead(lead.id, (current) => { const at = new Date().toISOString(); const nextStatus = current.status === 'new' ? 'assigned' : current.status; return { ...current, status: nextStatus, stageHistory: nextStatus === current.status ? current.stageHistory : transitionStage(current.stageHistory, nextStatus, viewer.id, at, 'Initial sales assignment'), assignments: current.assignments.map((assignment) => assignment.id === old?.id ? { ...assignment, endedAt: at } : assignment).concat({ id: makeId('assignment'), ownerId: nextOwnerId, assignedBy: viewer.id, at, visibility, reason }), activities: [...current.activities, leadActivity(viewer.id, 'assignment', `Assigned to ${nextOwnerName} with ${visibility === 'full_context' ? 'full context' : 'a fresh working view'}: ${reason}`)] }; });
     persist((activeSession) => reassignRemoteLead(activeSession, lead.id, { assignedTo: nextOwnerId, visibility, reason }), 'Assignment history saved to the CRM.');
     event.currentTarget.reset(); setNotice('Assignment saved; the earlier ownership record remains in history.');
   }
 
   function reportIncorrect(lead: Lead, event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = new FormData(event.currentTarget); const reason = String(form.get('reason') ?? '').trim(); const evidence = String(form.get('evidence') ?? '').trim();
-    if (!canFlagIncorrectLead(viewer, lead)) return setNotice('You cannot flag this lead outside your permitted scope.');
+    if (!canFlagIncorrectLead(viewer, lead, workspaceDirectory)) return setNotice('You cannot flag this lead outside your permitted scope.');
     if (!reason) return setNotice('Choose an incorrect-lead reason.');
     if (lead.incorrectReports.some((report) => report.reporterId === viewer.id)) return setNotice('Each user may flag a lead only once.');
     mutateLead(lead.id, (current) => { const at = new Date().toISOString(); const incorrectReports = [...current.incorrectReports, { reporterId: viewer.id, reporterRole: viewer.role, reason, evidence: evidence || undefined, at }]; const incorrectReview = incorrectReviewState(incorrectReports, current.incorrectReview); return { ...current, incorrectReports, incorrectReview, routingPaused: incorrectReview?.state === 'pending', activities: [...current.activities, leadActivity(viewer.id, 'incorrect_report', `Incorrect lead flag submitted: ${reason}.${evidence ? ` Evidence: ${evidence}` : ''}`)] }; });
@@ -185,7 +198,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
 
   function editLeadDetails(lead: Lead, event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canEditLeadDetails(viewer, lead)) return setNotice('Only Admin or permitted Marketing users can edit lead details.');
+    if (!canEditLeadDetails(viewer, lead, workspaceDirectory)) return setNotice('Only Admin or permitted Marketing users can edit lead details.');
     const form = new FormData(event.currentTarget); const name = String(form.get('name') ?? '').trim(); const source = String(form.get('source') ?? '').trim(); const category = String(form.get('category') ?? 'not_available') as Lead['category']; const description = String(form.get('description') ?? '').trim();
     if (!name) return setNotice('Lead name is required.');
     if (!sourceOptions.includes(source as typeof sourceOptions[number])) return setNotice('Choose an approved source.');
@@ -202,7 +215,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
     setNotice('Admin review decision recorded in audit history.');
   }
 
-  function createLead(event: FormEvent<HTMLFormElement>) {
+  async function createLead(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = new FormData(event.currentTarget); const name = String(form.get('name') ?? '').trim(); const phone = String(form.get('phone') ?? '').trim(); const email = String(form.get('email') ?? '').trim(); const source = String(form.get('source') ?? '').trim(); const category = String(form.get('category') ?? 'not_available') as NonNullable<Lead['category']>; const description = String(form.get('description') ?? '').trim(); const owner = String(form.get('owner') ?? '');
     if (!isLeadIdentity(name, phone, email)) return setNotice('A lead needs a name plus a phone number or email address.');
     if (viewer.role !== 'admin' && viewer.role !== 'marketer') return setNotice('Only Admin and Marketing can create leads.');
@@ -211,8 +224,21 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
     const at = new Date().toISOString(); const status: OpportunityStatus = owner ? 'assigned' : 'new';
     const lead: Lead = { id: makeId('lead'), name, phone: phone || undefined, email: email || undefined, source, category, description: description || undefined, marketingOwnerId: viewer.id, sourceDate: at.slice(0, 10), status, qualification: 'not_available', priority: 0, assignments: owner ? [{ id: makeId('assignment'), ownerId: owner, assignedBy: viewer.id, at, visibility: 'full_context', reason: 'Initial assignment' }] : [], stageHistory: [{ id: makeId('stage'), toStatus: status, enteredAt: at, actorId: viewer.id, reason: 'Lead created' }], activities: [leadActivity(viewer.id, 'system', 'Lead created in the test workspace.')], followUps: [], incorrectReports: [] };
     const duplicate = duplicateMatches([...leads, lead]).find((candidate) => candidate.leadId === lead.id);
-    setLeads((current) => [...current, lead]); setShowCreate(false); event.currentTarget.reset(); setNotice(duplicate ? 'Lead created and flagged as a duplicate candidate for review.' : 'Lead created successfully.');
-    persist((activeSession) => createRemoteLead(activeSession, { name, phone: phone || undefined, email: email || undefined, source, category, description: description || undefined, salesOwnerId: owner || undefined }), 'Lead created in the CRM.');
+    if (session) {
+      if (!remoteLoaded) { setNotice('The lead was not created because the CRM connection is unavailable. Sign in again and retry.'); return; }
+      try {
+        await createRemoteLead(session, { name, phone: phone || undefined, email: email || undefined, source, category, description: description || undefined, marketingOwnerId: viewer.role === 'marketer' ? viewer.id : undefined, salesOwnerId: owner || undefined });
+        const remoteLeads = await loadRemoteLeads(session);
+        setLeads(remoteLeads);
+        setShowCreate(false);
+        event.currentTarget.reset();
+        setNotice(duplicate ? 'Lead saved to the CRM and flagged as a duplicate candidate for review.' : 'Lead saved to the CRM and assigned successfully.');
+      } catch (error) {
+        setNotice(error instanceof Error ? `Lead was not saved: ${error.message}` : 'Lead was not saved. Please retry.');
+      }
+      return;
+    }
+    setLeads((current) => [...current, lead]); setShowCreate(false); event.currentTarget.reset(); setNotice(duplicate ? 'Test lead created and flagged as a duplicate candidate.' : 'Test lead created in this browser.');
   }
 
   function resetDemo() { setLeads(structuredClone(seedLeads)); setSelectedId(undefined); setNotice('Test workspace reset to the protected sample data.'); }
@@ -247,13 +273,13 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
       : roleReferenceKind && <RoleReferenceSidebar kind={roleReferenceKind} viewer={viewer} activePage={page} onNavigate={navigate} onReset={resetDemo} onSignOut={onSignOut} />}
     </aside>
     <section className={`content ${referenceDashboard ? 'reference-dashboard-content' : 'unified-content'}`}>
-      {!referenceDashboard && <><UnifiedPageHeader page={page} viewer={viewer} viewers={workspaceUsers} theme={theme} onViewer={switchViewer} onTheme={setTheme} />
-        <div className="notice"><b>Functional test workspace</b><span>These records are safe test data. Every change is kept in this browser only, ready to be replaced by the final verified import.</span></div></>}
+      {!referenceDashboard && <><UnifiedPageHeader page={page} viewer={viewer} viewers={switchableUsers} theme={theme} onViewer={switchViewer} onTheme={setTheme} />
+        <div className="notice"><b>{remoteLoaded ? 'Connected CRM workspace' : 'Functional test workspace'}</b><span>{remoteLoaded ? 'Changes are saved to the shared CRM database and are visible according to each user’s role and assignment.' : session ? 'The CRM connection is unavailable. Operational changes are blocked until the connection is restored.' : 'These are browser-only test records. Sign in before using the CRM operationally.'}</span></div></>}
       {notice && <div className="toast" role="status">{notice}</div>}
-      {adminReference ? <AdminCommandCenter viewer={viewer} viewers={workspaceUsers} leads={dashboardLeads} dashboard={filteredDashboard} period={dashboardPeriod} source={dashboardSource} theme={theme} onViewer={switchViewer} onPeriod={setDashboardPeriod} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} /> : roleReferenceDashboard && roleReferenceKind ? <RoleReferenceDashboard kind={roleReferenceKind} viewer={viewer} viewers={workspaceUsers} leads={dashboardLeads} period={dashboardPeriod} source={dashboardSource} theme={theme} onViewer={switchViewer} onPeriod={setDashboardPeriod} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} onCreate={() => setShowCreate(true)} onOpenLead={(leadId) => { setSelectedId(leadId); navigate('Lead inbox'); }} /> : <>
-      {page === 'Lead inbox' && (selected ? <LeadWorkspace lead={selected} viewer={viewer} session={session} onBack={() => setSelectedId(undefined)} onStatus={updateStatus} onQualification={updateQualification} onReassign={reassign} onEditDetails={editLeadDetails} onReportIncorrect={reportIncorrect} onDecision={decideReview} /> : <section className="inbox-layout"><LeadTable leads={visible} onSelect={select} onCreate={() => setShowCreate(true)} /></section>)}
+      {adminReference ? <AdminCommandCenter viewer={viewer} viewers={switchableUsers} leads={dashboardLeads} dashboard={filteredDashboard} period={dashboardPeriod} source={dashboardSource} theme={theme} onViewer={switchViewer} onPeriod={setDashboardPeriod} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} /> : roleReferenceDashboard && roleReferenceKind ? <RoleReferenceDashboard kind={roleReferenceKind} viewer={viewer} viewers={switchableUsers} leads={dashboardLeads} period={dashboardPeriod} source={dashboardSource} theme={theme} onViewer={switchViewer} onPeriod={setDashboardPeriod} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} onCreate={() => setShowCreate(true)} onOpenLead={(leadId) => { setSelectedId(leadId); navigate('Lead inbox'); }} /> : <>
+      {page === 'Lead inbox' && (selected ? <LeadWorkspace lead={selected} viewer={viewer} workspaceUsers={workspaceDirectory} session={session} onBack={() => setSelectedId(undefined)} onStatus={updateStatus} onQualification={updateQualification} onReassign={reassign} onEditDetails={editLeadDetails} onReportIncorrect={reportIncorrect} onDecision={decideReview} /> : <section className="inbox-layout"><LeadTable leads={visible} users={workspaceDirectory} onSelect={select} onCreate={() => setShowCreate(true)} /></section>)}
       {page === 'Follow-ups' && <FollowUpList leads={visible} viewer={viewer} onSelect={select} onComplete={completeFollowUp} />}
-      {page === 'Assignments' && <AssignmentList leads={visible} onSelect={select} />}
+      {page === 'Assignments' && <AssignmentList leads={visible} users={workspaceDirectory} onSelect={select} />}
       {page === 'Review queue' && <ReviewQueue leads={leads.filter((lead) => lead.incorrectReview?.state === 'pending')} onSelect={select} />}
       {page === 'Reports' && <Reports dashboard={dashboard} viewer={viewer} duplicates={duplicateCount} />}
       {page === 'Benchmark Board' && canViewManagementBoards(viewer) && <BenchmarkBoard leads={dashboardLeads} />}
@@ -263,7 +289,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
       {page === 'User management' && viewer.role === 'admin' && session && <AdminUserManagement session={session} onNotice={setNotice} />}
       </>}
     </section>
-    {showCreate && <CreateLead viewer={viewer} onClose={() => setShowCreate(false)} onSubmit={createLead} />}
+    {showCreate && <CreateLead viewer={viewer} salesAgents={workspaceDirectory.filter((user) => user.role === 'sales_agent')} crmReady={!session || remoteLoaded} onClose={() => setShowCreate(false)} onSubmit={createLead} />}
   </main>;
 }
 
@@ -315,7 +341,7 @@ function PasswordReset({ session, onComplete }: { session: Session; onComplete: 
 
 export function App() { return <AuthGate />; }
 
-function LeadTable({ leads, onSelect, onCreate, onViewAll }: { leads: Lead[]; onSelect: (id: string) => void; onCreate: () => void; onViewAll?: () => void }) { return <article className="panel leads-panel"><div className="panel-heading"><div><span className="eyebrow">LEAD INBOX <em className="preview-badge">Action queue</em></span><h2>Ready for the next action</h2><p>Use status, ownership, and the next follow-up to decide what to do next.</p></div><div className="lead-table-actions"><button className="primary" onClick={onCreate}>Add lead</button>{onViewAll && <button className="quiet" onClick={onViewAll}>View all leads <IconArrowUpRight size={15} /></button>}</div></div><div className="lead-table"><div className="lead-row header"><span>Lead</span><span>Owner</span><span>Status</span><span>Next action</span></div>{leads.length ? leads.map((lead) => { const next = lead.followUps.find((followUp) => followUp.status === 'open'); return <button className="lead-row lead-button" key={lead.id} onClick={() => onSelect(lead.id)}><strong><span className="lead-identity"><span className="avatar avatar-lead">{initialsFor(lead.name)}</span><span>{lead.name}<small>{lead.source}</small></span></span></strong><span className="owner-identity"><span className="avatar">{initialsFor(nameFor(ownerId(lead)))}</span>{nameFor(ownerId(lead))}</span><span className={`status ${lead.status}`}>{statusLabels[lead.status]}</span><span>{relativeDue(next)}</span></button>; }) : <p className="empty">No leads are visible for this user.</p>}</div></article>; }
+function LeadTable({ leads, users: directory, onSelect, onCreate, onViewAll }: { leads: Lead[]; users: User[]; onSelect: (id: string) => void; onCreate: () => void; onViewAll?: () => void }) { const displayName = (id?: string) => directory.find((user) => user.id === id)?.name ?? 'Unassigned'; return <article className="panel leads-panel"><div className="panel-heading"><div><span className="eyebrow">LEAD INBOX <em className="preview-badge">Action queue</em></span><h2>Ready for the next action</h2><p>Use status, ownership, and the next follow-up to decide what to do next.</p></div><div className="lead-table-actions"><button className="primary" onClick={onCreate}>Add lead</button>{onViewAll && <button className="quiet" onClick={onViewAll}>View all leads <IconArrowUpRight size={15} /></button>}</div></div><div className="lead-table"><div className="lead-row header"><span>Lead</span><span>Owner</span><span>Status</span><span>Next action</span></div>{leads.length ? leads.map((lead) => { const next = lead.followUps.find((followUp) => followUp.status === 'open'); const ownerName = displayName(ownerId(lead)); return <button className="lead-row lead-button" key={lead.id} onClick={() => onSelect(lead.id)}><strong><span className="lead-identity"><span className="avatar avatar-lead">{initialsFor(lead.name)}</span><span>{lead.name}<small>{lead.source}</small></span></span></strong><span className="owner-identity"><span className="avatar">{initialsFor(ownerName)}</span>{ownerName}</span><span className={`status ${lead.status}`}>{statusLabels[lead.status]}</span><span>{relativeDue(next)}</span></button>; }) : <p className="empty">No leads are visible for this user.</p>}</div></article>; }
 
 const dashboardPeriodLabels: Record<DashboardPeriod, string> = { daily: 'Today', weekly: 'This week', monthly: 'This month', yearly: 'This year', lifetime: 'Lifetime', custom: 'Custom range' };
 function DashboardFilters({ period, source, status, teamMember, customStart, customEnd, scope, viewer, canChooseScope, onPeriod, onSource, onStatus, onTeamMember, onCustomStart, onCustomEnd, onScope }: { period: DashboardPeriod; source: string; status: 'all' | OpportunityStatus; teamMember: string; customStart: string; customEnd: string; scope: DashboardScope; viewer: User; canChooseScope: boolean; onPeriod: (period: DashboardPeriod) => void; onSource: (source: string) => void; onStatus: (status: 'all' | OpportunityStatus) => void; onTeamMember: (userId: string) => void; onCustomStart: (value: string) => void; onCustomEnd: (value: string) => void; onScope: (scope: DashboardScope) => void }) {
@@ -650,7 +676,7 @@ function LeadDetail({ lead, viewer, onStatus, onMarkWon, onQualification, onLost
 }
 
 function FollowUpList({ leads, viewer, onSelect, onComplete }: { leads: Lead[]; viewer: User; onSelect: (id: string) => void; onComplete: (lead: Lead, id: string) => void }) { const rows = leads.flatMap((lead) => lead.followUps.filter((followUp) => followUp.status === 'open').map((followUp) => ({ lead, followUp }))).sort((a, b) => a.followUp.dueAt.localeCompare(b.followUp.dueAt)); return <article className="panel"><h2>Follow-up task list</h2><p>Overdue work is shown first. Completing a task is recorded in history.</p>{rows.length ? rows.map(({ lead, followUp }) => <div className="task-row" key={followUp.id}><button className="text-button dark" onClick={() => onSelect(lead.id)}>{lead.name}</button><span>{followUp.action}</span><span className={relativeDue(followUp) === 'Overdue' ? 'overdue' : ''}>{relativeDue(followUp)}</span>{canUpdateLead(viewer, lead) && !lead.routingPaused && <button className="quiet" onClick={() => onComplete(lead, followUp.id)}>Complete</button>}</div>) : <p className="empty">No open follow-ups.</p>}</article>; }
-function AssignmentList({ leads, onSelect }: { leads: Lead[]; onSelect: (id: string) => void }) { return <article className="panel"><h2>Assignment history</h2><p>Every owner remains visible. Fresh-start assignments protect the new agent’s working view without deleting history.</p>{leads.flatMap((lead) => lead.assignments.map((assignment) => ({ lead, assignment }))).sort((a, b) => b.assignment.at.localeCompare(a.assignment.at)).map(({ lead, assignment }) => <div className="task-row" key={assignment.id}><button className="text-button dark" onClick={() => onSelect(lead.id)}>{lead.name}</button><span>{nameFor(assignment.ownerId)}</span><span>{assignment.visibility === 'full_context' ? 'Full context' : 'Fresh view'}</span><span>{assignment.reason}</span></div>)}</article>; }
+function AssignmentList({ leads, users: directory, onSelect }: { leads: Lead[]; users: User[]; onSelect: (id: string) => void }) { return <article className="panel"><h2>Assignment history</h2><p>Every owner remains visible. Fresh-start assignments protect the new agent’s working view without deleting history.</p>{leads.flatMap((lead) => lead.assignments.map((assignment) => ({ lead, assignment }))).sort((a, b) => b.assignment.at.localeCompare(a.assignment.at)).map(({ lead, assignment }) => <div className="task-row" key={assignment.id}><button className="text-button dark" onClick={() => onSelect(lead.id)}>{lead.name}</button><span>{directory.find((user) => user.id === assignment.ownerId)?.name ?? 'Unknown user'}</span><span>{assignment.visibility === 'full_context' ? 'Full context' : 'Fresh view'}</span><span>{assignment.reason}</span></div>)}</article>; }
 function ReviewQueue({ leads, onSelect }: { leads: Lead[]; onSelect: (id: string) => void }) { return <article className="panel"><h2>Incorrect Review queue</h2><p>Three different agents must report a lead before it reaches this queue. Leads stay paused until Admin decides.</p>{leads.length ? leads.map((lead) => <div className="task-row" key={lead.id}><button className="text-button dark" onClick={() => onSelect(lead.id)}>{lead.name}</button><span>{lead.incorrectReports.length} reports</span><span>Routing paused</span><span>{lead.incorrectReports.map((report) => nameFor(report.reporterId)).join(', ')}</span></div>) : <p className="empty">No lead is waiting for review.</p>}</article>; }
 function Reports({ dashboard, viewer, duplicates }: { dashboard: ReturnType<typeof dashboardFor>; viewer: User; duplicates: number }) { return <section className="report-grid"><article className="panel"><h2>{viewer.role === 'marketer' ? 'Marketing quality report' : 'Sales performance report'}</h2><div className="report-row"><span>Visible leads</span><b>{dashboard.visible.length}</b></div><div className="report-row"><span>MQL / SQL</span><b>{dashboard.mql} / {dashboard.sql}</b></div><div className="report-row"><span>Won</span><b>{dashboard.won}</b></div><div className="report-row"><span>Conversion</span><b>{dashboard.conversionRate}%</b></div><div className="report-row"><span>Overdue follow-ups</span><b>{dashboard.overdue}</b></div><div className="report-row"><span>Duplicate candidates</span><b>{duplicates}</b></div></article><article className="panel"><span className="spark dark">XAVIAR EVIDENCE MODEL</span><h2>What this report will use</h2><p>Response speed, follow-up consistency, qualification outcome, note quality, source quality, duplicate rate, and conversion. The production version will cite the exact CRM events behind each recommendation.</p></article></section>; }
 function AdminUserManagement({ session, onNotice }: { session: Session; onNotice: (message: string) => void }) {
@@ -662,4 +688,4 @@ function AdminUserManagement({ session, onNotice }: { session: Session; onNotice
   return <section className="board"><div className="board-heading"><div><span className="eyebrow">ADMIN ONLY</span><h2>User management</h2><p>Create and maintain accounts, roles, departments, manager relationships, and active access. Passwords are never displayed or stored in the CRM profile.</p></div><button className="primary" onClick={() => { setEditing(null); setCreating(true); }}>Add user</button></div>{loading ? <p className="empty">Loading workspace users…</p> : <div className="table-wrap"><table className="responsive-data-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Department</th><th>Manager</th><th>Access</th><th>Last sign-in</th><th>Action</th></tr></thead><tbody>{managed.map((user) => <tr key={user.id}><td data-label="Name"><b>{user.full_name}</b></td><td data-label="Email">{user.email || 'Not available'}</td><td data-label="Role">{roleLabels[user.role]}</td><td data-label="Department">{user.department ?? '—'}</td><td data-label="Manager">{managed.find((candidate) => candidate.id === user.manager_id)?.full_name ?? '—'}</td><td data-label="Access"><span className={user.active ? 'success-chip' : 'warning'}>{user.active ? 'Active' : 'Inactive'}</span></td><td data-label="Last sign-in">{user.last_sign_in_at ? formatDate(user.last_sign_in_at) : 'Never'}</td><td data-label="Action"><button className="quiet" onClick={() => { setCreating(false); setEditing(user); }}>Edit</button></td></tr>)}</tbody></table>{!managed.length && <p className="empty">No profiles are available.</p>}</div>}{(creating || editing) && <div className="modal-backdrop" role="presentation"><form className="modal" onSubmit={save}><div className="panel-heading"><div><span className="spark dark">{creating ? 'NEW USER' : 'EDIT USER'}</span><h2>{creating ? 'Add a workspace user' : `Edit ${editing?.full_name}`}</h2></div><button type="button" className="quiet" onClick={() => { setCreating(false); setEditing(null); }}>Close</button></div><div className="detail-grid"><label>Full name<input name="fullName" defaultValue={editing?.full_name ?? ''} required /></label>{creating ? <label>Email<input name="email" type="email" required /></label> : <label>Email<input value={editing?.email ?? ''} readOnly /></label>}<label>Role<select name="role" defaultValue={editing?.role ?? 'sales_agent'}>{(['admin', 'manager', 'marketer', 'sales_agent'] as ManagedUser['role'][]).map((role) => <option key={role} value={role}>{roleLabels[role]}</option>)}</select></label><label>Department<select name="department" defaultValue={editing?.department ?? ''}><option value="">Choose department</option><option value="marketing">Marketing</option><option value="sales">Sales</option></select></label><label>Manager<select name="managerId" defaultValue={editing?.manager_id ?? ''}><option value="">Choose manager</option>{managers.filter((manager) => manager.id !== editing?.id).map((manager) => <option key={manager.id} value={manager.id}>{manager.full_name} · {manager.department ?? 'Department not set'}</option>)}</select></label>{creating ? <label>Temporary password<input name="password" type="password" minLength={8} required placeholder="At least 8 characters" /></label> : <label className="checkbox-label"><input name="active" type="checkbox" defaultChecked={editing?.active} /> Account active</label>}</div><p className="board-note">Rules: admins have no manager; non-admin users need a same-department active manager; the last active admin and your own admin access cannot be removed.</p><button className="primary">{creating ? 'Create user' : 'Save changes'}</button></form></div>}</section>;
 }
 
-function CreateLead({ viewer, onClose, onSubmit }: { viewer: User; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) { const allowed = viewer.role === 'admin' || viewer.role === 'marketer'; return <div className="modal-backdrop" role="presentation"><form className="modal lead-form-modal" onSubmit={onSubmit}><div className="panel-heading"><div><span className="spark dark">NEW LEAD</span><h2>Create a lead</h2></div><button type="button" className="quiet" onClick={onClose}>Close</button></div>{allowed ? <><p>A record only becomes a lead when it has a name plus a phone number or email address.</p><div className="detail-grid"><label>Name<input name="name" required /></label><label>Source<select name="source" defaultValue="" required><option value="" disabled>Choose source</option>{sourceOptions.map((source) => <option key={source} value={source}>{source}</option>)}</select></label><label>Lead category<select name="category" defaultValue="not_available" required>{leadCategoryOptions.map((category) => <option key={category} value={category}>{leadCategoryLabels[category]}</option>)}</select></label><label>Phone<input name="phone" type="tel" inputMode="tel" /></label><label>Email<input name="email" type="email" inputMode="email" /></label><label>Initial sales owner<select name="owner" defaultValue=""><option value="">Leave unassigned</option>{users.filter((user) => user.role === 'sales_agent').map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select></label><label className="form-span">Description<textarea name="description" rows={5} maxLength={4000} placeholder="Add the lead request, project needs, background, or other useful context." /></label></div><button className="primary">Create lead</button></> : <p className="warning">Only Admin and Marketing can create leads.</p>}</form></div>; }
+function CreateLead({ viewer, salesAgents, crmReady, onClose, onSubmit }: { viewer: User; salesAgents: User[]; crmReady: boolean; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) { const allowed = viewer.role === 'admin' || viewer.role === 'marketer'; return <div className="modal-backdrop" role="presentation"><form className="modal lead-form-modal" onSubmit={onSubmit}><div className="panel-heading"><div><span className="spark dark">NEW LEAD</span><h2>Create a lead</h2></div><button type="button" className="quiet" onClick={onClose}>Close</button></div>{allowed ? <><p>A record only becomes a lead when it has a name plus a phone number or email address.</p>{!crmReady && <p className="warning">The CRM connection is unavailable. Reconnect before creating a lead so no assignment is lost.</p>}<div className="detail-grid"><label>Name<input name="name" required /></label><label>Source<select name="source" defaultValue="" required><option value="" disabled>Choose source</option>{sourceOptions.map((source) => <option key={source} value={source}>{source}</option>)}</select></label><label>Lead category<select name="category" defaultValue="not_available" required>{leadCategoryOptions.map((category) => <option key={category} value={category}>{leadCategoryLabels[category]}</option>)}</select></label><label>Phone<input name="phone" type="tel" inputMode="tel" /></label><label>Email<input name="email" type="email" inputMode="email" /></label><label>Initial sales owner<select name="owner" defaultValue=""><option value="">Leave unassigned</option>{salesAgents.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select></label><label className="form-span">Description<textarea name="description" rows={5} maxLength={4000} placeholder="Add the lead request, project needs, background, or other useful context." /></label></div><button className="primary" disabled={!crmReady}>Create and save lead</button></> : <p className="warning">Only Admin and Marketing can create leads.</p>}</form></div>; }
