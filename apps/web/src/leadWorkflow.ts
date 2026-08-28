@@ -1,4 +1,8 @@
 export type ContactMethodType = 'phone' | 'email';
+
+export function isRemoteCrmId(id: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+}
 export type ContactHealth = 'unverified' | 'verified' | 'incorrect' | 'wrong_person' | 'reception_gatekeeper' | 'do_not_contact';
 export type ContactFocus = 'active' | 'secondary' | 'removed';
 export type LeadContactMethod = { id: string; type: ContactMethodType; value: string; label?: string; health: ContactHealth; focus: ContactFocus; reason?: string; restricted?: boolean; lastAttemptAt?: string; lastOutcome?: string };

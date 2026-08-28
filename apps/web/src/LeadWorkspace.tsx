@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { IconArrowLeft, IconAt, IconCheck, IconChevronDown, IconCircleCheck, IconClock, IconEdit, IconFlag, IconMail, IconMessage, IconPhone, IconPlus, IconRefresh, IconUser, IconX } from '@tabler/icons-react';
 import { canEditLeadDetails, canFlagIncorrectLead, leadCategoryLabels, leadCategoryOptions, salesIncorrectReportCount, sourceOptions, type Lead, type User } from './domain';
-import { canRestore, focusForHealth, healthLabel, validateContactMethod, type ContactHealth, type LeadContactMethod } from './leadWorkflow';
+import { canRestore, focusForHealth, healthLabel, isRemoteCrmId, validateContactMethod, type ContactHealth, type LeadContactMethod } from './leadWorkflow';
 import type { Session } from '@supabase/supabase-js';
 import { addRemoteContactMethod, assessRemoteContactMethod, loadRemoteActivityHistory, loadRemoteContactMethods, logRemoteSalesActivity, restoreRemoteContactMethod } from './api';
 
@@ -14,7 +14,6 @@ const firstMethods = (lead: Lead): LeadContactMethod[] => [
 function actionIcon(type: string) { return type === 'email' ? <IconMail size={16} /> : type === 'sms' ? <IconMessage size={16} /> : <IconPhone size={16} />; }
 function format(value: string) { return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(value)); }
 function hasMarketingControl(user: User) { return user.role === 'marketer' || user.role === 'admin' || (user.role === 'manager' && user.department === 'marketing'); }
-function isRemoteId(id: string) { return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id); }
 
 export function LeadWorkspace({ lead, viewer, session, onBack, onStatus, onQualification, onReassign, onEditDetails, onReportIncorrect, onDecision }: { lead: Lead; viewer: User; session?: Session; onBack: () => void; onStatus: (lead: Lead, status: Lead['status']) => void; onQualification: (lead: Lead, qualification: Lead['qualification']) => void; onReassign: (lead: Lead, event: FormEvent<HTMLFormElement>) => void; onEditDetails: (lead: Lead, event: FormEvent<HTMLFormElement>) => void; onReportIncorrect: (lead: Lead, event: FormEvent<HTMLFormElement>) => void; onDecision: (lead: Lead, decision: 'confirmed_incorrect' | 'rejected' | 'merge_duplicate') => void; }) {
   const [methods, setMethods] = useState<LeadContactMethod[]>(() => firstMethods(lead));
@@ -38,7 +37,7 @@ export function LeadWorkspace({ lead, viewer, session, onBack, onStatus, onQuali
 
   useEffect(() => { setMethods(firstMethods(lead)); setHistory([]); }, [lead.id]);
   useEffect(() => {
-    if (!session) return;
+    if (!session || !isRemoteCrmId(lead.id)) return;
     let alive = true;
     void Promise.all([loadRemoteContactMethods(session, lead.id), loadRemoteActivityHistory(session, lead.id)]).then(([methodResult, historyResult]) => {
       if (!alive) return;
@@ -56,13 +55,13 @@ export function LeadWorkspace({ lead, viewer, session, onBack, onStatus, onQuali
     if (!canManage) return;
     const focus = focusForHealth(health);
     setMethods((items) => items.map((item) => item.id === method.id ? { ...item, health, focus, restricted: health === 'do_not_contact' } : item));
-    if (session && isRemoteId(method.id)) void assessRemoteContactMethod(session, lead.id, method.id, { health }).catch((error: unknown) => setNotice(error instanceof Error ? error.message : 'CRM could not update this contact method.'));
+    if (session && isRemoteCrmId(lead.id) && isRemoteCrmId(method.id)) void assessRemoteContactMethod(session, lead.id, method.id, { health }).catch((error: unknown) => setNotice(error instanceof Error ? error.message : 'CRM could not update this contact method.'));
     setNotice(focus === 'removed' ? `${method.value} was moved out of your active focus.` : `${method.value} was updated.`);
   }
   function restore(method: LeadContactMethod) {
     if (!canRestore(method, viewer.role)) return setNotice('This method can be restored only by Lead Gen, Manager, or Admin.');
     setMethods((items) => items.map((item) => item.id === method.id ? { ...item, health: 'unverified', focus: 'active', restricted: false } : item));
-    if (session && isRemoteId(method.id)) void restoreRemoteContactMethod(session, lead.id, method.id, { reason: 'Restored for reassignment or renewed outreach.' }).catch((error: unknown) => setNotice(error instanceof Error ? error.message : 'CRM could not restore this contact method.'));
+    if (session && isRemoteCrmId(lead.id) && isRemoteCrmId(method.id)) void restoreRemoteContactMethod(session, lead.id, method.id, { reason: 'Restored for reassignment or renewed outreach.' }).catch((error: unknown) => setNotice(error instanceof Error ? error.message : 'CRM could not restore this contact method.'));
     setNotice(`${method.value} was restored to active contact methods.`);
   }
   function addContact(event: FormEvent<HTMLFormElement>) {
@@ -71,7 +70,7 @@ export function LeadWorkspace({ lead, viewer, session, onBack, onStatus, onQuali
     const comparable = type === 'phone' ? value.replace(/\D/g, '') : value.toLowerCase();
     if (methods.some((method) => method.type === type && (type === 'phone' ? method.value.replace(/\D/g, '') : method.value.toLowerCase()) === comparable)) return setNotice('This contact method is already listed.');
     const append = (id: string) => { setMethods((items) => [...items, { id, type, value, label, health: 'unverified', focus: 'active' }]); formElement.reset(); setContactOpen(false); setNotice(`${type === 'email' ? 'Email address' : 'Phone number'} added. It starts as Unverified.`); };
-    if (session) void addRemoteContactMethod(session, lead.id, { methodType: type, value, label }).then((result) => append(result.contactMethodId)).catch((error: unknown) => setNotice(error instanceof Error ? error.message : 'CRM could not add this contact method.'));
+    if (session && isRemoteCrmId(lead.id)) void addRemoteContactMethod(session, lead.id, { methodType: type, value, label }).then((result) => append(result.contactMethodId)).catch((error: unknown) => setNotice(error instanceof Error ? error.message : 'CRM could not add this contact method.'));
     else append(`${lead.id}-${Date.now()}`);
   }
   function logActivity(event: FormEvent<HTMLFormElement>) {
@@ -80,7 +79,7 @@ export function LeadWorkspace({ lead, viewer, session, onBack, onStatus, onQuali
     const at = new Date().toISOString();
     setHistory((items) => [{ id: `${Date.now()}`, at, type, outcome, method: method.value, note: note || undefined }, ...items]);
     setMethods((items) => items.map((item) => item.id === method.id ? { ...item, lastAttemptAt: at, lastOutcome: outcome } : item));
-    if (session && isRemoteId(method.id)) void logRemoteSalesActivity(session, lead.id, { contactMethodId: method.id, type, outcome, body: note || undefined }).catch((error: unknown) => setNotice(error instanceof Error ? error.message : 'CRM could not save this activity.'));
+    if (session && isRemoteCrmId(lead.id) && isRemoteCrmId(method.id)) void logRemoteSalesActivity(session, lead.id, { contactMethodId: method.id, type, outcome, body: note || undefined }).catch((error: unknown) => setNotice(error instanceof Error ? error.message : 'CRM could not save this activity.'));
     if (outcome === 'connected' || outcome === 'replied' || outcome === 'meeting_booked') onStatus(lead, 'connected');
     setActivityOpen(false); setNotice('Activity logged. Your history and follow-up context are updated.');
   }

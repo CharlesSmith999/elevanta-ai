@@ -96,7 +96,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   }, [session]);
 
   function persist(action: (activeSession: Session) => Promise<unknown>, success?: string) {
-    if (!session) return;
+    if (!session || !remoteLoaded) return;
     void action(session).then(() => { if (success) setNotice(success); }).catch((error: unknown) => setNotice(error instanceof Error ? error.message : 'The CRM could not save this change.'));
   }
 
