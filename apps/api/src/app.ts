@@ -161,6 +161,16 @@ export function createApp() {
   const protectedRoute = (handler: (request: AuthenticatedRequest, response: Response) => Promise<void>) => [requireUser, asyncRoute(async (request, response) => { if (!response.locals.ready) return; await handler(request, response); })];
 
   app.get('/v1/me', ...protectedRoute(async (request, response) => { response.json({ profile: request.profile }); }));
+  app.get('/v1/workspace-members', ...protectedRoute(async (request, response) => {
+    const { data, error } = await request.supabase!
+      .from('profiles')
+      .select('id, full_name, role, department, manager_id, active')
+      .eq('workspace_id', request.profile!.workspace_id)
+      .eq('active', true)
+      .order('full_name', { ascending: true });
+    if (error) throw error;
+    response.json({ users: data ?? [] });
+  }));
   app.get('/v1/contacts', ...protectedRoute(async (request, response) => {
     const search = typeof request.query.search === 'string' ? request.query.search.trim() : '';
     let query = request.supabase!.from('contacts').select('*').order('updated_at', { ascending: false });

@@ -34,6 +34,18 @@ test('dashboard excludes other agents’ work', () => {
   assert.equal(dashboard.visible.every((lead) => lead.assignments.some((assignment) => !assignment.endedAt && assignment.ownerId === 'owais')), true);
 });
 
+test('dashboard uses live workspace UUIDs for assigned Sales users', () => {
+  const salesId = '11111111-1111-4111-8111-111111111111';
+  const managerId = '22222222-2222-4222-8222-222222222222';
+  const directory = [
+    { id: managerId, name: 'Sales Manager', role: 'manager' as const, department: 'sales' as const },
+    { id: salesId, name: 'Sales Agent', role: 'sales_agent' as const, managerId, department: 'sales' as const },
+  ];
+  const assigned = { ...structuredClone(seedLeads[0]), id: 'live-assignment', assignments: [{ id: 'live-owner', ownerId: salesId, assignedBy: managerId, at: new Date().toISOString(), visibility: 'full_context' as const, reason: 'Initial assignment' }] };
+  assert.deepEqual(dashboardFor(directory[1], [assigned], new Date(), directory).visible.map((lead) => lead.id), ['live-assignment']);
+  assert.deepEqual(dashboardFor(directory[0], [assigned], new Date(), directory).visible.map((lead) => lead.id), ['live-assignment']);
+});
+
 test('follow-up metrics distinguish a due-today task from an overdue task', () => {
   const dashboard = dashboardFor(user('mustabeen'), seedLeads);
   assert.equal(dashboard.dueToday, 0);

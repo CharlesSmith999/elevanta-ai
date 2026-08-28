@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import type { Activity, Assignment, FollowUp, IncorrectReport, Lead, LeadCategory, OpportunityStatus, Qualification, Role, StageHistory } from './domain';
 import type { ContactFocus, ContactHealth, ContactMethodType } from './leadWorkflow';
+import { supabase } from './auth';
 
 /**
  * Production is a single Vercel deployment, so API calls must stay on the
@@ -47,6 +48,15 @@ export type ManagedUser = {
   last_sign_in_at: string | null;
 };
 
+export type WorkspaceMember = {
+  id: string;
+  full_name: string;
+  role: 'admin' | 'manager' | 'sales_agent' | 'marketer';
+  department: 'marketing' | 'sales' | null;
+  manager_id: string | null;
+  active: boolean;
+};
+
 export type RemoteContactMethod = {
   id: string;
   health: ContactHealth;
@@ -72,11 +82,19 @@ export type RemoteActivity = {
   contact_methods?: { value: string; method_type: ContactMethodType } | null;
 };
 
-async function request<T>(session: Session, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${apiBase}${path}`, {
+async function send(session: Session, path: string, init?: RequestInit) {
+  return fetch(`${apiBase}${path}`, {
     ...init,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}`, ...(init?.headers ?? {}) },
   });
+}
+
+async function request<T>(session: Session, path: string, init?: RequestInit): Promise<T> {
+  let response = await send(session, path, init);
+  if (response.status === 401 && supabase) {
+    const { data, error } = await supabase.auth.refreshSession();
+    if (!error && data.session) response = await send(data.session, path, init);
+  }
   if (!response.ok) {
     const body = await response.json().catch(() => ({})) as { message?: string };
     throw new ApiError(response.status, body.message ?? `CRM request failed (${response.status})`);
@@ -122,6 +140,11 @@ function mapOpportunity(record: OpportunityRecord): Lead {
 export async function loadRemoteLeads(session: Session): Promise<Lead[]> {
   const result = await request<{ opportunities: OpportunityRecord[] }>(session, '/v1/opportunities');
   return result.opportunities.map(mapOpportunity);
+}
+
+export async function loadWorkspaceMembers(session: Session): Promise<WorkspaceMember[]> {
+  const result = await request<{ users: WorkspaceMember[] }>(session, '/v1/workspace-members');
+  return result.users;
 }
 
 export const createRemoteLead = (session: Session, body: unknown) => request<{ opportunityId: string }>(session, '/v1/opportunities', { method: 'POST', body: JSON.stringify(body) });
