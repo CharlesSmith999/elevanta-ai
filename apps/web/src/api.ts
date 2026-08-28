@@ -89,11 +89,23 @@ async function send(session: Session, path: string, init?: RequestInit) {
   });
 }
 
+let refreshPromise: Promise<Session | null> | null = null;
+async function refreshAccessSession() {
+  if (!supabase) return null;
+  refreshPromise ??= supabase.auth.refreshSession().then(({ data, error }) => error ? null : data.session).finally(() => { refreshPromise = null; });
+  return refreshPromise;
+}
+
 async function request<T>(session: Session, path: string, init?: RequestInit): Promise<T> {
   let response = await send(session, path, init);
   if (response.status === 401 && supabase) {
-    const { data, error } = await supabase.auth.refreshSession();
-    if (!error && data.session) response = await send(data.session, path, init);
+    const refreshed = await refreshAccessSession();
+    if (refreshed) response = await send(refreshed, path, init);
+    if (response.status === 401) {
+      // Do not leave the UI in a misleading half-signed-in state. A stale
+      // browser token is cleared so the user can sign in again cleanly.
+      await supabase.auth.signOut();
+    }
   }
   if (!response.ok) {
     const body = await response.json().catch(() => ({})) as { message?: string };
