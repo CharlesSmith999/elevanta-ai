@@ -1,12 +1,12 @@
 # Supabase Migration Traceability
 
-Status: Reconciled through v1.6 on 2026-08-23; v1.7 migration pending release
+Status: Reconciled through v1.7 on 2026-08-28
 
 Project: `jayxyikgefnzitxcbdov`
 
 ## Result
 
-The production Supabase project has a canonical `supabase_migrations.schema_migrations` ledger containing all 13 migrations released through lead workflow v1.6.
+The production Supabase project has a canonical `supabase_migrations.schema_migrations` ledger containing all 14 migrations released through lead details and reporting v1.7.
 
 Before the ledger was created, each migration was checked against the live schema. That verification found one material mismatch: migration `202607290005_dashboard_completion_events.sql` had not completed because its loss-reason validation contained an invalid one-argument `nullif` call. The source SQL was corrected, the migration was applied, and all 10 migration-effect checks passed before any version was recorded.
 
@@ -29,14 +29,15 @@ No lead records were imported, removed, or activated during this reconciliation.
 | `202608230001` | `lead_workflow_v16` |
 | `202608230002` | `xaviar_lead_workflow_v11` |
 | `202608230003` | `status_guard_v16` |
+| `202608250001` | `lead_details_reporting_v17` |
 
 ## 2026-08-23 lead workflow verification
 
 The three v1.6 migrations were applied in filename order using the approved Supabase workflow. The release verification confirmed the four new workflow tables, guarded contact-method and activity routines, the automatic contact-method trigger for newly created opportunities, four RLS policies, and all three migration-ledger entries. No real lead data was imported or changed.
 
-## Pending v1.7 migration
+## 2026-08-25 v1.7 verification
 
-`202608250001_lead_details_reporting_v17.sql` is implemented locally but has not been applied to Supabase or recorded in the migration ledger. It adds the controlled lead category, scoped lead-detail editing, type-safe contact-method entry, reporter-role evidence, and the rule that only three distinct Sales Agent reports trigger Admin review. It does not import or modify real lead records.
+`202608250001_lead_details_reporting_v17.sql` is applied and recorded in the canonical migration ledger. Verification confirmed the controlled lead-category column, reporter-role evidence, scoped create/edit routines, type-safe contact-method entry, whole-lead reporting, and the rule that only three distinct Sales Agent reports trigger Admin review. No real lead records were imported, removed, or activated.
 
 ## Required process for future migrations
 

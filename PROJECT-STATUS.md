@@ -1,7 +1,7 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-08-25
+Last updated: 2026-08-28
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.7.md](./CRM-DECISIONS-v1.7.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
 
 ## Current position
@@ -40,7 +40,7 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 | 3 — Controls and dashboards | Complete | Direction 1 role dashboards are released and live-verified: Admin, Marketing Manager view, Sales Manager, Marketing Agent, and Sales Agent all retain the approved elements in light and dark mode. Benchmark cohorts remain open for Xaviar evaluation. | No Milestone 3 product work remains. |
 | 4 — AI support | Technical release complete; human approval pending | Xaviar sub-phases 4A–4H are released using safe sample data: data contract, event foundation, explanations, recommendations, coaching, privacy-safe benchmarks, calibrated prediction controls, five-role dashboard integration, safety tests, and the verified additive Supabase foundation. | Record one Admin plus one Manager approval. No live agent rollout occurs in this milestone. |
 | Lead workflow v1.6 refinement | Release complete | Immediate assignment, derived Sales Engagement, multi-method contact quality, Sales/Lead Gen screens, activity history, role guards, protected API routes, additive migrations, Xaviar v1.1 event stream, 50 passing automated tests, type checks, production build, database migration/security verification, Vercel preview, production build, live CRM application, and API-health checks are complete. | No release work remains. Admin and Manager Xaviar approval is still required before Milestone 5. |
-| Lead details and reporting v1.7 | Local implementation complete; release pending | Approved categories were reconciled with the workbook. Description, scoped Marketing-side editing, type-aware phone/email entry, contact-method-only removal, explicit whole-lead flags, and the Sales-only three-agent threshold are implemented in the database migration, API, UI, and permission model. | Complete final validation, then obtain explicit authorization before applying the migration, publishing, and deploying. No real data migration. |
+| Lead details and reporting v1.7 | Release complete | Approved categories, description, scoped Marketing-side editing, type-aware phone/email entry, contact-method-only removal, explicit whole-lead flags, and the Sales-only three-agent threshold are released. Migration `202608250001` is applied and recorded. PRs #35 and #36 are merged, production is deployed, and the signed-in Lead Workspace no longer sends sample IDs to CRM endpoints. | No v1.7 release work remains. Real lead-data migration stays in Milestone 5. |
 | 5 — Production data migration | Not started | Deliberately deferred until Milestones 2–4 and Xaviar safety review are complete. | Stage and validate the approved Excel data, preserve provenance, apply duplicate handling, reconcile dashboards, activate migrated records, and then begin live agent/marketer use. |
 | Phase 2 — Workflow automation | Not started | Scope is documented only. | Email, SMS, calendar, phone, digests, escalation, consent enforcement, and human approval gates. |
 | Phase 3 — SaaS product | Not started | Scope is documented only. | Multi-tenancy, billing, self-service administration, onboarding, limits, and product analytics. |
@@ -56,13 +56,13 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 - GitHub publishing: complete through the authorized ChatGPT Codex Connector, restricted to `CharlesSmith999/elevanta-ai`.
 - Deployment procedure: [DEPLOYMENT-SOP.md](./docs/DEPLOYMENT-SOP.md) is the required reference for all releases; it uses the existing Git-connected Vercel project and forbids duplicate deployment instances.
 - API deployment path: `api/[...path].ts` now routes Vercel `/api/*` requests into the shared Node API without creating a second service.
-- Latest release validation: Vercel production deployment for `6d8ba91` is Ready. The API wrapper now normalizes both relative and absolute Vercel request URLs, resolving the signed-in dashboard's `/api/v1/opportunities` 404 path. The Supabase stage-history table and ownership view are verified.
+- Latest release validation: v1.7 PR [#35](https://github.com/CharlesSmith999/elevanta-ai/pull/35) and the sample-ID regression fix PR [#36](https://github.com/CharlesSmith999/elevanta-ai/pull/36) are merged. Vercel production deployment for `1663c7d0d56d127912f6305b93ab01de655ac977` is successful. The production Lead Workspace was opened against a safe sample lead with no 404 or CRM connection error, and `/api/health` returned HTTP 200.
 
 ## Validation completed
 
 - TypeScript checks pass.
 - Production web build passes.
-- Lead details and reporting v1.7 local validation passed on 2026-08-25: 55 automated domain, permission, privacy, Xaviar, category, contact-entry, and incorrect-threshold tests; API and web TypeScript checks; API build; production web build; repository whitespace check; desktop workflow checks; and a 390 px responsive check with no horizontal overflow. The existing web bundle-size warning remains non-blocking.
+- Lead details and reporting v1.7 release validation passed on 2026-08-28: 56 automated domain, permission, privacy, Xaviar, category, contact-entry, identifier-routing, and incorrect-threshold tests; API and web TypeScript checks; API build; production web build; repository whitespace check; desktop workflow checks; and a 390 px responsive check with no horizontal overflow. GitHub Actions run 285 and the Vercel preview passed. The existing web bundle-size warning remains non-blocking.
 - Domain tests were previously verified successfully for the CRM rules.
 - Step 2 Supabase verification passed: all 10 approved source labels exist in `source_dictionary`; `opportunities` contains `total_project_cost`, `upfront_payment_amount`, and `won_at`; the foundational CRM tables are present.
 - Steps 6–10 local readiness verification passed: 16 domain/permission/reconciliation tests, TypeScript checks, and production build.
@@ -113,7 +113,7 @@ Steps 11–12 are complete and deployed: the Node/React architecture and API imp
 
 ## Next milestone target
 
-Milestones 1–3 and lead workflow v1.6 are released. Xaviar Milestone 4 implementation is released, with Admin plus Manager human approval still pending. Lead details and reporting v1.7 is implemented locally and must pass its final validation and release gate before publication. Only after Xaviar human approval and the v1.7 release gate close may Milestone 5 production lead-data migration begin.
+Milestones 1–3, lead workflow v1.6, and lead details/reporting v1.7 are released. Xaviar Milestone 4 implementation is released, with Admin plus Manager human approval still pending. That human approval is the remaining gate before Milestone 5 production lead-data migration may begin.
 
 ## 2026-08-23 lead-workflow documentation record
 
@@ -133,7 +133,7 @@ Milestones 1–3 and lead workflow v1.6 are released. Xaviar Milestone 4 impleme
 - Validation passed: API and web TypeScript checks, production build, 50 automated domain, permission, privacy, Xaviar, and lead-workflow tests, preview smoke checks, production application smoke check, and production API health check.
 - No real lead data, credentials, or private design-image assets were published.
 
-## 2026-08-25 lead details and reporting v1.7 local implementation record
+## 2026-08-25 to 2026-08-28 lead details and reporting v1.7 release record
 
 - `CRM-DECISIONS-v1.7.md` records the approved description, category, editing, contact-entry, and incorrect-reporting rules.
 - Lead creation and scoped editing now support Description and the exact workbook categories: App, Game, SEO, SMM, Web, and Not available.
@@ -141,9 +141,11 @@ Milestones 1–3 and lead workflow v1.6 are released. Xaviar Milestone 4 impleme
 - Add Contact now validates phone and email according to the selected method, rejects duplicates, and preserves audit history.
 - Contact-method health remains separate from opportunity state. Marking one phone or email Incorrect removes only that method from active focus.
 - Any authorized viewer may submit one explicit whole-lead flag. Only three distinct Sales Agent flags create the Admin review item and pause routing.
-- The additive migration is `202608250001_lead_details_reporting_v17.sql`. It is not applied or recorded in Supabase yet.
-- Local validation passed: 55 automated tests, API and web TypeScript checks, API build, production web build, repository whitespace check, desktop interaction checks, and a 390 px responsive check. The existing bundle-size warning is non-blocking.
-- Publication, Supabase application, and Vercel deployment remain pending explicit release authorization. No real lead data or credentials were added.
+- The additive migration `202608250001_lead_details_reporting_v17.sql` is applied to Supabase project `jayxyikgefnzitxcbdov` and recorded in `supabase_migrations.schema_migrations`. Verification confirmed the category and reporter-role columns plus the create, edit, contact-method, and incorrect-report RPCs.
+- PR [#35](https://github.com/CharlesSmith999/elevanta-ai/pull/35) released v1.7 to `main` at `f4e6e4633c8aefd4ae715cc0d18d3aa2114a52f4`.
+- The production smoke check found one remaining safe-sample edge case: sample lead IDs were reaching UUID-only CRM endpoints. PR [#36](https://github.com/CharlesSmith999/elevanta-ai/pull/36) fixed that boundary and was merged to `main` at `1663c7d0d56d127912f6305b93ab01de655ac977`.
+- Final validation passed: 56 automated tests, API and web TypeScript checks, API and web production builds, GitHub Actions run 285, Vercel preview and production deployments, production `/api/health` HTTP 200, and a signed-in Lead Workspace check with no 404 or CRM connection error.
+- No real lead data, credentials, or private design images were published or imported.
 
 ## 2026-08-17 UI/UX remediation status
 
