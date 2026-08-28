@@ -13,4 +13,4 @@ AI companion: **Xaviar**
 - [PROJECT-STATUS.md](./PROJECT-STATUS.md) — current milestone progress, validation results, and next target.
 - [docs/DEPLOYMENT-SOP.md](./docs/DEPLOYMENT-SOP.md) — required GitHub, Vercel, and Supabase deployment procedure.
 
-The released CRM/Xaviar foundation and v1.6 lead workflow, plus the local v1.7 release candidate, are documented in `PROJECT-STATUS.md`. Real production data migration remains Milestone 5 only.
+The released CRM/Xaviar foundation, v1.6 lead workflow, and v1.7 lead-details extension are documented in `PROJECT-STATUS.md`. Real production data migration remains Milestone 5 only.
