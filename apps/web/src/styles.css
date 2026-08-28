@@ -643,3 +643,4 @@
 /* Modal clarity: every overlay keeps a solid, theme-aware surface above the backdrop. */
 .modal-backdrop,.workflow-modal-backdrop{z-index:100;background:rgba(8,10,28,.68);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);isolation:isolate}
 .modal-backdrop>.modal,.workflow-modal,.workflow-drawer{opacity:1;background:var(--surface,var(--panel))!important;box-shadow:0 24px 70px rgba(7,12,31,.32)}
+.crm-reconnect-warning{display:flex;align-items:center;justify-content:space-between;gap:12px}.crm-reconnect-warning .quiet{flex:0 0 auto}
