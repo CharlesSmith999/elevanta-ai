@@ -46,6 +46,8 @@ function leadActivity(actorId: string, kind: Activity['kind'], body: string): Ac
 function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?: Session }) {
   const [leads, setLeads] = useState<Lead[]>(safeLeadData);
   const [remoteLoaded, setRemoteLoaded] = useState(false);
+  const [connectionError, setConnectionError] = useState('');
+  const [connectionAttempt, setConnectionAttempt] = useState(0);
   const [workspaceDirectory, setWorkspaceDirectory] = useState<User[]>(workspaceUsers);
   const [viewerId, setViewerId] = useState(session?.user.id ?? 'shariq');
   const [page, setPage] = useState('Dashboard');
@@ -94,6 +96,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   useEffect(() => {
     if (!session) return;
     let active = true;
+    setConnectionError('');
     Promise.all([loadRemoteLeads(session), loadWorkspaceMembers(session)]).then(([remoteLeads, members]) => {
       if (!active) return;
       const directory: User[] = members.map((member) => ({ id: member.id, name: member.full_name, role: member.role, managerId: member.manager_id ?? undefined, department: member.department ?? 'marketing' }));
@@ -102,9 +105,9 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
       setViewerId(directory.some((member) => member.id === session.user.id) ? session.user.id : directory[0]?.id ?? 'shariq');
       setRemoteLoaded(true);
       setNotice('Connected to the CRM workspace.');
-    }).catch((error: unknown) => { if (active) { setRemoteLoaded(false); setNotice(error instanceof Error ? `CRM connection unavailable: ${error.message}` : 'CRM connection unavailable. Sign in again before making changes.'); } });
+    }).catch((error: unknown) => { if (active) { setRemoteLoaded(false); setConnectionError(error instanceof Error ? error.message : 'The CRM could not load your workspace.'); } });
     return () => { active = false; };
-  }, [session]);
+  }, [session, connectionAttempt]);
 
   function persist(action: (activeSession: Session) => Promise<unknown>, success?: string) {
     if (session && !remoteLoaded) { setNotice('This change was not saved because the CRM connection is unavailable. Sign in again and retry.'); return; }
@@ -275,6 +278,11 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
     <section className={`content ${referenceDashboard ? 'reference-dashboard-content' : 'unified-content'}`}>
       {!referenceDashboard && <><UnifiedPageHeader page={page} viewer={viewer} viewers={switchableUsers} theme={theme} onViewer={switchViewer} onTheme={setTheme} />
         <div className="notice"><b>{remoteLoaded ? 'Connected CRM workspace' : 'Functional test workspace'}</b><span>{remoteLoaded ? 'Changes are saved to the shared CRM database and are visible according to each user’s role and assignment.' : session ? 'The CRM connection is unavailable. Operational changes are blocked until the connection is restored.' : 'These are browser-only test records. Sign in before using the CRM operationally.'}</span></div></>}
+      {session && !remoteLoaded && <div className="connection-banner" role={connectionError ? 'alert' : 'status'}>
+        <strong>{connectionError ? 'CRM connection unavailable' : 'Connecting to your CRM workspace…'}</strong>
+        <span>{connectionError || 'Waiting for your saved leads and team directory.'}</span>
+        {connectionError && <button type="button" onClick={() => setConnectionAttempt((attempt) => attempt + 1)}>Retry connection</button>}
+      </div>}
       {notice && <div className="toast" role="status">{notice}</div>}
       {adminReference ? <AdminCommandCenter viewer={viewer} viewers={switchableUsers} leads={dashboardLeads} dashboard={filteredDashboard} period={dashboardPeriod} source={dashboardSource} theme={theme} onViewer={switchViewer} onPeriod={setDashboardPeriod} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} /> : roleReferenceDashboard && roleReferenceKind ? <RoleReferenceDashboard kind={roleReferenceKind} viewer={viewer} viewers={switchableUsers} leads={dashboardLeads} period={dashboardPeriod} source={dashboardSource} theme={theme} onViewer={switchViewer} onPeriod={setDashboardPeriod} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} onCreate={() => setShowCreate(true)} onOpenLead={(leadId) => { setSelectedId(leadId); navigate('Lead inbox'); }} /> : <>
       {page === 'Lead inbox' && (selected ? <LeadWorkspace lead={selected} viewer={viewer} workspaceUsers={workspaceDirectory} session={session} onBack={() => setSelectedId(undefined)} onStatus={updateStatus} onQualification={updateQualification} onReassign={reassign} onEditDetails={editLeadDetails} onReportIncorrect={reportIncorrect} onDecision={decideReview} /> : <section className="inbox-layout"><LeadTable leads={visible} users={workspaceDirectory} onSelect={select} onCreate={() => setShowCreate(true)} /></section>)}
