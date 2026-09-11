@@ -1,3 +1,4 @@
 {
-  "outputDirectory": "apps/web/dist"
+  "outputDirectory": "apps/web/dist",
+  "rewrites": [{ "source": "/api/:path*", "destination": "/api?__crm_path=:path*" }]
 }
