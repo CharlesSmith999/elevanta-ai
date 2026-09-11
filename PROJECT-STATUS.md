@@ -1,12 +1,14 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-08-28
+Last updated: 2026-09-10
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.7.md](./CRM-DECISIONS-v1.7.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
 
 ## Current position
 
-Elevanta AI has a working Phase 1 CRM foundation released on `main`. Production authentication and the safe sample-data workspace are live and verified; real lead-data migration remains deferred to Milestone 5.
+Milestones 1–3 and refinements v1.6/v1.7 have been implemented and released. However, production operational acceptance is reopened for the connection incident below. Historical release records are not evidence that the current deployment can load or save leads. Xaviar is technically released with Admin and Manager approval pending. Real lead-data migration remains deferred to Milestone 5.
+
+Current priority: [Production connection recovery](./docs/CONNECTION-RECOVERY-2026-09-10.md). On September 10 the live API reproduced an invalid Supabase URL, and code inspection found that successful authentication never continued into protected route handlers. A disappearing error toast previously concealed the unresolved failure. Do not report this incident complete until authenticated read/write checks pass on the production domain.
 
 The full Excel workbook has **not** been imported into the active CRM yet, by deliberate decision. The current public preview uses safe sample data in the browser so the workflow can be tested without exposing private lead data. **Real lead-data migration is a Milestone 5 activity only, after Xaviar development and safety review; it is not a Milestone 1 release requirement and must not be requested again during Milestones 1–4.**
 

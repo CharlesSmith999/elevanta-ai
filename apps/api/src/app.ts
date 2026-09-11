@@ -1,6 +1,7 @@
 import cors from 'cors';
 import express, { NextFunction, Request, Response } from 'express';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { ConfigurationError, supabaseConfig } from './config.js';
 import { z, ZodError } from 'zod';
 import { buildApiXaviarReport, canRequestXaviar, opportunityBelongsToSubject, type XaviarOpportunity, type XaviarProfile } from './xaviar.js';
 
@@ -69,9 +70,7 @@ const coachingPlanUpdate = z.object({ status: z.enum(['draft', 'active', 'comple
 const xaviarReleaseReview = z.object({ decision: z.enum(['approved', 'changes_required']), notes: z.string().trim().min(1).max(3000), releaseVersion: z.string().trim().min(1).max(100) });
 
 function configuredClient(token: string) {
-  const url = process.env.SUPABASE_URL;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-  if (!url || !anonKey) throw new Error('Supabase is not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY.');
+  const { url, anonKey } = supabaseConfig();
   return createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: `Bearer ${token}` } } });
 }
 
@@ -83,7 +82,7 @@ function serviceClient() {
 }
 
 function parse(schema: z.ZodTypeAny, value: unknown) { return schema.parse(value); }
-function asyncRoute(handler: (request: AuthenticatedRequest, response: Response) => Promise<void>) { return (request: AuthenticatedRequest, response: Response, next: NextFunction) => { handler(request, response).catch(next); }; }
+function asyncRoute(handler: (request: AuthenticatedRequest, response: Response, next: NextFunction) => Promise<void>) { return (request: AuthenticatedRequest, response: Response, next: NextFunction) => { handler(request, response, next).catch(next); }; }
 
 async function persistXaviarReport(subject: XaviarProfile, report: ReturnType<typeof buildApiXaviarReport>) {
   const admin = serviceClient();
@@ -133,7 +132,7 @@ async function persistXaviarReport(subject: XaviarProfile, report: ReturnType<ty
   return { ...report, recommendations: report.recommendations.map((item) => ({ ...item, id: storedIds.get(item.id) ?? item.id })) };
 }
 
-export function createApp() {
+export function createApp(clientForToken: (token: string) => SupabaseClient = configuredClient) {
   const app = express();
   app.use(cors({ origin: process.env.WEB_ORIGIN?.split(',') ?? true }));
   app.use(express.json({ limit: '100kb' }));
@@ -146,17 +145,22 @@ export function createApp() {
     next();
   });
   app.get('/health', (_request, response) => response.json({ service: 'elevanta-api', status: 'ok', phase: 1 }));
+  app.get('/ready', (_request, response) => {
+    supabaseConfig();
+    response.json({ service: 'elevanta-api', configuration: 'valid' });
+  });
 
-  const requireUser = asyncRoute(async (request, response) => {
+  const requireUser = asyncRoute(async (request, response, next) => {
     const header = request.header('authorization');
     const token = header?.startsWith('Bearer ') ? header.slice(7).trim() : '';
     if (!token) { response.status(401).json({ message: 'A signed-in user is required.' }); return; }
-    const supabase = configuredClient(token);
+    const supabase = clientForToken(token);
     const { data: auth, error: authError } = await supabase.auth.getUser(token);
     if (authError || !auth.user) { response.status(401).json({ message: 'Your session is invalid or expired.' }); return; }
     const { data: profile, error: profileError } = await supabase.from('profiles').select('id, workspace_id, role, full_name, manager_id, department, active').eq('id', auth.user.id).maybeSingle();
     if (profileError || !profile || !profile.active) { response.status(403).json({ message: 'Your CRM profile is inactive or unavailable.' }); return; }
     request.profile = profile as Profile; request.supabase = supabase; response.locals.ready = true;
+    next();
   });
   const protectedRoute = (handler: (request: AuthenticatedRequest, response: Response) => Promise<void>) => [requireUser, asyncRoute(async (request, response) => { if (!response.locals.ready) return; await handler(request, response); })];
 
@@ -407,6 +411,7 @@ export function createApp() {
   }));
 
   app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
+    if (error instanceof ConfigurationError) { response.status(503).json({ message: error.message }); return; }
     if (error instanceof ZodError) { response.status(400).json({ message: 'Please correct the submitted fields.', issues: error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message })) }); return; }
     const message = error instanceof Error ? error.message : 'Unexpected server error.';
     const status = /not permitted|only admin|only the current|only admin and marketing/i.test(message) ? 403 : /not found/i.test(message) ? 404 : /requires|cannot|invalid|must|paused|duplicate/i.test(message) ? 422 : 500;

@@ -112,6 +112,9 @@ Every production deployment must confirm:
 
 - The application loads without browser-console errors.
 - The API health endpoint responds successfully once the API deployment is enabled.
+- `/api/ready` must confirm valid server configuration. This is a configuration check, not a database or authentication test.
+- A signed-in request must successfully load the workspace directory and leads. Verify one labelled synthetic lead saved with an actual profile UUID, then reload and check assigned-owner visibility. Never infer this from `/api/health`, an absent toast, or a Ready deployment badge.
+- A connection failure must remain visible on dashboards until recovery. Record the exact tested production commit and any unverified workflow.
 - Email/password sign-in works for an approved test account.
 - Password reset sends a generic response, accepts a valid recovery link, enforces matching minimum-length passwords, and signs the user out after a successful change.
 - Sales agents cannot access leads outside their assignment scope.
