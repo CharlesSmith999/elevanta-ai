@@ -4,6 +4,16 @@ import type { AddressInfo } from 'node:net';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createApp } from './app.js';
 import { supabaseConfig, ConfigurationError } from './config.js';
+import { normalizeCrmPath } from './routing.js';
+
+test('deployment rewrite preserves nested CRM routes and query filters', () => {
+  for (const path of ['health', 'ready', 'v1/me', 'v1/admin/users', 'v1/opportunities/example/contact-methods', 'v1/opportunities/example/contact-methods/method/restore']) {
+    assert.equal(normalizeCrmPath(`/api/${path}`), `/${path}`);
+    assert.equal(normalizeCrmPath(`/api?__crm_path=${encodeURIComponent(path)}`), `/${path}`);
+    assert.equal(normalizeCrmPath(`https://example.com/api/${path}?source=Bark%20Paid`), `/${path}?source=Bark+Paid`);
+  }
+  assert.equal(normalizeCrmPath('/api/v1/me?__crm_path=v1/admin/users'), '/v1/me');
+});
 
 const profile = { id: '00000000-0000-4000-8000-000000000001', workspace_id: '00000000-0000-4000-8000-000000000002', role: 'sales_agent', full_name: 'Synthetic Test Agent', manager_id: null, department: 'sales', active: true };
 
