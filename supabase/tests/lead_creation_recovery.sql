@@ -8,6 +8,8 @@ declare
   workspace uuid;
   assigned_id uuid;
   unassigned_id uuid;
+  email_id uuid;
+  phone_id uuid;
   rejected boolean := false;
 begin
   select id, workspace_id into admin_id, workspace from public.profiles where role='admin' and active limit 1;
@@ -18,6 +20,10 @@ begin
   if not exists(select 1 from public.opportunities where id=assigned_id and status='assigned' and description='Synthetic rollback test' and lead_category='web') then raise exception 'Assigned lead fields not preserved'; end if;
   if not exists(select 1 from public.assignments where opportunity_id=assigned_id and assigned_to=sales_id and ended_at is null) then raise exception 'Active assignment missing'; end if;
   if not exists(select 1 from public.opportunity_contact_methods where opportunity_id=assigned_id) then raise exception 'Email not linked'; end if;
+  email_id := public.add_opportunity_contact_method(assigned_id,'email',gen_random_uuid()::text||'@example.com','QA extra email');
+  phone_id := public.add_opportunity_contact_method(assigned_id,'phone','12025550199','QA fictional phone');
+  if (select count(*) from public.opportunity_contact_methods where opportunity_id=assigned_id and contact_method_id in (email_id,phone_id) and health='unverified' and focus='active') <> 2 then raise exception 'Added phone/email health or focus incorrect'; end if;
+  if (select count(*) from public.contact_method_events where opportunity_id=assigned_id and contact_method_id in (email_id,phone_id) and event_type='added') <> 2 then raise exception 'Added phone/email audit events missing'; end if;
   unassigned_id := public.create_opportunity_v17(p_name=>'QA rollback unassigned',p_email=>gen_random_uuid()::text||'@example.com',p_source=>'Other');
   if not exists(select 1 from public.opportunities where id=unassigned_id and status='new') then raise exception 'Unassigned status incorrect'; end if;
   begin

@@ -17,9 +17,9 @@ test('deployment rewrite preserves nested CRM routes and query filters', () => {
 
 const profile = { id: '00000000-0000-4000-8000-000000000001', workspace_id: '00000000-0000-4000-8000-000000000002', role: 'sales_agent', full_name: 'Synthetic Test Agent', manager_id: null, department: 'sales', active: true };
 
-function fakeClient(mode: 'active' | 'invalid' | 'inactive' | 'error' = 'active') {
+function fakeClient(mode: 'active' | 'invalid' | 'inactive' | 'error' = 'active', selections: string[] = []) {
   const query = {
-    select() { return query; }, eq() { return query; }, order() { return query; },
+    select(columns: string) { selections.push(columns); return query; }, eq() { return query; }, order() { return query; },
     maybeSingle: async () => ({ data: { ...profile, active: mode !== 'inactive' }, error: null }),
     then(resolve: (value: unknown) => unknown) { return Promise.resolve({ data: [profile], error: null }).then(resolve); },
   };
@@ -30,6 +30,21 @@ function fakeClient(mode: 'active' | 'invalid' | 'inactive' | 'error' = 'active'
     } }, from: () => query,
   } as unknown as SupabaseClient;
 }
+
+test('contact methods endpoint uses only the existing contact-method relationship', async () => {
+  const selections: string[] = [];
+  const server = createApp(() => fakeClient('active', selections)).listen(0, '127.0.0.1');
+  try {
+    await new Promise<void>((resolve) => server.once('listening', resolve));
+    const response = await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/v1/opportunities/${profile.id}/contact-methods`, { headers: { Authorization: 'Bearer synthetic-test-token' }, signal: AbortSignal.timeout(2000) });
+    assert.equal(response.status, 200);
+    assert.ok(selections.some((selection) => selection.includes('contact_methods(id, method_type, value')));
+    assert.ok(selections.every((selection) => !selection.includes('contact_method_events(')), 'Events have no direct foreign key to opportunity_contact_methods');
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
 
 for (const [mode, expected] of [['active', 200], ['invalid', 401], ['inactive', 403], ['error', 500]] as const) {
   test(`protected HTTP route completes for ${mode} user`, async () => {
