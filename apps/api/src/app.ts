@@ -200,7 +200,7 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
   app.get('/v1/opportunities/:id/contact-methods', ...protectedRoute(async (request, response) => {
     const opportunityId = parse(id, request.params.id);
     const { data, error } = await request.supabase!.from('opportunity_contact_methods')
-      .select('id, health, focus, assessment_reason, last_assessed_at, last_assessed_by, contact_methods(id, method_type, value, label, globally_restricted), contact_method_events(id, event_type, reason, created_at, actor_id)')
+      .select('id, health, focus, assessment_reason, last_assessed_at, last_assessed_by, contact_methods(id, method_type, value, label, globally_restricted)')
       .eq('opportunity_id', opportunityId).order('created_at', { ascending: true });
     if (error) throw error; response.json({ contactMethods: data ?? [] });
   }));

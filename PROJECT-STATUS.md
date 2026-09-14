@@ -1,8 +1,31 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-09-11
+Last updated: 2026-09-14
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.7.md](./CRM-DECISIONS-v1.7.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
+
+## Live acceptance update: 2026-09-14
+
+September 14: fresh-build lead creation is now browser-verified with category, description, and active Sales assignment. Admin failure is traced to missing service_role table grants; narrow permission-repair approval is requested and application is pending. Additional email creation reproduced a contact-health enum mismatch; migration 202609140002 is applied and rollback-only phone/email link and audit-event checks pass. The API contact-method read also requested a nonexistent direct event relationship; the unused embed is removed in the pending repair release. Automated suite: 64 tests passed. Remaining gates below stay open until the corresponding live checks pass.
+
+This section supersedes older all-clear statements below. The approved product scope is unchanged. Implementation milestones are not a substitute for current production acceptance.
+
+| Check | Verified result |
+|---|---|
+| Invalid Supabase URL and hanging authentication | Repaired in PR #39; live authenticated workspace reads now complete. |
+| Nested API 404s | Repaired in PR #40; live Admin route returns the application's 401 for invalid authentication, not Vercel NOT_FOUND. |
+| Lead creation database failure | Migration 202609110001 applied and recorded. Assigned/unassigned creation, identity and owner validation, contact linking, and assigned Sales RLS visibility passed rollback-only SQL tests. Zero rollback-test records remain. |
+| Live lead persistence | One clearly labelled synthetic QA lead was saved with an active Sales assignment and appeared after a fresh page load. No real workbook was imported. |
+| Lead-form error handling | PR #40 includes inline errors, saving protection, safe form reset, and separate handling for a saved lead whose refresh fails. An older open browser tab reproduced the former reset error after successfully saving. Final-build browser submission still needs confirmation. |
+| Admin user management | Still failing with “Unexpected server error.” Its missing server-only key was added to Production and redeployed, but this did not yet resolve the failure. Database privileges and server diagnostics remain to be checked. Do not mark this feature accepted. |
+| Password recovery | Production Site URL and redirect allowlist were verified earlier. Inbox delivery, password change, and fresh sign-in have not been verified in this incident. |
+| Remaining browser checks | Fresh-build lead submission, contact-email addition, Sales UI verification, and Admin user management remain open. Browser automation was blocked by the account usage limit before these checks could finish. |
+
+Release evidence: PR [#39](https://github.com/CharlesSmith999/elevanta-ai/pull/39) and [#40](https://github.com/CharlesSmith999/elevanta-ai/pull/40) are merged. Production source commit: `e6c726092ce2923ad257cc59e3aa0f53ad9cb5a1`. Vercel reports success for [deployment 9zHiPyhNu5BYGgQMb4JEbrLN4qz3](https://vercel.com/charles-team3/elevanta-ai-pipeline/9zHiPyhNu5BYGgQMb4JEbrLN4qz3). Validation: 63 automated tests, API/web type checks, and both production builds passed. Existing bundle-size warning remains.
+
+Milestones 0–3 and v1.6/v1.7 are implemented, with operational acceptance reopened for the items above. Xaviar technical release is recorded as complete, pending Admin and Manager approval. Milestone 5 migration and subsequent automation/SaaS phases remain deferred.
+
+Next action: restore browser access, capture the exact Admin server/database error, repair that verified cause, and complete the remaining live checks. Never infer completion from health checks or deployment success alone.
 
 ## Current position
 
