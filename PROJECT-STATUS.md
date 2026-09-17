@@ -1,8 +1,22 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-09-14
+Last updated: 2026-09-17
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.7.md](./CRM-DECISIONS-v1.7.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
+
+## Live acceptance update: 2026-09-17
+
+The production Admin user-management incident is resolved. Migration `202609150001_admin_service_role_grants.sql` was applied to Supabase project `jayxyikgefnzitxcbdov` and recorded in `supabase_migrations.schema_migrations`. It grants only the server-side `service_role` privileges required for profiles, assignment lookup, and audit-event insertion. It does not grant access to `anon` or `authenticated`, disable RLS, or import lead data.
+
+Production browser acceptance passed with the existing Admin account: User management loaded all six workspace accounts without the former HTTP 500; a clearly labelled synthetic QA lead was created with category, description, email, and active Sales assignment; a second email was added and remained present after a fresh remote load; and the assigned Sales Agent could see the lead and both contact methods, update method health, log activity, change Sales lifecycle, and set SQL while MQL remained unavailable to Sales. The asynchronous contact-method load was explicitly allowed to finish before acceptance, avoiding a false missing-data result.
+
+The previously open fresh-build lead submission, contact-email addition, Sales UI, and Admin user-management checks are closed. No real workbook data was imported. Password-reset inbox delivery and the final password-change step remain a human-operated acceptance check because they require control of the recipient inbox and password entry. Xaviar still requires one Admin and one Manager approval before Milestone 5.
+
+## Live acceptance update: 2026-09-15
+
+September 15: the Admin endpoint was rechecked with the provided Admin account. Production `/api/health` returns HTTP 200, unauthenticated `/api/v1/admin/users` returns the application's HTTP 401 instead of Vercel 404, `/api/v1/me` returns role `admin`, and `/api/v1/workspace-members` returns six users. Authenticated `/api/v1/admin/users` still returns HTTP 500 on the current production deployment, matching the September 14 database-grant diagnosis.
+
+Pending repair release: migration `202609150001_admin_service_role_grants.sql` grants only the service-role table privileges used by Admin user management: public schema usage, profile select/insert/update, assignment select, and audit-event insert. The API error handler now preserves safe Supabase/Auth error messages instead of collapsing non-Error objects into `Unexpected server error`. Local validation passed after the repair: API/web TypeScript checks, 57 domain/permission/privacy/Xaviar/lead-workflow tests, and production build. This still requires Supabase migration application and production deployment before Admin user management can be accepted.
 
 ## Live acceptance update: 2026-09-14
 
@@ -16,22 +30,22 @@ This section supersedes older all-clear statements below. The approved product s
 | Nested API 404s | Repaired in PR #40; live Admin route returns the application's 401 for invalid authentication, not Vercel NOT_FOUND. |
 | Lead creation database failure | Migration 202609110001 applied and recorded. Assigned/unassigned creation, identity and owner validation, contact linking, and assigned Sales RLS visibility passed rollback-only SQL tests. Zero rollback-test records remain. |
 | Live lead persistence | One clearly labelled synthetic QA lead was saved with an active Sales assignment and appeared after a fresh page load. No real workbook was imported. |
-| Lead-form error handling | PR #40 includes inline errors, saving protection, safe form reset, and separate handling for a saved lead whose refresh fails. An older open browser tab reproduced the former reset error after successfully saving. Final-build browser submission still needs confirmation. |
-| Admin user management | Still failing with “Unexpected server error.” Its missing server-only key was added to Production and redeployed, but this did not yet resolve the failure. Database privileges and server diagnostics remain to be checked. Do not mark this feature accepted. |
+| Lead-form error handling | PR #40 includes inline errors, saving protection, safe form reset, and separate handling for a saved lead whose refresh fails. Final-build browser submission passed on September 17. |
+| Admin user management | Resolved on September 17 by migration `202609150001`; the production directory loads six accounts without the former HTTP 500. |
 | Password recovery | Production Site URL and redirect allowlist were verified earlier. Inbox delivery, password change, and fresh sign-in have not been verified in this incident. |
-| Remaining browser checks | Fresh-build lead submission, contact-email addition, Sales UI verification, and Admin user management remain open. Browser automation was blocked by the account usage limit before these checks could finish. |
+| Remaining browser checks | Fresh-build lead submission, contact-email addition, Sales UI verification, and Admin user management passed on September 17. |
 
 Release evidence: PR [#39](https://github.com/CharlesSmith999/elevanta-ai/pull/39) and [#40](https://github.com/CharlesSmith999/elevanta-ai/pull/40) are merged. Production source commit: `e6c726092ce2923ad257cc59e3aa0f53ad9cb5a1`. Vercel reports success for [deployment 9zHiPyhNu5BYGgQMb4JEbrLN4qz3](https://vercel.com/charles-team3/elevanta-ai-pipeline/9zHiPyhNu5BYGgQMb4JEbrLN4qz3). Validation: 63 automated tests, API/web type checks, and both production builds passed. Existing bundle-size warning remains.
 
 Milestones 0–3 and v1.6/v1.7 are implemented, with operational acceptance reopened for the items above. Xaviar technical release is recorded as complete, pending Admin and Manager approval. Milestone 5 migration and subsequent automation/SaaS phases remain deferred.
 
-Next action: restore browser access, capture the exact Admin server/database error, repair that verified cause, and complete the remaining live checks. Never infer completion from health checks or deployment success alone.
+Next action: obtain one Admin and one Manager approval for Xaviar. Password-reset inbox delivery remains a separate human-operated acceptance check. Real-data migration remains deferred to Milestone 5.
 
 ## Current position
 
-Milestones 1–3 and refinements v1.6/v1.7 have been implemented and released. However, production operational acceptance is reopened for the connection incident below. Historical release records are not evidence that the current deployment can load or save leads. Xaviar is technically released with Admin and Manager approval pending. Real lead-data migration remains deferred to Milestone 5.
+Milestones 1–3 and refinements v1.6/v1.7 have been implemented, released, and operationally reaccepted after the September connection incident. Production now loads and saves leads, additional contact methods persist, assigned Sales users receive the correct working view, and Admin user management loads successfully. Xaviar is technically released with Admin and Manager approval pending. Real lead-data migration remains deferred to Milestone 5.
 
-Current priority: [Production connection recovery](./docs/CONNECTION-RECOVERY-2026-09-10.md). On September 10 the live API reproduced an invalid Supabase URL, and code inspection found that successful authentication never continued into protected route handlers. A disappearing error toast previously concealed the unresolved failure. Do not report this incident complete until authenticated read/write checks pass on the production domain.
+The September connection incident is documented in [Production connection recovery](./docs/CONNECTION-RECOVERY-2026-09-10.md). Its authenticated read/write, nested-route, lead-creation, contact-method, and Admin-directory acceptance checks are now closed by the September 17 verification above.
 
 September 11 verification: PR [#39](https://github.com/CharlesSmith999/elevanta-ai/pull/39) is merged. Corrected Supabase configuration and authentication continuation now allow the production workspace to load saved leads and actual users. Additional live tests found nested-route 404s and a database enum mismatch preventing lead creation. The second repair includes a single explicitly routed API entry point, migration `202609110001`, inline form errors, and duplicate-submission protection. Local validation passed all 63 automated tests, both application type checks, and both production builds. Live end-to-end acceptance remains open until the second repair is deployed and verified; earlier milestone completion rows below describe implementation history, not a current all-clear.
 
