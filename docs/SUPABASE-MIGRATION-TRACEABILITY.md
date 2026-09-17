@@ -1,12 +1,12 @@
 # Supabase Migration Traceability
 
-Status: Reconciled through v1.7 on 2026-08-28
+Status: Reconciled through the Admin service-role repair on 2026-09-17
 
 Project: `jayxyikgefnzitxcbdov`
 
 ## Result
 
-The production Supabase project has a canonical `supabase_migrations.schema_migrations` ledger containing all 14 migrations released through lead details and reporting v1.7.
+The production Supabase project has a canonical `supabase_migrations.schema_migrations` ledger containing all 17 migrations released through the Admin service-role repair.
 
 Before the ledger was created, each migration was checked against the live schema. That verification found one material mismatch: migration `202607290005_dashboard_completion_events.sql` had not completed because its loss-reason validation contained an invalid one-argument `nullif` call. The source SQL was corrected, the migration was applied, and all 10 migration-effect checks passed before any version was recorded.
 
@@ -30,6 +30,9 @@ No lead records were imported, removed, or activated during this reconciliation.
 | `202608230002` | `xaviar_lead_workflow_v11` |
 | `202608230003` | `status_guard_v16` |
 | `202608250001` | `lead_details_reporting_v17` |
+| `202609110001` | `lead_status_type_repair` |
+| `202609140002` | `contact_method_type_repair` |
+| `202609150001` | `admin_service_role_grants` |
 
 ## 2026-08-23 lead workflow verification
 
@@ -38,6 +41,10 @@ The three v1.6 migrations were applied in filename order using the approved Supa
 ## 2026-08-25 v1.7 verification
 
 `202608250001_lead_details_reporting_v17.sql` is applied and recorded in the canonical migration ledger. Verification confirmed the controlled lead-category column, reporter-role evidence, scoped create/edit routines, type-safe contact-method entry, whole-lead reporting, and the rule that only three distinct Sales Agent reports trigger Admin review. No real lead records were imported, removed, or activated.
+
+## 2026-09-17 production repair verification
+
+Migrations `202609110001_lead_status_type_repair`, `202609140002_contact_method_type_repair`, and `202609150001_admin_service_role_grants` are applied and recorded in the canonical ledger. Live acceptance confirmed persistent lead creation, persistent additional email methods, Sales visibility of both methods, and successful Admin user-directory loading. The service-role migration is intentionally narrow and does not change end-user grants or RLS policies. No real workbook data was imported.
 
 ## Required process for future migrations
 
