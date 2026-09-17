@@ -83,6 +83,11 @@ function serviceClient() {
 
 function parse(schema: z.ZodTypeAny, value: unknown) { return schema.parse(value); }
 function asyncRoute(handler: (request: AuthenticatedRequest, response: Response, next: NextFunction) => Promise<void>) { return (request: AuthenticatedRequest, response: Response, next: NextFunction) => { handler(request, response, next).catch(next); }; }
+function errorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error && 'message' in error && typeof error.message === 'string') return error.message;
+  return 'Unexpected server error.';
+}
 
 async function persistXaviarReport(subject: XaviarProfile, report: ReturnType<typeof buildApiXaviarReport>) {
   const admin = serviceClient();
@@ -413,7 +418,7 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
   app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
     if (error instanceof ConfigurationError) { response.status(503).json({ message: error.message }); return; }
     if (error instanceof ZodError) { response.status(400).json({ message: 'Please correct the submitted fields.', issues: error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message })) }); return; }
-    const message = error instanceof Error ? error.message : 'Unexpected server error.';
+    const message = errorMessage(error);
     const status = /not permitted|only admin|only the current|only admin and marketing/i.test(message) ? 403 : /not found/i.test(message) ? 404 : /requires|cannot|invalid|must|paused|duplicate/i.test(message) ? 422 : 500;
     response.status(status).json({ message });
   });
