@@ -1,8 +1,8 @@
 # Elevanta AI — Lead Workflow Specification v1.0
 
-Status: v1.6 released on 2026-08-23 and v1.7 extension released on 2026-08-28 with safe sample data; real-data migration remains Milestone 5 only
+Status: v1.6 and v1.7 released; v1.8 inbound research extension approved for safe-fixture implementation; live Gmail activation remains gated
 
-Decision authority: [CRM-DECISIONS-v1.7.md](./CRM-DECISIONS-v1.7.md), extending [CRM-DECISIONS-v1.6.md](./CRM-DECISIONS-v1.6.md)
+Decision authority: [CRM-DECISIONS-v1.8.md](./CRM-DECISIONS-v1.8.md), extending [CRM-DECISIONS-v1.7.md](./CRM-DECISIONS-v1.7.md)
 
 This is the implementation-facing source of truth for lead creation, immediate assignment, Sales working, contact-quality management, activity logging, follow-ups, reassignment, role visibility, Admin review, and Xaviar evidence. It uses safe sample data until the separately controlled Milestone 5 migration.
 
@@ -40,10 +40,24 @@ The interface must separate:
 | Restore Do Not Contact | No | No | In-scope manager only | In-scope manager only | Yes |
 | Submit incorrect-lead flag | Own/visible lead, once | Current assignment, once; counts toward threshold | Visible lead, once; does not count | Visible lead, once; does not count | Visible lead, once; does not count |
 | Decide three-agent incorrect review | No | No | No | No | Yes |
+| View inbound research queue | Own items | No | Marketing-team scope | No | Yes |
+| Research masked lead | Own items | No | Marketing-team scope | No | Yes |
+| Publish research lead to Sales | Own ready items | No | Marketing-team scope | No | Yes |
 
 All Manager and Admin corrections create an audit event. Department scope and one-direct-manager rules remain unchanged.
 
 ## 3. End-to-end lead flow
+
+### 3.0 Gmail research intake
+
+1. A permitted Gmail message is captured once using its provider message ID.
+2. The parser stores the original masked fields, source metadata, received time, parser version, and a safe processing result in the Marketing-only Lead Research Queue.
+3. Marketing researches the item and adds discovered phone/email methods, links, and evidence notes without overwriting the original payload.
+4. Research states are `New`, `Researching`, `Found`, `Not Found`, `Connected`, `Ready for Sales`, `Sent to Sales`, and `Rejected`.
+5. `Found`, `Not Found`, and `Connected` are research outcomes only. They never update the opportunity lifecycle.
+6. `Ready for Sales` requires a name plus at least one usable, unmasked, valid phone number or email address.
+7. Marketing selects an active Sales Agent and explicitly publishes the item. The transaction creates or links the Contact, creates one Opportunity, records provenance, creates the assignment, and marks the research item `Sent to Sales`.
+8. Retrying message capture or publication is idempotent and cannot create a second research item or Opportunity.
 
 ### 3.1 Marketing creates and assigns
 
@@ -144,14 +158,17 @@ If all useful methods fail, or the user has other clear evidence, any authorized
 
 ### 4.2 Marketing Agent / Lead Generator
 
-1. **Lead Overview:** lead identity, marketing owner, source, MQL, assigned Sales owner, Sales Engagement state, latest Sales activity summary, and next follow-up summary.
-2. **Contact Quality:** separate Active, Secondary, and Removed groups. Removed rows show health reason, Sales Agent, assignment, and timestamp.
-3. **Sales Progress:** read-only first-work, Connected, SQL, stage, follow-up, and activity history. Marketing does not log Sales activities.
-4. **Reassign Lead drawer:** new Sales owner, reason, thread visibility, and per-method restoration decisions.
-5. **Role actions:** Marketing may set/correct MQL, restore eligible methods, and reassign. It cannot set SQL, Sales lifecycle outcomes, log Sales work, or restore DNC.
+1. **Lead Research Queue:** masked inbound leads, research state, completeness, duplicate warning, owner, and next action.
+2. **Research Workspace:** immutable original payload plus editable discovered contact methods, evidence links, notes, category, and Sales handoff controls.
+3. **Lead Overview:** lead identity, marketing owner, source, MQL, assigned Sales owner, Sales Engagement state, latest Sales activity summary, and next follow-up summary.
+4. **Contact Quality:** separate Active, Secondary, and Removed groups. Removed rows show health reason, Sales Agent, assignment, and timestamp.
+5. **Sales Progress:** read-only first-work, Connected, SQL, stage, follow-up, and activity history. Marketing does not log Sales activities.
+6. **Reassign Lead drawer:** new Sales owner, reason, thread visibility, and per-method restoration decisions.
+7. **Role actions:** Marketing may research, publish a ready item, set/correct MQL, restore eligible methods, and reassign. It cannot set SQL, Sales lifecycle outcomes, log Sales work, or restore DNC.
 
 ### 4.3 Marketing Manager
 
+- Team Lead Research Queue, research aging, found rate, publication readiness, duplicate candidates, and parser failures.
 - Same complete contact-quality and downstream Sales Progress visibility for marketing-team-owned leads.
 - Team queue for high removal rates, repeated wrong-person results, missing active methods, restoration outcomes, and assigned-but-unworked leads.
 - May restore eligible methods and reassign within approved scope.
@@ -164,6 +181,7 @@ If all useful methods fail, or the user has other clear evidence, any authorized
 
 ### 4.5 Admin
 
+- Workspace-wide inbound connection health, parser failures, retries, research audit, and publication provenance.
 - Workspace-wide contact-quality audit and restoration history.
 - DNC restoration control with reason and audit event.
 - Three-agent Incorrect Review queue.
@@ -215,6 +233,17 @@ contact_method_events
 assignment_contact_method_decisions
   id, assignment_id, contact_method_id, decision, prior_focus_state,
   resulting_focus_state, decided_by, reason, created_at
+
+inbound_messages
+  id, workspace_id, provider, provider_message_id, provider_thread_id,
+  received_at, sender, subject, payload_hash, parser_version,
+  processing_state, failure_code, created_at, updated_at
+
+inbound_lead_candidates
+  id, workspace_id, inbound_message_id, marketing_owner_id, research_state,
+  original_payload, name, address, category, credits, description, details,
+  discovered_methods, evidence_links, research_notes, duplicate_state,
+  published_opportunity_id, published_at, created_at, updated_at
 ```
 
 ### Existing-table extensions
@@ -247,6 +276,12 @@ POST   /v1/opportunities/:id/activities/log
 GET    /v1/opportunities/:id/activity-history
 POST   /v1/opportunities/:id/reassignments/preview
 POST   /v1/opportunities/:id/reassignments/commit
+GET    /v1/inbound/research-leads
+POST   /v1/inbound/research-leads
+GET    /v1/inbound/research-leads/:id
+PATCH  /v1/inbound/research-leads/:id
+POST   /v1/inbound/research-leads/:id/publish
+GET    /v1/admin/inbound-health
 ```
 
 All mutations require authentication, role authorization, schema validation, idempotency, current-assignment validation, and audit creation. Activity plus follow-up and reassignment plus contact decisions are transactional operations.
@@ -304,6 +339,14 @@ Xaviar must:
 18. Imported historical events do not affect new-behavior coaching without approval.
 19. Time-to-first-work uses the correct ownership interval and timezone.
 20. Sales Engagement is derived once from the earliest Connected or SQL event and remains explainable after reassignment.
+21. Sales roles cannot list, read, update, or infer inbound research records.
+22. Replaying one Gmail message creates one research record.
+23. Concurrent publication attempts create exactly one Opportunity.
+24. A masked or invalid contact method cannot satisfy Sales readiness.
+25. Research outcomes never mutate the CRM lifecycle.
+26. Publishing requires an active Sales Agent in the same workspace and succeeds atomically.
+27. Email content cannot change permissions, execute instructions, or alter Xaviar policy.
+28. OAuth credentials and raw connector failures never reach the browser or audit payload.
 
 ## 10. Development sequence
 
@@ -316,6 +359,9 @@ Xaviar must:
 7. Implement Manager and Admin oversight screens.
 8. Extend Xaviar event stream, calculations, explanations, and tests.
 9. Run permission, edge-case, responsive, dark/light, API, database, and regression tests.
-10. Release through the existing Git-connected Vercel deployment only after approval.
+10. Build the Lead Research Queue and ingestion contract with synthetic email fixtures.
+11. Review the existing Apps Script and reconcile its sender filters, parsing rules, retries, and archive behavior.
+12. Activate read-only Gmail intake only after Xaviar Admin/Manager approval and live-ingestion acceptance.
+13. Release through the existing Git-connected Vercel deployment only after approval.
 
 Real Excel data remains out of scope until Milestone 5.

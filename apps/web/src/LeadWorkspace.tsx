@@ -6,7 +6,7 @@ import type { Session } from '@supabase/supabase-js';
 import { addRemoteContactMethod, assessRemoteContactMethod, loadRemoteActivityHistory, loadRemoteContactMethods, logRemoteSalesActivity, restoreRemoteContactMethod } from './api';
 
 const healthOptions: ContactHealth[] = ['verified', 'incorrect', 'wrong_person', 'reception_gatekeeper', 'do_not_contact'];
-const firstMethods = (lead: Lead): LeadContactMethod[] => [
+const firstMethods = (lead: Lead): LeadContactMethod[] => lead.discoveredContactMethods ? lead.discoveredContactMethods.map((method, index) => ({ ...method, id: `${lead.id}-method-${index}`, health: 'unverified', focus: 'active' })) : [
   ...(lead.phone ? [{ id: `${lead.id}-phone`, type: 'phone' as const, value: lead.phone, health: 'unverified' as const, focus: 'active' as const }] : []),
   ...(lead.email ? [{ id: `${lead.id}-email`, type: 'email' as const, value: lead.email, health: 'unverified' as const, focus: 'active' as const }] : []),
 ];

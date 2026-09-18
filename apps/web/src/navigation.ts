@@ -5,6 +5,7 @@ export type NavigationItem = { label: string; page: string };
 const admin: NavigationItem[] = [
   { label: 'Command Center', page: 'Dashboard' },
   { label: 'Leads', page: 'Lead inbox' },
+  { label: 'Lead research', page: 'Lead research' },
   { label: 'Follow-ups', page: 'Follow-ups' },
   { label: 'Assignments', page: 'Assignments' },
   { label: 'Reports', page: 'Reports' },
@@ -19,6 +20,7 @@ const admin: NavigationItem[] = [
 const marketingManager: NavigationItem[] = [
   { label: 'Command Center', page: 'Dashboard' },
   { label: 'Leads', page: 'Lead inbox' },
+  { label: 'Lead research', page: 'Lead research' },
   { label: 'Assignments', page: 'Assignments' },
   { label: 'Reports', page: 'Reports' },
   { label: 'Benchmark Board', page: 'Benchmark Board' },
@@ -42,6 +44,7 @@ const salesManager: NavigationItem[] = [
 const marketingAgent: NavigationItem[] = [
   { label: 'Workspace', page: 'Dashboard' },
   { label: 'Leads', page: 'Lead inbox' },
+  { label: 'Lead research', page: 'Lead research' },
   { label: 'Follow-ups', page: 'Follow-ups' },
   { label: 'Reports', page: 'Reports' },
   { label: 'My standing', page: 'Leaderboard' },

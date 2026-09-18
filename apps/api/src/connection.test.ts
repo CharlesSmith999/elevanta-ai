@@ -7,7 +7,7 @@ import { supabaseConfig, ConfigurationError } from './config.js';
 import { normalizeCrmPath } from './routing.js';
 
 test('deployment rewrite preserves nested CRM routes and query filters', () => {
-  for (const path of ['health', 'ready', 'v1/me', 'v1/admin/users', 'v1/opportunities/example/contact-methods', 'v1/opportunities/example/contact-methods/method/restore']) {
+  for (const path of ['health', 'ready', 'v1/me', 'v1/admin/users', 'v1/inbound/research-leads', 'v1/inbound/research-leads/example/publish', 'v1/opportunities/example/contact-methods', 'v1/opportunities/example/contact-methods/method/restore']) {
     assert.equal(normalizeCrmPath(`/api/${path}`), `/${path}`);
     assert.equal(normalizeCrmPath(`/api?__crm_path=${encodeURIComponent(path)}`), `/${path}`);
     assert.equal(normalizeCrmPath(`https://example.com/api/${path}?source=Bark%20Paid`), `/${path}?source=Bark+Paid`);
@@ -40,6 +40,28 @@ test('contact methods endpoint uses only the existing contact-method relationshi
     assert.equal(response.status, 200);
     assert.ok(selections.some((selection) => selection.includes('contact_methods(id, method_type, value')));
     assert.ok(selections.every((selection) => !selection.includes('contact_method_events(')), 'Events have no direct foreign key to opportunity_contact_methods');
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+test('Sales users cannot read, edit, publish, or inspect health for masked research leads', async () => {
+  const server = createApp(() => fakeClient('active')).listen(0, '127.0.0.1');
+  try {
+    await new Promise<void>((resolve) => server.once('listening', resolve));
+    const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const headers = { Authorization: 'Bearer synthetic-test-token', 'Content-Type': 'application/json' };
+    const routes: Array<[string, RequestInit]> = [
+      ['/v1/inbound/research-leads', { headers }],
+      [`/v1/inbound/research-leads/${profile.id}`, { method: 'PATCH', headers, body: '{}' }],
+      [`/v1/inbound/research-leads/${profile.id}/publish`, { method: 'POST', headers, body: '{}' }],
+      ['/v1/admin/inbound-health', { headers }],
+    ];
+    for (const [path, options] of routes) {
+      const response = await fetch(`${base}${path}`, { ...options, signal: AbortSignal.timeout(2000) });
+      assert.equal(response.status, 403, path);
+    }
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

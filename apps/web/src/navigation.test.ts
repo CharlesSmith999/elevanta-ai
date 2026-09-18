@@ -23,11 +23,16 @@ test('admin-only navigation never leaks into agent roles', () => {
   }
   assert.equal(canNavigateTo(viewer('shariq'), 'User management'), true);
   assert.equal(canNavigateTo(viewer('shariq'), 'Review queue'), true);
+  assert.equal(canNavigateTo(viewer('shariq'), 'Lead research'), true);
+  assert.equal(canNavigateTo(viewer('muzammil'), 'Lead research'), true);
+  assert.equal(canNavigateTo(viewer('owais'), 'Lead research'), false);
 });
 
 test('manager navigation follows the approved department workflow', () => {
   assert.equal(canNavigateTo(marketingManager, 'Follow-ups'), false);
   assert.equal(canNavigateTo(marketingManager, 'Assignments'), true);
+  assert.equal(canNavigateTo(marketingManager, 'Lead research'), true);
   assert.equal(canNavigateTo(viewer('ali'), 'Follow-ups'), true);
   assert.equal(canNavigateTo(viewer('ali'), 'Assignments'), true);
+  assert.equal(canNavigateTo(viewer('ali'), 'Lead research'), false);
 });

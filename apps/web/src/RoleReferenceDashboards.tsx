@@ -2,7 +2,7 @@ import {
   IconActivityHeartbeat, IconAlertTriangle, IconArrowUpRight, IconBriefcase,
   IconBulb, IconCalendar, IconChartBar, IconChecklist, IconCircleCheck, IconClock,
   IconCurrencyDollar, IconFilter, IconHome, IconPlus, IconReportAnalytics,
-  IconRobot, IconSparkles, IconTarget, IconTrendingUp, IconTrophy, IconUserCircle,
+  IconRobot, IconSearch, IconSparkles, IconTarget, IconTrendingUp, IconTrophy, IconUserCircle,
   IconUsers,
 } from '@tabler/icons-react';
 import {
@@ -57,7 +57,7 @@ function roleLabel(kind: RoleReferenceKind) {
 
 export function RoleReferenceSidebar({ kind, viewer, activePage, onNavigate, onReset, onSignOut }: { kind: RoleReferenceKind; viewer: User; activePage: string; onNavigate: (page: string) => void; onReset: () => void; onSignOut?: () => void }) {
   type NavItem = [string, typeof IconHome, string];
-  const icons: Record<string, typeof IconHome> = { Dashboard: kind === 'sales-manager' ? IconBriefcase : IconHome, 'Lead inbox': kind === 'sales-manager' ? IconBriefcase : IconUsers, 'Follow-ups': IconChecklist, Assignments: kind === 'sales-manager' ? IconUsers : IconTarget, Reports: IconReportAnalytics, 'Benchmark Board': IconChartBar, Leaderboard: IconTrophy, 'Data quality': IconCircleCheck, Xaviar: IconRobot };
+  const icons: Record<string, typeof IconHome> = { Dashboard: kind === 'sales-manager' ? IconBriefcase : IconHome, 'Lead inbox': kind === 'sales-manager' ? IconBriefcase : IconUsers, 'Lead research': IconSearch, 'Follow-ups': IconChecklist, Assignments: kind === 'sales-manager' ? IconUsers : IconTarget, Reports: IconReportAnalytics, 'Benchmark Board': IconChartBar, Leaderboard: IconTrophy, 'Data quality': IconCircleCheck, Xaviar: IconRobot };
   const nav: NavItem[] = navigationFor(viewer).map((item) => [item.label, icons[item.page] ?? IconHome, item.page]);
   const [title, department] = roleLabel(kind);
   return <div className="admin-reference-sidebar role-reference-sidebar"><div className="admin-reference-brand"><IconSparkles className="admin-reference-spark" size={28} stroke={2.1} /><span>Elevanta <b>AI</b></span></div><nav aria-label={`${title} navigation`}>{nav.map(([label, Icon, page]) => <button key={label} className={page === activePage ? 'admin-reference-nav active' : 'admin-reference-nav'} aria-current={page === activePage ? 'page' : undefined} onClick={() => onNavigate(page)}><Icon size={20} stroke={1.8} /><span>{label}</span></button>)}</nav><div className="admin-reference-sidebar-bottom"><div className="admin-reference-profile"><span>{initials(viewer.name)}</span><div><b>{viewer.name}</b><small>{title}<br />{department}</small></div></div><div className="sidebar-session-actions"><button type="button" onClick={onReset}>Reset test data</button>{onSignOut && <button type="button" onClick={onSignOut}>Sign out</button>}</div></div></div>;

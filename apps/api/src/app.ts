@@ -11,6 +11,8 @@ const sourceOptions = ['Bark Paid', 'Bark Stalk', 'Thumbtack', 'SEO', 'Social Me
 const leadCategories = ['app', 'game', 'seo', 'smm', 'web', 'not_available'] as const;
 const dashboardRoles = z.enum(['agent', 'manager', 'admin', 'marketer']);
 const dashboardPeriods = z.enum(['daily', 'weekly', 'monthly', 'yearly', 'lifetime', 'custom']);
+const researchState = z.enum(['new','researching','found','not_found','connected','ready_for_sales','sent_to_sales','rejected']);
+const duplicateState = z.enum(['clear','possible','confirmed']);
 
 const id = z.string().uuid();
 const newLead = z.object({ name: z.string().trim().min(1).max(160), phone: z.string().trim().max(60).optional(), email: z.string().trim().email().max(254).optional(), source: z.enum(sourceOptions).default('Other'), category: z.enum(leadCategories).default('not_available'), marketingOwnerId: id.optional(), salesOwnerId: id.optional(), description: z.string().trim().max(4000).optional() }).refine((value) => Boolean(value.phone || value.email), { message: 'A lead needs a phone number or email address.' });
@@ -18,6 +20,26 @@ const leadDetailsUpdate = z.object({ name: z.string().trim().min(1).max(160), so
 const lostReasonOptions = ['Price or budget', 'No response', 'Timing or priority', 'Competitor selected', 'Not a fit', 'Proposal declined', 'Other'] as const;
 const statusUpdate = z.object({ status: z.enum(['assigned', 'contacted', 'connected', 'follow_up_required', 'qualified', 'proposal_sent', 'won', 'lost', 'not_interested', 'incorrect', 'duplicate', 'do_not_contact']), qualification: z.enum(['mql', 'sql', 'not_available']).optional(), totalProjectCost: z.number().nonnegative().optional(), upfrontPaymentAmount: z.number().nonnegative().optional(), lostReason: z.enum(lostReasonOptions).optional() });
 const assignment = z.object({ assignedTo: id, visibility: z.enum(['full_context', 'fresh_start']), reason: z.string().trim().min(1).max(1000) });
+const researchMethod = z.object({ type: z.enum(['phone','email']), value: z.string().trim().min(1).max(254), label: z.string().trim().max(80).optional() }).superRefine((method, ctx) => {
+  if (/\*/.test(method.value)) ctx.addIssue({ code: 'custom', path: ['value'], message: 'Masked contact details cannot be sent to Sales.' });
+  if (method.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(method.value)) ctx.addIssue({ code: 'custom', path: ['value'], message: 'Enter a valid email address.' });
+  if (method.type === 'phone') {
+    const digits = method.value.replace(/\D/g, '');
+    if (!/^[+\d\s().-]+$/.test(method.value) || digits.length < 7 || digits.length > 15) ctx.addIssue({ code: 'custom', path: ['value'], message: 'Enter a valid phone number with 7 to 15 digits.' });
+  }
+});
+const inboundCandidate = z.object({ providerMessageId: z.string().trim().min(1).max(255), providerThreadId: z.string().trim().max(255).optional(), receivedAt: z.string().datetime({ offset: true }), name: z.string().trim().min(1).max(160), maskedPhone: z.string().trim().max(80).optional(), maskedEmail: z.string().trim().max(254).optional(), address: z.string().trim().max(500).optional(), source: z.string().trim().min(1).max(100).default('Bark Stalk'), category: z.enum(leadCategories).default('not_available'), credits: z.number().int().nonnegative().optional(), description: z.string().trim().max(4000).optional(), details: z.string().trim().max(12000).optional(), marketingOwnerId: id, originalPayload: z.record(z.unknown()).default({}) });
+const inboundCandidateUpdate = z.object({ state: researchState, name: z.string().trim().min(1).max(160), category: z.enum(leadCategories), methods: z.array(researchMethod).max(20), evidenceLinks: z.array(z.string().trim().url().max(2048)).max(20), researchNotes: z.string().trim().max(8000).optional(), duplicateState }).superRefine((value, ctx) => {
+  const unique = new Set(value.methods.map((method) => `${method.type}:${method.type === 'phone' ? method.value.replace(/\D/g, '') : method.value.trim().toLowerCase()}`));
+  if (value.state === 'sent_to_sales') ctx.addIssue({ code: 'custom', path: ['state'], message: 'Use Send to Sales to publish this lead.' });
+  for (const link of value.evidenceLinks) {
+    const url = new URL(link);
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) ctx.addIssue({ code: 'custom', path: ['evidenceLinks'], message: 'Use HTTP or HTTPS links without credentials.' });
+  }
+  if (unique.size !== value.methods.length) ctx.addIssue({ code: 'custom', path: ['methods'], message: 'Duplicate contact methods are not allowed.' });
+  if (value.state === 'ready_for_sales' && (value.duplicateState === 'confirmed' || !value.methods.length)) ctx.addIssue({ code: 'custom', path: ['state'], message: 'Ready for Sales requires a usable contact method and no confirmed duplicate.' });
+});
+const inboundCandidatePublish = z.object({ salesOwnerId: id });
 const note = z.object({ body: z.string().trim().min(1).max(5000) });
 const followUp = z.object({ dueAt: z.string().datetime({ offset: true }), actionType: z.enum(['Call', 'Email', 'SMS', 'Task']) });
 const contactMethodType = z.enum(['phone', 'email']);
@@ -185,6 +207,44 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     let query = request.supabase!.from('contacts').select('*').order('updated_at', { ascending: false });
     if (search) query = query.or(`name.ilike.%${search}%,normalized_email.ilike.%${search}%,normalized_phone.ilike.%${search}%`);
     const { data, error } = await query; if (error) throw error; response.json({ contacts: data });
+  }));
+  app.get('/v1/inbound/research-leads', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role === 'sales_agent' || (request.profile!.role === 'manager' && request.profile!.department !== 'marketing')) { response.status(403).json({ message: 'Lead Research is available only to Marketing and Admin.' }); return; }
+    const { data, error } = await request.supabase!.from('inbound_lead_candidates')
+      .select('*, inbound_messages(provider_message_id, provider_thread_id, received_at)')
+      .order('created_at', { ascending: false });
+    if (error) throw error; response.json({ researchLeads: data ?? [] });
+  }));
+  app.post('/v1/inbound/research-leads', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'admin' && request.profile!.role !== 'marketer') { response.status(403).json({ message: 'Only Admin and Marketing may add research leads.' }); return; }
+    const value = parse(inboundCandidate, request.body);
+    const { data, error } = await request.supabase!.rpc('create_inbound_candidate_v18', {
+      p_provider_message_id: value.providerMessageId, p_provider_thread_id: value.providerThreadId ?? null,
+      p_received_at: value.receivedAt, p_name: value.name, p_masked_phone: value.maskedPhone ?? null,
+      p_masked_email: value.maskedEmail ?? null, p_address: value.address ?? null, p_source: value.source,
+      p_lead_category: value.category, p_credits: value.credits ?? null, p_description: value.description ?? null,
+      p_details: value.details ?? null, p_marketing_owner_id: value.marketingOwnerId, p_original_payload: value.originalPayload,
+    });
+    if (error) throw error; response.status(201).json({ researchLeadId: data });
+  }));
+  app.patch('/v1/inbound/research-leads/:id', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role === 'sales_agent' || (request.profile!.role === 'manager' && request.profile!.department !== 'marketing')) { response.status(403).json({ message: 'Lead Research is available only to Marketing and Admin.' }); return; }
+    const candidateId = parse(id, request.params.id); const value = parse(inboundCandidateUpdate, request.body);
+    const { error } = await request.supabase!.rpc('update_inbound_candidate_v18', { p_candidate_id: candidateId, p_research_state: value.state, p_name: value.name, p_lead_category: value.category, p_discovered_methods: value.methods, p_evidence_links: value.evidenceLinks, p_research_notes: value.researchNotes ?? null, p_duplicate_state: value.duplicateState });
+    if (error) throw error; response.status(204).send();
+  }));
+  app.post('/v1/inbound/research-leads/:id/publish', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role === 'sales_agent' || (request.profile!.role === 'manager' && request.profile!.department !== 'marketing')) { response.status(403).json({ message: 'Lead Research is available only to Marketing and Admin.' }); return; }
+    const candidateId = parse(id, request.params.id); const value = parse(inboundCandidatePublish, request.body);
+    const { data, error } = await request.supabase!.rpc('publish_inbound_candidate_v18', { p_candidate_id: candidateId, p_sales_owner_id: value.salesOwnerId });
+    if (error) throw error; response.status(201).json({ opportunityId: data });
+  }));
+  app.get('/v1/admin/inbound-health', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'admin') { response.status(403).json({ message: 'Only Admin can view inbound connection health.' }); return; }
+    const { data, error } = await request.supabase!.from('inbound_messages').select('processing_state');
+    if (error) throw error;
+    const states = (data ?? []).reduce<Record<string, number>>((counts, row) => ({ ...counts, [row.processing_state]: (counts[row.processing_state] ?? 0) + 1 }), {});
+    response.json({ provider: 'gmail', liveConnection: 'disabled_pending_approval', parserVersion: 'fixture-v1', states });
   }));
   app.get('/v1/opportunities', ...protectedRoute(async (request, response) => {
     const status = typeof request.query.status === 'string' ? request.query.status : undefined;
