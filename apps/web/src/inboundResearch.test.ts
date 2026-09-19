@@ -22,4 +22,6 @@ test('research queue remains hidden from every Sales role', () => {
   assert.equal(canViewResearchLead(users.find((user) => user.id === 'ali')!, lead, scopedUsers), false);
   assert.equal(canViewResearchLead(users.find((user) => user.id === 'shariq')!, lead, scopedUsers), true);
   assert.equal(canViewResearchLead(marketingManager, lead, scopedUsers), true);
+  assert.equal(canViewResearchLead(users.find((user) => user.id === 'yasir')!, lead, []), true);
+  assert.equal(canViewResearchLead({ ...marketingManager, id: 'unrelated-manager' }, lead, []), true);
 });

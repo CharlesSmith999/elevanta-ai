@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { GmailConnection } from './GmailConnection';
 import { IconArrowLeft, IconCircleCheck, IconExternalLink, IconMail, IconPhone, IconSearch, IconSend, IconShieldLock, IconTrash } from '@tabler/icons-react';
 import type { Session } from '@supabase/supabase-js';
 import type { LeadCategory, User } from './domain';
@@ -33,8 +34,8 @@ export function LeadResearchQueue({ viewer, users, session, onPublished, onNotic
     if (saving) return;
     setSaving(true); setError('');
     try {
-      if (session) await updateResearchLead(session, next.id, { state: next.state, name: next.name, category: next.category, methods: next.methods, evidenceLinks: next.evidenceLinks, researchNotes: next.researchNotes, duplicateState: next.duplicateState });
-      setItems((current) => current.map((item) => item.id === next.id ? next : item));
+      if (session) await updateResearchLead(session, next.id, { expectedRevision: next.revision ?? 0, state: next.state, name: next.name, category: next.category, methods: next.methods, evidenceLinks: next.evidenceLinks, researchNotes: next.researchNotes, duplicateState: next.duplicateState });
+      setItems((current) => current.map((item) => item.id === next.id ? { ...next, revision: (next.revision ?? 0) + 1, marketingOwnerId: viewer.role === 'marketer' ? viewer.id : next.marketingOwnerId } : item));
       onNotice('Research progress saved.');
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Research progress could not be saved.'); }
     finally { setSaving(false); }
@@ -46,9 +47,9 @@ export function LeadResearchQueue({ viewer, users, session, onPublished, onNotic
     if (!users.some((user) => user.id === salesOwnerId && user.role === 'sales_agent')) return setError('Choose an active Sales Agent.');
     setSaving(true); setError('');
     try {
-      if (session) await publishResearchLead(session, selected.id, { salesOwnerId });
+      if (session) await publishResearchLead(session, selected.id, { salesOwnerId, expectedRevision: selected.revision ?? 0 });
       setItems((current) => current.map((item) => item.id === selected.id ? { ...item, state: 'sent_to_sales' } : item));
-      await onPublished(selected, salesOwnerId); onNotice('Lead sent to Sales and added to the normal Lead Inbox.');
+      await onPublished({ ...selected, marketingOwnerId: viewer.role === 'marketer' ? viewer.id : selected.marketingOwnerId }, salesOwnerId); onNotice('Lead sent to Sales and added to the normal Lead Inbox.');
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'The lead could not be sent to Sales.'); }
     finally { setSaving(false); }
   }
@@ -58,7 +59,8 @@ export function LeadResearchQueue({ viewer, users, session, onPublished, onNotic
 
   const counts = Object.fromEntries(researchStates.map((state) => [state, items.filter((item) => canViewResearchLead(viewer, item, users) && item.state === state).length]));
   return <section className="research-page">
-    <header className="research-hero"><div><span className="eyebrow">MARKETING / INBOUND RESEARCH</span><h2>Lead Research Queue</h2><p>Research masked Gmail leads here. Only complete, verified leads can be sent to Sales.</p></div><div className="research-connection"><IconMail size={20} /><span><b>Gmail activation pending</b><small>Safe test data only</small></span></div></header>
+    {viewer.role === 'admin' && session && <GmailConnection session={session} />}
+    <header className="research-hero"><div><span className="eyebrow">MARKETING / INBOUND RESEARCH</span><h2>Lead Research Queue</h2><p>Shared Marketing queue. Anyone in Marketing can add details and send a ready lead to Sales. No claim step is required.</p></div><div className="research-connection"><IconMail size={20} /><span><b>Gmail activation pending</b><small>Safe test data only</small></span></div></header>
     <div className="research-metrics"><article><strong>{visible.length}</strong><span>Visible items</span></article><article><strong>{counts.researching ?? 0}</strong><span>Researching</span></article><article><strong>{(counts.found ?? 0) + (counts.connected ?? 0)}</strong><span>Information found</span></article><article><strong>{counts.ready_for_sales ?? 0}</strong><span>Ready for Sales</span></article></div>
     <div className="research-toolbar"><label>Status<select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)}><option value="all">All research states</option>{researchStates.map((state) => <option key={state} value={state}>{researchStateLabels[state]}</option>)}</select></label><span>{visible.length} result{visible.length === 1 ? '' : 's'}</span></div>
     {error && <p className="warning" role="alert">{error}</p>}{loading ? <p className="research-loading">Loading research queue…</p> : <div className="research-list"><div className="research-row research-head"><span>Lead</span><span>Category</span><span>Research state</span><span>Contact readiness</span><span>Received</span></div>{visible.map((lead) => <button key={lead.id} className="research-row" onClick={() => setSelectedId(lead.id)}><span><b>{lead.name}</b><small>{lead.maskedEmail ?? lead.maskedPhone ?? 'Masked contact unavailable'}</small></span><span>{leadCategoryLabels[lead.category]}</span><span><i className={`research-status ${lead.state}`}>{researchStateLabels[lead.state]}</i></span><span className={isReadyForSales(lead) ? 'research-ready' : ''}>{isReadyForSales(lead) ? 'Usable contact found' : 'Research required'}</span><span>{new Date(lead.receivedAt).toLocaleString()}</span></button>)}{!visible.length && <p className="research-loading">No research leads match this view.</p>}</div>}
@@ -68,6 +70,7 @@ export function LeadResearchQueue({ viewer, users, session, onPublished, onNotic
 function ResearchWorkspace({ lead, salesAgents, saving, error, onBack, onSave, onPublish }: { lead: ResearchLead; salesAgents: User[]; saving: boolean; error: string; onBack: () => void; onSave: (lead: ResearchLead) => Promise<void>; onPublish: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
   const [draft, setDraft] = useState(lead); const [methodType, setMethodType] = useState<'phone' | 'email'>('phone'); const [methodValue, setMethodValue] = useState(''); const [evidence, setEvidence] = useState('');
   const published = lead.state === 'sent_to_sales';
+  useEffect(() => { setDraft(lead); }, [lead]);
   const ready = isReadyForSales(draft) && draft.state === 'ready_for_sales' && JSON.stringify(draft) === JSON.stringify(lead);
   const [entryError, setEntryError] = useState('');
   const addMethod = () => { const value = methodValue.trim(); const candidate: ResearchMethod = { type: methodType, value }; if (published) return; if (!validResearchMethod(candidate)) return setEntryError('Enter a valid, unmasked phone number or email.'); if (draft.methods.some((item) => researchMethodKey(item) === researchMethodKey(candidate))) return setEntryError('This contact method is already listed.'); setEntryError(''); setDraft((current) => ({ ...current, methods: [...current.methods, candidate] })); setMethodValue(''); };
