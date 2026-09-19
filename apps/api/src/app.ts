@@ -33,8 +33,12 @@ const inboundCandidateUpdate = z.object({ state: researchState, name: z.string()
   const unique = new Set(value.methods.map((method) => `${method.type}:${method.type === 'phone' ? method.value.replace(/\D/g, '') : method.value.trim().toLowerCase()}`));
   if (value.state === 'sent_to_sales') ctx.addIssue({ code: 'custom', path: ['state'], message: 'Use Send to Sales to publish this lead.' });
   for (const link of value.evidenceLinks) {
-    const url = new URL(link);
-    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) ctx.addIssue({ code: 'custom', path: ['evidenceLinks'], message: 'Use HTTP or HTTPS links without credentials.' });
+    try {
+      const url = new URL(link);
+      if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) ctx.addIssue({ code: 'custom', path: ['evidenceLinks'], message: 'Use HTTP or HTTPS links without credentials.' });
+    } catch {
+      ctx.addIssue({ code: 'custom', path: ['evidenceLinks'], message: 'Enter a valid evidence URL.' });
+    }
   }
   if (unique.size !== value.methods.length) ctx.addIssue({ code: 'custom', path: ['methods'], message: 'Duplicate contact methods are not allowed.' });
   if (value.state === 'ready_for_sales' && (value.duplicateState === 'confirmed' || !value.methods.length)) ctx.addIssue({ code: 'custom', path: ['state'], message: 'Ready for Sales requires a usable contact method and no confirmed duplicate.' });

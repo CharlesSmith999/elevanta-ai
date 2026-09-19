@@ -1,8 +1,9 @@
 # Supabase Migration Traceability
 
-## Pending migration
+## Inbound research migration
 
-- `202609170001_inbound_lead_research_v18.sql` is implemented and locally validated but deliberately not applied. It adds the Marketing-only masked-lead research queue and audited Sales publication. Application is gated by the v1.8 release review; live Gmail activation remains a separate later gate requiring Apps Script review.
+- `202609170001_inbound_lead_research_v18.sql` was applied to the existing Supabase project on 2026-09-18 and recorded in the migration ledger. The research workflow remains separate from live Gmail ingestion.
+- `202609180001_research_read_scope.sql` adds an explicit active-profile read check; application verification follows the release checklist.
 
 Status: Reconciled through the Admin service-role repair on 2026-09-17
 
