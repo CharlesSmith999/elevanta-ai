@@ -4,7 +4,7 @@ Status: Planning baseline, approved from stakeholder answers
 
 Branding: The product is named **Elevanta AI**. Its embedded AI sales companion is named **Xaviar**. Xaviar is advisory in Phase 1 and supports lead analysis, follow-up guidance, agent and marketer coaching, and performance reporting. Autonomous outbound communication remains deferred to Phase 2.
 
-CRM readiness reference: [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md). Shared dashboard definitions are in [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), the released dashboard baseline is in [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), and the approved redesign decisions are in [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md). The current lead-workflow authority is [CRM-DECISIONS-v1.7.md](./CRM-DECISIONS-v1.7.md), extending [CRM-DECISIONS-v1.6.md](./CRM-DECISIONS-v1.6.md), with its full role, screen, data, API, security, and Xaviar contract in [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md). Xaviar evaluation reference: [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md).
+CRM readiness reference: [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md). Shared dashboard definitions are in [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), the released dashboard baseline is in [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), and the approved redesign decisions are in [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md). The current lead-workflow authority is [CRM-DECISIONS-v1.8.md](./CRM-DECISIONS-v1.8.md), extending [CRM-DECISIONS-v1.7.md](./CRM-DECISIONS-v1.7.md), with its full role, screen, data, API, security, and Xaviar contract in [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md). Xaviar evaluation reference: [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md).
 
 ## 1. Product vision
 
@@ -95,12 +95,13 @@ When three different agents report the same contact/opportunity as incorrect:
 - Agent and marketer performance/coaching views.
 - Explainable AI-generated coaching summaries using CRM data.
 - Audit log, exports, and data-quality reporting.
+- A Marketing-only Lead Research Queue for safe masked inbound lead research and explicit Sales handoff.
 
 ### Deferred to later phases
 
 - Daily digest and escalation automation beyond basic overdue indicators.
 - Native Bark connector.
-- Email, SMS, calendar, phone, and call transcription integrations.
+- Outbound email, SMS, calendar, phone, and call transcription integrations. The approved read-only inbound Gmail research intake is governed separately by `CRM-DECISIONS-v1.8.md`.
 - AI autonomous outbound email, SMS, and calls.
 - Public SaaS billing, tenant self-service, white-labeling, and marketplace integrations.
 
@@ -225,6 +226,10 @@ Initial REST resources:
 - `GET /dashboards/agent|manager|admin|marketer`
 - `GET /coaching/:userId`
 - `POST /imports/validate` and `POST /imports/commit`
+- `GET/POST /inbound/research-leads`
+- `GET/PATCH /inbound/research-leads/:id`
+- `POST /inbound/research-leads/:id/publish`
+- `GET /admin/inbound-health`
 
 All mutating endpoints require authenticated user, role authorization, idempotency where applicable, and an audit event.
 
@@ -301,13 +306,17 @@ Stage and import the approved Excel lead data, preserve workbook/tab/row provena
 
 After activation, newly recorded CRM work becomes Xaviar’s primary source for personalized coaching. Imported historical data is labeled as historical context and is used only when its provenance and quality are sufficient.
 
+### Inbound Lead Research extension
+
+Before live Gmail activation, build and verify the Marketing-only Lead Research Queue with synthetic message fixtures. Masked Gmail leads remain outside the normal Lead Inbox until Marketing records a usable unmasked contact method and explicitly sends the item to an active Sales Agent. Provider message ID and publication idempotency prevent duplicate records. Live Gmail reading remains disabled until the current Apps Script is reviewed and the Xaviar Admin/Manager approvals are complete.
+
 ### Lead workflow v1.6 implementation gate
 
 Before Milestone 5 activation, implement and validate [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md) with safe sample data. This gate replaces manual Sales Acceptance with derived First Worked, Connected, SQL, and Sales Engagement evidence; adds multiple contact methods and immutable contact-quality history; and completes the Sales, Marketing, Manager, Admin, database/API, and Xaviar changes. No real Excel data is imported during this gate.
 
 ### Phase 2 — workflow automation
 
-Track whether Xaviar recommendations are followed, send in-app reminders and escalations, provide daily task guidance, and add email/SMS/calendar/phone connectors with consent enforcement, templates, and human approval gates. Any outbound action requires explicit approval until autonomous operation is separately approved.
+Track whether Xaviar recommendations are followed, send in-app reminders and escalations, provide daily task guidance, and add outbound email/SMS/calendar/phone connectors with consent enforcement, templates, and human approval gates. Any outbound action requires explicit approval until autonomous operation is separately approved. The read-only inbound Gmail research intake does not authorize outbound communication.
 
 ### Phase 3 — SaaS product
 

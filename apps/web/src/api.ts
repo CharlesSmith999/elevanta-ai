@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import type { Activity, Assignment, FollowUp, IncorrectReport, Lead, LeadCategory, OpportunityStatus, Qualification, Role, StageHistory } from './domain';
 import type { ContactFocus, ContactHealth, ContactMethodType } from './leadWorkflow';
+import type { ResearchLead, ResearchMethod, ResearchState } from './inboundResearch';
 import { supabase } from './auth';
 
 /**
@@ -81,6 +82,15 @@ export type RemoteActivity = {
   created_at: string;
   contact_methods?: { value: string; method_type: ContactMethodType } | null;
 };
+
+type RemoteResearchLead = {
+  id: string; marketing_owner_id: string; research_state: ResearchState; name: string; masked_phone?: string | null; masked_email?: string | null;
+  address?: string | null; source: string; lead_category: LeadCategory; credits?: number | null; description?: string | null; details?: string | null;
+  discovered_methods?: ResearchMethod[] | null; evidence_links?: string[] | null; research_notes?: string | null; duplicate_state: ResearchLead['duplicateState']; published_opportunity_id?: string | null;
+  inbound_messages?: { provider_message_id: string; provider_thread_id?: string | null; received_at: string } | null;
+};
+
+const mapResearchLead = (record: RemoteResearchLead): ResearchLead => ({ id: record.id, providerMessageId: record.inbound_messages?.provider_message_id ?? 'Unavailable', providerThreadId: record.inbound_messages?.provider_thread_id ?? undefined, receivedAt: record.inbound_messages?.received_at ?? '', source: record.source, name: record.name, maskedPhone: record.masked_phone ?? undefined, maskedEmail: record.masked_email ?? undefined, address: record.address ?? undefined, category: record.lead_category, credits: record.credits ?? undefined, description: record.description ?? undefined, details: record.details ?? undefined, marketingOwnerId: record.marketing_owner_id, state: record.research_state, methods: record.discovered_methods ?? [], evidenceLinks: record.evidence_links ?? [], researchNotes: record.research_notes ?? undefined, duplicateState: record.duplicate_state, publishedOpportunityId: record.published_opportunity_id ?? undefined });
 
 async function send(session: Session, path: string, init?: RequestInit) {
   return fetch(`${apiBase}${path}`, {
@@ -177,3 +187,7 @@ export const addRemoteContactMethod = (session: Session, id: string, body: unkno
 export const assessRemoteContactMethod = (session: Session, id: string, contactMethodId: string, body: unknown) => request<void>(session, `/v1/opportunities/${id}/contact-methods/${contactMethodId}`, { method: 'PATCH', body: JSON.stringify(body) });
 export const restoreRemoteContactMethod = (session: Session, id: string, contactMethodId: string, body: unknown) => request<void>(session, `/v1/opportunities/${id}/contact-methods/${contactMethodId}/restore`, { method: 'POST', body: JSON.stringify(body) });
 export const logRemoteSalesActivity = (session: Session, id: string, body: unknown) => request<{ activityId: string }>(session, `/v1/opportunities/${id}/activities`, { method: 'POST', body: JSON.stringify(body) });
+export async function loadResearchLeads(session: Session) { const result = await request<{ researchLeads: RemoteResearchLead[] }>(session, '/v1/inbound/research-leads'); return result.researchLeads.map(mapResearchLead); }
+export const createResearchLead = (session: Session, body: unknown) => request<{ researchLeadId: string }>(session, '/v1/inbound/research-leads', { method: 'POST', body: JSON.stringify(body) });
+export const updateResearchLead = (session: Session, id: string, body: unknown) => request<void>(session, `/v1/inbound/research-leads/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+export const publishResearchLead = (session: Session, id: string, body: unknown) => request<{ opportunityId: string }>(session, `/v1/inbound/research-leads/${id}/publish`, { method: 'POST', body: JSON.stringify(body) });

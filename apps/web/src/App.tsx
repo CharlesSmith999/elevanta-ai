@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { IconActivityHeartbeat, IconAlertTriangle, IconArrowUpRight, IconBriefcase, IconBulb, IconCalendar, IconChartBar, IconChartPieFilled, IconChecklist, IconChevronDown, IconCircleCheck, IconClock, IconCurrencyDollar, IconFilter, IconFlag, IconHome, IconMenu2, IconMoonStars, IconReportAnalytics, IconRobot, IconRocket, IconSparkles, IconSun, IconTarget, IconTargetArrow, IconTrophy, IconTrendingUp, IconUserCircle, IconUsers, IconX } from '@tabler/icons-react';
+import { IconActivityHeartbeat, IconAlertTriangle, IconArrowUpRight, IconBriefcase, IconBulb, IconCalendar, IconChartBar, IconChartPieFilled, IconChecklist, IconChevronDown, IconCircleCheck, IconClock, IconCurrencyDollar, IconFilter, IconFlag, IconHome, IconMenu2, IconMoonStars, IconReportAnalytics, IconRobot, IconRocket, IconSearch, IconSparkles, IconSun, IconTarget, IconTargetArrow, IconTrophy, IconTrendingUp, IconUserCircle, IconUsers, IconX } from '@tabler/icons-react';
 import { Area, AreaChart, Bar as RechartsBar, BarChart as RechartsBarChart, CartesianGrid, Cell, Funnel, FunnelChart, LabelList, Line, LineChart, RadialBar, RadialBarChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from 'recharts';
 import {
   Activity, DashboardPeriod, FollowUp, Lead, OpportunityStatus, Qualification, Role, User, benchmarkBySource, canEditLeadDetails, canFlagIncorrectLead, canReassign, canUpdateLead, canViewDataQualityBoard, canViewManagementBoards, canViewNamedLeaderboard,
@@ -12,6 +12,7 @@ import { RoleReferenceDashboard, RoleReferenceKind, RoleReferenceSidebar, RoleSw
 import { XaviarWorkspace } from './XaviarWorkspace';
 import { navigationFor } from './navigation';
 import { LeadWorkspace } from './LeadWorkspace';
+import { LeadResearchQueue } from './LeadResearchQueue';
 import type { Session } from '@supabase/supabase-js';
 
 const storageKey = 'elevanta-test-workspace-v1';
@@ -295,6 +296,16 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
       {notice && <div className="toast" role="status">{notice}</div>}
       {adminReference ? <AdminCommandCenter viewer={viewer} viewers={switchableUsers} leads={dashboardLeads} dashboard={filteredDashboard} period={dashboardPeriod} source={dashboardSource} theme={theme} onViewer={switchViewer} onPeriod={setDashboardPeriod} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} /> : roleReferenceDashboard && roleReferenceKind ? <RoleReferenceDashboard kind={roleReferenceKind} viewer={viewer} viewers={switchableUsers} leads={dashboardLeads} period={dashboardPeriod} source={dashboardSource} theme={theme} onViewer={switchViewer} onPeriod={setDashboardPeriod} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} onCreate={() => setShowCreate(true)} onOpenLead={(leadId) => { setSelectedId(leadId); navigate('Lead inbox'); }} /> : <>
       {page === 'Lead inbox' && (selected ? <LeadWorkspace lead={selected} viewer={viewer} workspaceUsers={workspaceDirectory} session={session} onBack={() => setSelectedId(undefined)} onStatus={updateStatus} onQualification={updateQualification} onReassign={reassign} onEditDetails={editLeadDetails} onReportIncorrect={reportIncorrect} onDecision={decideReview} /> : <section className="inbox-layout"><LeadTable leads={visible} users={workspaceDirectory} onSelect={select} onCreate={() => setShowCreate(true)} /></section>)}
+      {page === 'Lead research' && <LeadResearchQueue viewer={viewer} users={workspaceDirectory} session={session} onNotice={setNotice} onPublished={async (research, salesOwnerId) => {
+        if (session) setLeads(await loadRemoteLeads(session));
+        else {
+          const at = new Date().toISOString();
+          const id = `research-opportunity-${research.id}`;
+          const lead: Lead = { id, name: research.name, phone: research.methods.find((method) => method.type === 'phone')?.value, email: research.methods.find((method) => method.type === 'email')?.value, discoveredContactMethods: research.methods, source: research.source, category: research.category, description: research.description, marketingOwnerId: research.marketingOwnerId, sourceDate: at.slice(0, 10), status: 'assigned', qualification: 'not_available', priority: 0, assignments: [{ id: `assignment-${id}`, ownerId: salesOwnerId, assignedBy: viewer.id, at, visibility: 'full_context', reason: 'Research handoff' }], activities: [leadActivity(viewer.id, 'system', 'Lead published from the synthetic research queue.')], followUps: [], incorrectReports: [] };
+          setLeads((current) => current.some((item) => item.id === id) ? current : [...current, lead]);
+        }
+        navigate('Lead inbox');
+      }} />}
       {page === 'Follow-ups' && <FollowUpList leads={visible} viewer={viewer} onSelect={select} onComplete={completeFollowUp} />}
       {page === 'Assignments' && <AssignmentList leads={visible} users={workspaceDirectory} onSelect={select} />}
       {page === 'Review queue' && <ReviewQueue leads={leads.filter((lead) => lead.incorrectReview?.state === 'pending')} onSelect={select} />}
@@ -581,7 +592,7 @@ function DashboardBoards({ viewer, leads, scope }: { viewer: User; leads: Lead[]
 }
 
 function AdminReferenceSidebar({ viewer, activePage, onNavigate, onReset, onSignOut }: { viewer: User; activePage: string; onNavigate: (page: string) => void; onReset: () => void; onSignOut?: () => void }) {
-  const icons: Record<string, typeof IconHome> = { Dashboard: IconHome, 'Lead inbox': IconUsers, 'Follow-ups': IconChecklist, Assignments: IconTarget, Reports: IconReportAnalytics, 'Benchmark Board': IconChartBar, Leaderboard: IconTrophy, 'Data quality': IconCircleCheck, 'Review queue': IconFlag, 'User management': IconUserCircle, Xaviar: IconRobot };
+  const icons: Record<string, typeof IconHome> = { Dashboard: IconHome, 'Lead inbox': IconUsers, 'Lead research': IconSearch, 'Follow-ups': IconChecklist, Assignments: IconTarget, Reports: IconReportAnalytics, 'Benchmark Board': IconChartBar, Leaderboard: IconTrophy, 'Data quality': IconCircleCheck, 'Review queue': IconFlag, 'User management': IconUserCircle, Xaviar: IconRobot };
   const primary = navigationFor(viewer).map((item) => [item.label, icons[item.page] ?? IconHome, item.page] as const);
   return <div className="admin-reference-sidebar"><div className="admin-reference-brand"><IconSparkleMark /><span>Elevanta <b>AI</b></span></div><nav aria-label="Command center navigation">{primary.map(([label, Icon, page]) => <button key={label} className={page === activePage ? 'admin-reference-nav active' : 'admin-reference-nav'} aria-current={page === activePage ? 'page' : undefined} onClick={() => onNavigate(page)}><Icon size={20} stroke={1.8} /><span>{label}</span></button>)}</nav><div className="admin-reference-sidebar-bottom"><div className="admin-reference-profile"><span>{initialsFor(viewer.name)}</span><div><b>{viewer.name}</b><small>Company Admin</small></div><IconChevronDown size={15} /></div><div className="sidebar-session-actions"><button type="button" onClick={onReset}>Reset test data</button>{onSignOut && <button type="button" onClick={onSignOut}>Sign out</button>}</div></div></div>;
 }
