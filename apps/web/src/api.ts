@@ -188,7 +188,8 @@ export const assessRemoteContactMethod = (session: Session, id: string, contactM
 export const restoreRemoteContactMethod = (session: Session, id: string, contactMethodId: string, body: unknown) => request<void>(session, `/v1/opportunities/${id}/contact-methods/${contactMethodId}/restore`, { method: 'POST', body: JSON.stringify(body) });
 export const logRemoteSalesActivity = (session: Session, id: string, body: unknown) => request<{ activityId: string }>(session, `/v1/opportunities/${id}/activities`, { method: 'POST', body: JSON.stringify(body) });
 export async function loadResearchLeads(session: Session) { const result = await request<{ researchLeads: RemoteResearchLead[] }>(session, '/v1/inbound/research-leads'); return result.researchLeads.map(mapResearchLead); }
-export type GmailHealth = { connected:boolean; enabled:boolean; activatedAt?:string; lastSyncAt?:string; lastError?:string; activationApproved:boolean; failures?:{provider_message_id:string;failure_code:string;received_at:string}[] };
+export type GmailHealth = { mailbox:string; setupReady:boolean; connected:boolean; enabled:boolean; activatedAt?:string; lastSyncAt?:string; lastError?:string; activationApproved:boolean; failures?:{provider_message_id:string;failure_code:string;received_at:string}[] };
+export const saveGmailMailbox = (session:Session,mailbox:string) => request(session,'/v1/admin/gmail/mailbox',{method:'PUT',body:JSON.stringify({mailbox})});
 export const getGmailHealth = (session:Session) => request<GmailHealth>(session,'/v1/admin/gmail');
 export const connectGmail = (session:Session) => request<{url:string}>(session,'/v1/admin/gmail/connect',{method:'POST'});
 export const enableGmail = (session:Session,enabled:boolean) => request(session,'/v1/admin/gmail/enabled',{method:'POST',body:JSON.stringify({enabled})});

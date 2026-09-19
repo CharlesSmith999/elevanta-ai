@@ -57,6 +57,9 @@ test('Sales users cannot read, edit, publish, or inspect health for masked resea
       [`/v1/inbound/research-leads/${profile.id}`, { method: 'PATCH', headers, body: '{}' }],
       [`/v1/inbound/research-leads/${profile.id}/publish`, { method: 'POST', headers, body: '{}' }],
       ['/v1/admin/inbound-health', { headers }],
+      ['/v1/admin/gmail', { headers }],
+      ['/v1/admin/gmail/mailbox', { method:'PUT', headers, body:'{"mailbox":"synthetic@example.invalid"}' }],
+      ['/v1/admin/gmail/connect', { method:'POST', headers }],
     ];
     for (const [path, options] of routes) {
       const response = await fetch(`${base}${path}`, { ...options, signal: AbortSignal.timeout(2000) });

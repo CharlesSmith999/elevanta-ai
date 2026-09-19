@@ -2,7 +2,7 @@ import cors from 'cors';
 import express, { NextFunction, Request, Response } from 'express';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { ConfigurationError, supabaseConfig } from './config.js';
-import { startGmailConnection, finishGmailConnection, gmailHealth, setGmailEnabled, syncGmail, validSchedulerSecret } from './gmailConnector.js';
+import { startGmailConnection, finishGmailConnection, gmailHealth, saveGmailMailbox, setGmailEnabled, syncGmail, validSchedulerSecret } from './gmailConnector.js';
 import { z, ZodError } from 'zod';
 import { buildApiXaviarReport, canRequestXaviar, opportunityBelongsToSubject, type XaviarOpportunity, type XaviarProfile } from './xaviar.js';
 
@@ -208,6 +208,12 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     const result = await startGmailConnection(serviceClient(),request.profile!.workspace_id,request.profile!.id);
     response.cookie('gmail_oauth', result.state, { httpOnly:true,secure:true,sameSite:'lax',maxAge:600000,path:'/api/v1/inbound/gmail/callback' });
     response.json({url:result.url});
+  }));
+  app.put('/v1/admin/gmail/mailbox', ...protectedRoute(async (request,response) => {
+    if(request.profile!.role!=='admin'){response.status(403).json({message:'Only Admin can manage Gmail.'});return;}
+    const value=z.object({mailbox:z.string().trim().toLowerCase().email().max(254)}).strict().parse(request.body);
+    await saveGmailMailbox(serviceClient(),request.profile!.workspace_id,request.profile!.id,value.mailbox);
+    response.json({saved:true});
   }));
   app.get('/v1/inbound/gmail/callback', asyncRoute(async (request,response) => {
     response.setHeader('Cache-Control','no-store'); response.setHeader('Referrer-Policy','no-referrer');

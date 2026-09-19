@@ -8,6 +8,8 @@ Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.
 
 ### Shared incoming queue update: 2026-09-19
 
+Owner requested deferred mailbox setup through an Admin form. Form, workspace-scoped address persistence, validation, disconnected status and OAuth settings-revision binding are implemented. Saving does not connect or activate Gmail. Live mailbox authorization is deliberately deferred; this no longer blocks releasing the inactive form. PR #44 contains this release; production migration and deployment verification are pending.
+
 Approved authority: [CRM-DECISIONS-v1.9.md](./CRM-DECISIONS-v1.9.md). Shared queue implementation is local and tested, not yet deployed. All Marketing Agents, Marketing Managers and Admin may see incoming items; Sales roles cannot. No claim step. The publishing marketer owns the resulting normal lead. Revision checks reject outdated saves/handoffs; repeated publication keeps the original assignment.
 
 Validation: 75 application tests pass, both TypeScript checks pass, production build passes. All 20 migrations replay in isolated PostgreSQL. Shared-marketer visibility, Sales/inactive denial, stale edits, stale handoff, legacy RPC bypass denial, repeated handoff, publisher attribution and multi-method preservation passed database checks.

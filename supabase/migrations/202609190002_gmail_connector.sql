@@ -2,7 +2,8 @@ begin;
 create table public.gmail_connections (
  workspace_id uuid primary key references public.workspaces(id),
  mailbox text not null,
- encrypted_refresh_token text not null,
+ encrypted_refresh_token text,
+ settings_revision uuid not null default gen_random_uuid(),
  enabled boolean not null default false,
  activated_at timestamptz,
  scan_after timestamptz,
@@ -19,12 +20,28 @@ create table public.gmail_oauth_states (
  workspace_id uuid not null references public.workspaces(id),
  actor_id uuid not null references public.profiles(id),
  verifier_cipher text not null,
+ mailbox text not null,
+ settings_revision uuid not null,
  expires_at timestamptz not null
 );
 alter table public.gmail_connections enable row level security;
 alter table public.gmail_oauth_states enable row level security;
 revoke all on public.gmail_connections,public.gmail_oauth_states from anon,authenticated;
 grant select,insert,update,delete on public.gmail_connections,public.gmail_oauth_states to service_role;
+
+create function public.gmail_save_mailbox(p_workspace uuid,p_actor uuid,p_mailbox text) returns void language plpgsql security definer set search_path=public as $$
+begin
+ if not exists(select 1 from profiles where id=p_actor and workspace_id=p_workspace and role='admin' and active) then raise exception 'Active Admin required'; end if;
+ if length(p_mailbox)>254 or p_mailbox !~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$' then raise exception 'Invalid mailbox email'; end if;
+ insert into gmail_connections(workspace_id,mailbox,connected_by)
+ values(p_workspace,lower(trim(p_mailbox)),p_actor)
+ on conflict(workspace_id) do update set mailbox=excluded.mailbox,settings_revision=gen_random_uuid(),connected_by=p_actor,updated_at=now()
+ where gmail_connections.encrypted_refresh_token is null and not gmail_connections.enabled;
+ if not found then raise exception 'Mailbox is already connected. Its address cannot be changed here.'; end if;
+end;
+$$;
+revoke all on function public.gmail_save_mailbox(uuid,uuid,text) from public,anon,authenticated;
+grant execute on function public.gmail_save_mailbox(uuid,uuid,text) to service_role;
 
 create function public.gmail_claim_scan(p_workspace uuid,p_lease uuid) returns setof public.gmail_connections language sql security definer set search_path=public as $$
  update gmail_connections set lease_id=p_lease,lease_until=now()+interval '3 minutes'

@@ -31,6 +31,8 @@ The old script labels threads rather than individual messages, lacks a message-I
 
 ## Current status
 
+Owner update: provide an Admin form to save the mailbox later without Google authorization or OAuth server configuration. Saving is not connecting or activating. The saved address is workspace-scoped and validated server-side. Once connected, changing the mailbox is blocked to prevent silently replacing credentials. OAuth callbacks must match the saved mailbox and settings revision. Release may proceed with intake disabled; live Google acceptance is deferred by the owner.
+
 Parser/reader, OAuth/PKCE callback, encrypted token storage, worker leases/cursor, idempotent persistence, scheduler and Admin controls are implemented locally. They are not deployed or connected. Mailbox identity is supplied privately by the owner and must not be hardcoded in public source. Google Cloud was inspected and blocks setup until the signed-in account enables 2-step verification. Live OAuth consent, configuration, production migration and real-message acceptance remain pending.
 
 ## Server implementation contract
@@ -40,5 +42,5 @@ Parser/reader, OAuth/PKCE callback, encrypted token storage, worker leases/curso
 - Privileged connector access is restricted to dedicated connection/state tables and ingestion/lease RPCs. Existing normal lead requests continue using the caller's permissions.
 - Scheduler authenticates with a separate secret. One workspace lease serializes scans; each persisted outcome is idempotent. The page cursor advances only after every message in that page has a durable outcome. Failed scans retain the cursor.
 - Connecting is not activation. Explicit activation requires the server release gate; it starts a new-email-only timestamp. Disable invalidates the worker lease immediately.
-- Required configuration: GOOGLE_GMAIL_CLIENT_ID, GOOGLE_GMAIL_CLIENT_SECRET, GMAIL_REDIRECT_URI, GMAIL_EXPECTED_MAILBOX, GMAIL_TOKEN_KEY, CRON_SECRET, GMAIL_LIVE_APPROVED. Values must remain outside Git. Callback is the existing site's /api/v1/inbound/gmail/callback.
+- Required connection configuration: GOOGLE_GMAIL_CLIENT_ID, GOOGLE_GMAIL_CLIENT_SECRET, GMAIL_REDIRECT_URI, GMAIL_TOKEN_KEY, CRON_SECRET, GMAIL_LIVE_APPROVED. Values must remain outside Git. The mailbox is entered through the Admin form and stored per workspace, not in an environment variable. Saving the address needs only the existing CRM database configuration. Callback is the existing site's /api/v1/inbound/gmail/callback.
 - Schedule defaults to daily on the existing Vercel project to avoid assuming paid-plan minute scheduling. Manual Admin sync is also available. Faster scheduling requires a supported hosting plan and a separate approved configuration change.

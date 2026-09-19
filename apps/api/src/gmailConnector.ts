@@ -5,13 +5,13 @@ import { createGmailReader, GmailReadError, parseBarkMessage } from './gmailInta
 const scope = 'https://www.googleapis.com/auth/gmail.readonly';
 export const digest = (s: string) => createHash('sha256').update(s).digest('hex');
 export function gmailConfig(env = process.env) {
-  const names = ['GOOGLE_GMAIL_CLIENT_ID','GOOGLE_GMAIL_CLIENT_SECRET','GMAIL_REDIRECT_URI','GMAIL_EXPECTED_MAILBOX','GMAIL_TOKEN_KEY'] as const;
+  const names = ['GOOGLE_GMAIL_CLIENT_ID','GOOGLE_GMAIL_CLIENT_SECRET','GMAIL_REDIRECT_URI','GMAIL_TOKEN_KEY'] as const;
   if (names.some(name => !env[name])) throw new Error('Gmail connection configuration is incomplete.');
   const redirect = new URL(env.GMAIL_REDIRECT_URI!);
   if (redirect.protocol !== 'https:' || redirect.username || redirect.password || redirect.search || redirect.hash || redirect.pathname !== '/api/v1/inbound/gmail/callback') throw new Error('Invalid Gmail callback configuration.');
   const key = Buffer.from(env.GMAIL_TOKEN_KEY!, 'base64');
   if (key.length !== 32) throw new Error('Invalid Gmail encryption configuration.');
-  return { clientId: env.GOOGLE_GMAIL_CLIENT_ID!, clientSecret: env.GOOGLE_GMAIL_CLIENT_SECRET!, redirect: redirect.href, mailbox: env.GMAIL_EXPECTED_MAILBOX!.trim().toLowerCase(), key };
+  return { clientId: env.GOOGLE_GMAIL_CLIENT_ID!, clientSecret: env.GOOGLE_GMAIL_CLIENT_SECRET!, redirect: redirect.href, key };
 }
 export function seal(value: string, key: Buffer, context: string) {
   const iv = randomBytes(12); const cipher = createCipheriv('aes-256-gcm', key, iv); cipher.setAAD(Buffer.from(context));
@@ -37,9 +37,11 @@ async function tokenRequest(fields: Record<string,string>) {
 }
 function check(error: unknown) { if (error) throw new Error('Gmail database operation failed.'); }
 export async function startGmailConnection(db: SupabaseClient, workspace: string, actor: string) {
+  const {data:settings,error:settingsError}=await db.from('gmail_connections').select('mailbox,settings_revision').eq('workspace_id',workspace).maybeSingle();check(settingsError);
+  if(!settings?.mailbox)throw new Error('Save a mailbox email address first.');
   const config = gmailConfig(); const state = randomBytes(32).toString('base64url'); const verifier = randomBytes(48).toString('base64url');
-  const { error } = await db.from('gmail_oauth_states').insert({ state_hash: digest(state), workspace_id: workspace, actor_id: actor, verifier_cipher: seal(verifier, config.key, workspace), expires_at: new Date(Date.now()+600000).toISOString() }); check(error);
-  const query = new URLSearchParams({ client_id: config.clientId, redirect_uri: config.redirect, response_type: 'code', scope, access_type: 'offline', prompt: 'consent', login_hint: config.mailbox, state, code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256' });
+  const { error } = await db.from('gmail_oauth_states').insert({ state_hash: digest(state), workspace_id: workspace, actor_id: actor, mailbox:settings.mailbox, settings_revision:settings.settings_revision, verifier_cipher: seal(verifier, config.key, workspace), expires_at: new Date(Date.now()+600000).toISOString() }); check(error);
+  const query = new URLSearchParams({ client_id: config.clientId, redirect_uri: config.redirect, response_type: 'code', scope, access_type: 'offline', prompt: 'consent', login_hint: settings.mailbox, state, code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256' });
   return { url: `https://accounts.google.com/o/oauth2/v2/auth?${query}`, state };
 }
 export async function finishGmailConnection(db: SupabaseClient, state: string, cookie: string, code: string) {
@@ -51,17 +53,22 @@ export async function finishGmailConnection(db: SupabaseClient, state: string, c
   const config = gmailConfig();
   const tokens = await tokenRequest({ code, grant_type: 'authorization_code', redirect_uri: config.redirect, code_verifier: unseal(data.verifier_cipher, config.key, data.workspace_id) });
   if (!tokens.refresh_token || !tokens.scope?.split(' ').includes(scope)) throw new Error('Read-only Gmail consent was not completed.');
-  await createGmailReader(tokens.access_token).verifyMailbox(config.mailbox);
-  const { error: saveError } = await db.from('gmail_connections').upsert({ workspace_id: data.workspace_id, mailbox: config.mailbox, encrypted_refresh_token: seal(tokens.refresh_token,config.key,data.workspace_id), enabled:false, activated_at:null, scan_after:null, page_token:null, lease_id:null, lease_until:null, last_error:null, connected_by:data.actor_id, updated_at:new Date().toISOString() }); check(saveError);
+  await createGmailReader(tokens.access_token).verifyMailbox(data.mailbox);
+  const { data: saved, error: saveError } = await db.from('gmail_connections').update({ encrypted_refresh_token: seal(tokens.refresh_token,config.key,data.workspace_id), enabled:false, activated_at:null, scan_after:null, page_token:null, lease_id:null, lease_until:null, last_error:null, connected_by:data.actor_id, updated_at:new Date().toISOString() }).eq('workspace_id',data.workspace_id).eq('mailbox',data.mailbox).eq('settings_revision',data.settings_revision).select('workspace_id'); check(saveError);
+  if(!saved?.length)throw new Error('Mailbox settings changed. Start authorization again.');
+}
+export async function saveGmailMailbox(db:SupabaseClient,workspace:string,actor:string,mailbox:string) {
+ const {error}=await db.rpc('gmail_save_mailbox',{p_workspace:workspace,p_actor:actor,p_mailbox:mailbox});check(error);
 }
 export async function gmailHealth(db: SupabaseClient, workspace: string) {
-  const { data, error } = await db.from('gmail_connections').select('enabled,activated_at,last_sync_at,last_error').eq('workspace_id',workspace).maybeSingle(); check(error);
-  return { connected: Boolean(data), enabled: data?.enabled ?? false, activatedAt:data?.activated_at, lastSyncAt:data?.last_sync_at, lastError:data?.last_error, activationApproved: process.env.GMAIL_LIVE_APPROVED === 'true' };
+  const { data, error } = await db.from('gmail_connections').select('mailbox,encrypted_refresh_token,enabled,activated_at,last_sync_at,last_error').eq('workspace_id',workspace).maybeSingle(); check(error);
+  let setupReady=false;try{gmailConfig();setupReady=true;}catch{}
+  return { mailbox:data?.mailbox ?? '', setupReady, connected: Boolean(data?.encrypted_refresh_token), enabled: data?.enabled ?? false, activatedAt:data?.activated_at, lastSyncAt:data?.last_sync_at, lastError:data?.last_error, activationApproved: process.env.GMAIL_LIVE_APPROVED === 'true' };
 }
 export async function setGmailEnabled(db: SupabaseClient, workspace: string, enabled: boolean) {
   if (enabled && process.env.GMAIL_LIVE_APPROVED !== 'true') throw new Error('Gmail activation requires the documented release approvals.');
   const now = new Date().toISOString();
-  const { data, error } = await db.from('gmail_connections').update({ enabled, lease_id:null,lease_until:null,page_token:null, ...(enabled ? { activated_at:now,scan_after:now } : {}), updated_at:now }).eq('workspace_id',workspace).eq('enabled',!enabled).select('workspace_id'); check(error);
+  const { data, error } = await db.from('gmail_connections').update({ enabled, lease_id:null,lease_until:null,page_token:null, ...(enabled ? { activated_at:now,scan_after:now } : {}), updated_at:now }).eq('workspace_id',workspace).eq('enabled',!enabled).not('encrypted_refresh_token','is',null).select('workspace_id'); check(error);
   if (!data?.length) throw new Error('Connect Gmail first, or refresh the connection status.');
 }
 export async function syncGmail(db: SupabaseClient, workspace: string) {
@@ -70,9 +77,9 @@ export async function syncGmail(db: SupabaseClient, workspace: string) {
   const connection = data?.[0]; if (!connection) return { state:'idle', processed:0 };
   const started = Date.now(); let processed = 0;
   try {
-    const config = gmailConfig(); if (connection.mailbox !== config.mailbox) throw new GmailReadError('authorization');
+    const config = gmailConfig();
     const tokens = await tokenRequest({ grant_type:'refresh_token', refresh_token:unseal(connection.encrypted_refresh_token,config.key,workspace) });
-    const reader = createGmailReader(tokens.access_token); await reader.verifyMailbox(config.mailbox);
+    const reader = createGmailReader(tokens.access_token); await reader.verifyMailbox(connection.mailbox);
     const page = await reader.list(connection.scan_after ?? connection.activated_at, connection.page_token ?? undefined);
     const {data:recorded,error:recordedError}=await db.rpc('gmail_recorded_ids',{p_workspace:workspace,p_lease:lease,p_ids:page.messages.map(m=>m.id)});check(recordedError);
     const done=new Set((recorded ?? []).map((m:{provider_message_id:string})=>m.provider_message_id));
