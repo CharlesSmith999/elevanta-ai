@@ -133,6 +133,12 @@ Every production deployment must confirm:
 
 ## 10. Current known deployment gaps
 
+### Gmail connector release (v1.9)
+
+The approved connector adds a narrowly scoped server-only use of the existing service-role client: dedicated Gmail connection/OAuth-state tables and worker lease/ingestion RPCs. Ordinary lead requests still use user sessions and RLS. Browser users, including Admin, cannot read encrypted tokens. See [GMAIL-INTAKE-IMPLEMENTATION.md](./GMAIL-INTAKE-IMPLEMENTATION.md) for secret names and activation gates. Apply both 202609190001 and 202609190002 before releasing the revised write API. Keep GMAIL_LIVE_APPROVED unset until live acceptance and documented approvals. Never commit credential values.
+
+Google Cloud setup currently blocks access until the signed-in account enables 2-step verification. That security step must be completed by the account owner. OAuth and a real-message smoke test remain outstanding.
+
 - The Xaviar technical release still needs one Admin and one Manager approval record.
 - Production workbook migration remains deliberately deferred to Milestone 5.
 - Every new database migration must be source-controlled and verified in the canonical Supabase migration ledger.

@@ -8,6 +8,10 @@ CRM readiness reference: [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE
 
 ## 1. Product vision
 
+The incoming research queue now follows [CRM-DECISIONS-v1.9.md](./CRM-DECISIONS-v1.9.md): shared Marketing/Admin visibility with no claim step. Normal CRM lead scope is unchanged.
+
+Direct Gmail research intake implementation and activation checklist: [GMAIL-INTAKE-IMPLEMENTATION.md](./docs/GMAIL-INTAKE-IMPLEMENTATION.md). Intake is new-email-only after activation and does not read the Google Sheet.
+
 Replace the current multi-tab Excel lead process with a shared CRM for sales agents, managers, marketers, and administrators. The CRM must preserve the complete history of every lead while allowing a reassigned agent to receive either the full prior thread or a fresh working view. Managers and administrators always retain the full history.
 
 Phase 1 is an internal operating system. Phase 2 adds workflow automation and AI-assisted email, SMS, and calling. Phase 3 packages the platform as a multi-tenant SaaS product.
