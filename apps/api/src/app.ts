@@ -2,6 +2,7 @@ import cors from 'cors';
 import express, { NextFunction, Request, Response } from 'express';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { ConfigurationError, supabaseConfig } from './config.js';
+import { startGmailConnection, finishGmailConnection, gmailHealth, saveGmailMailbox, setGmailEnabled, syncGmail, validSchedulerSecret } from './gmailConnector.js';
 import { z, ZodError } from 'zod';
 import { buildApiXaviarReport, canRequestXaviar, opportunityBelongsToSubject, type XaviarOpportunity, type XaviarProfile } from './xaviar.js';
 
@@ -29,7 +30,7 @@ const researchMethod = z.object({ type: z.enum(['phone','email']), value: z.stri
   }
 });
 const inboundCandidate = z.object({ providerMessageId: z.string().trim().min(1).max(255), providerThreadId: z.string().trim().max(255).optional(), receivedAt: z.string().datetime({ offset: true }), name: z.string().trim().min(1).max(160), maskedPhone: z.string().trim().max(80).optional(), maskedEmail: z.string().trim().max(254).optional(), address: z.string().trim().max(500).optional(), source: z.string().trim().min(1).max(100).default('Bark Stalk'), category: z.enum(leadCategories).default('not_available'), credits: z.number().int().nonnegative().optional(), description: z.string().trim().max(4000).optional(), details: z.string().trim().max(12000).optional(), marketingOwnerId: id, originalPayload: z.record(z.unknown()).default({}) });
-const inboundCandidateUpdate = z.object({ state: researchState, name: z.string().trim().min(1).max(160), category: z.enum(leadCategories), methods: z.array(researchMethod).max(20), evidenceLinks: z.array(z.string().trim().url().max(2048)).max(20), researchNotes: z.string().trim().max(8000).optional(), duplicateState }).superRefine((value, ctx) => {
+const inboundCandidateUpdate = z.object({ expectedRevision: z.number().int().nonnegative(), state: researchState, name: z.string().trim().min(1).max(160), category: z.enum(leadCategories), methods: z.array(researchMethod).max(20), evidenceLinks: z.array(z.string().trim().url().max(2048)).max(20), researchNotes: z.string().trim().max(8000).optional(), duplicateState }).superRefine((value, ctx) => {
   const unique = new Set(value.methods.map((method) => `${method.type}:${method.type === 'phone' ? method.value.replace(/\D/g, '') : method.value.trim().toLowerCase()}`));
   if (value.state === 'sent_to_sales') ctx.addIssue({ code: 'custom', path: ['state'], message: 'Use Send to Sales to publish this lead.' });
   for (const link of value.evidenceLinks) {
@@ -43,7 +44,7 @@ const inboundCandidateUpdate = z.object({ state: researchState, name: z.string()
   if (unique.size !== value.methods.length) ctx.addIssue({ code: 'custom', path: ['methods'], message: 'Duplicate contact methods are not allowed.' });
   if (value.state === 'ready_for_sales' && (value.duplicateState === 'confirmed' || !value.methods.length)) ctx.addIssue({ code: 'custom', path: ['state'], message: 'Ready for Sales requires a usable contact method and no confirmed duplicate.' });
 });
-const inboundCandidatePublish = z.object({ salesOwnerId: id });
+const inboundCandidatePublish = z.object({ salesOwnerId: id, expectedRevision: z.number().int().nonnegative() });
 const note = z.object({ body: z.string().trim().min(1).max(5000) });
 const followUp = z.object({ dueAt: z.string().datetime({ offset: true }), actionType: z.enum(['Call', 'Email', 'SMS', 'Task']) });
 const contactMethodType = z.enum(['phone', 'email']);
@@ -196,6 +197,48 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
   const protectedRoute = (handler: (request: AuthenticatedRequest, response: Response) => Promise<void>) => [requireUser, asyncRoute(async (request, response) => { if (!response.locals.ready) return; await handler(request, response); })];
 
   app.get('/v1/me', ...protectedRoute(async (request, response) => { response.json({ profile: request.profile }); }));
+  app.get('/v1/admin/gmail', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'admin') { response.status(403).json({ message:'Only Admin can manage Gmail.' }); return; }
+    const {data:failures,error:failureError}=await request.supabase!.from('inbound_messages').select('provider_message_id,failure_code,received_at').eq('processing_state','needs_review').order('received_at',{ascending:false}).limit(20);
+    if(failureError)throw failureError;
+    response.json({...await gmailHealth(serviceClient(),request.profile!.workspace_id),failures:failures ?? []});
+  }));
+  app.post('/v1/admin/gmail/connect', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'admin') { response.status(403).json({ message:'Only Admin can manage Gmail.' }); return; }
+    const result = await startGmailConnection(serviceClient(),request.profile!.workspace_id,request.profile!.id);
+    response.cookie('gmail_oauth', result.state, { httpOnly:true,secure:true,sameSite:'lax',maxAge:600000,path:'/api/v1/inbound/gmail/callback' });
+    response.json({url:result.url});
+  }));
+  app.put('/v1/admin/gmail/mailbox', ...protectedRoute(async (request,response) => {
+    if(request.profile!.role!=='admin'){response.status(403).json({message:'Only Admin can manage Gmail.'});return;}
+    const value=z.object({mailbox:z.string().trim().toLowerCase().email().max(254)}).strict().parse(request.body);
+    await saveGmailMailbox(serviceClient(),request.profile!.workspace_id,request.profile!.id,value.mailbox);
+    response.json({saved:true});
+  }));
+  app.get('/v1/inbound/gmail/callback', asyncRoute(async (request,response) => {
+    response.setHeader('Cache-Control','no-store'); response.setHeader('Referrer-Policy','no-referrer');
+    const cookie = request.headers.cookie?.split(';').map(v=>v.trim()).find(v=>v.startsWith('gmail_oauth='))?.slice('gmail_oauth='.length) ?? '';
+    response.clearCookie('gmail_oauth',{httpOnly:true,secure:true,sameSite:'lax',path:'/api/v1/inbound/gmail/callback'});
+    try {
+      await finishGmailConnection(serviceClient(),String(request.query.state ?? ''),cookie,String(request.query.code ?? ''));
+      response.type('text').send('Gmail connected. Automatic intake is still disabled. Return to the CRM Lead Research page to review and activate.');
+    } catch { response.status(400).type('text').send('Gmail was not connected. Return to the CRM and start authorization again.'); }
+  }));
+  app.post('/v1/admin/gmail/enabled', ...protectedRoute(async (request,response) => {
+    if (request.profile!.role !== 'admin') { response.status(403).json({message:'Only Admin can manage Gmail.'}); return; }
+    const value = z.object({enabled:z.boolean()}).parse(request.body);
+    await setGmailEnabled(serviceClient(),request.profile!.workspace_id,value.enabled); response.json({enabled:value.enabled});
+  }));
+  app.post('/v1/admin/gmail/sync', ...protectedRoute(async (request,response) => {
+    if (request.profile!.role !== 'admin') { response.status(403).json({message:'Only Admin can manage Gmail.'}); return; }
+    response.json(await syncGmail(serviceClient(),request.profile!.workspace_id));
+  }));
+  app.get('/v1/internal/gmail/sync',asyncRoute(async (request,response) => {
+    if (!validSchedulerSecret(request.headers.authorization,process.env.CRON_SECRET)) { response.status(401).json({message:'Unauthorized'}); return; }
+    const db = serviceClient(); const {data,error} = await db.from('gmail_connections').select('workspace_id').eq('enabled',true).limit(1);
+    if(error) { response.status(503).json({message:'Gmail scheduler unavailable'}); return; }
+    response.json(data?.[0] ? await syncGmail(db,data[0].workspace_id) : {state:'idle'});
+  }));
   app.get('/v1/workspace-members', ...protectedRoute(async (request, response) => {
     const { data, error } = await request.supabase!
       .from('profiles')
@@ -234,13 +277,13 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
   app.patch('/v1/inbound/research-leads/:id', ...protectedRoute(async (request, response) => {
     if (request.profile!.role === 'sales_agent' || (request.profile!.role === 'manager' && request.profile!.department !== 'marketing')) { response.status(403).json({ message: 'Lead Research is available only to Marketing and Admin.' }); return; }
     const candidateId = parse(id, request.params.id); const value = parse(inboundCandidateUpdate, request.body);
-    const { error } = await request.supabase!.rpc('update_inbound_candidate_v18', { p_candidate_id: candidateId, p_research_state: value.state, p_name: value.name, p_lead_category: value.category, p_discovered_methods: value.methods, p_evidence_links: value.evidenceLinks, p_research_notes: value.researchNotes ?? null, p_duplicate_state: value.duplicateState });
+    const { error } = await request.supabase!.rpc('update_inbound_candidate_v19', { p_expected_revision: value.expectedRevision, p_candidate_id: candidateId, p_research_state: value.state, p_name: value.name, p_lead_category: value.category, p_discovered_methods: value.methods, p_evidence_links: value.evidenceLinks, p_research_notes: value.researchNotes ?? null, p_duplicate_state: value.duplicateState });
     if (error) throw error; response.status(204).send();
   }));
   app.post('/v1/inbound/research-leads/:id/publish', ...protectedRoute(async (request, response) => {
     if (request.profile!.role === 'sales_agent' || (request.profile!.role === 'manager' && request.profile!.department !== 'marketing')) { response.status(403).json({ message: 'Lead Research is available only to Marketing and Admin.' }); return; }
     const candidateId = parse(id, request.params.id); const value = parse(inboundCandidatePublish, request.body);
-    const { data, error } = await request.supabase!.rpc('publish_inbound_candidate_v18', { p_candidate_id: candidateId, p_sales_owner_id: value.salesOwnerId });
+    const { data, error } = await request.supabase!.rpc('publish_inbound_candidate_v19', { p_expected_revision: value.expectedRevision, p_candidate_id: candidateId, p_sales_owner_id: value.salesOwnerId });
     if (error) throw error; response.status(201).json({ opportunityId: data });
   }));
   app.get('/v1/admin/inbound-health', ...protectedRoute(async (request, response) => {

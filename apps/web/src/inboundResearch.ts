@@ -5,6 +5,7 @@ export type ResearchState = typeof researchStates[number];
 export type ResearchMethod = { type: 'phone' | 'email'; value: string; label?: string };
 export type ResearchLead = {
   id: string;
+  revision?: number;
   providerMessageId: string;
   providerThreadId?: string;
   receivedAt: string;
@@ -43,11 +44,8 @@ export const researchMethodKey = (method: ResearchMethod) => method.type + ':' +
 export const validEvidenceUrl = (value: string) => { try { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password; } catch { return false; } };
 export const isReadyForSales = (lead: Pick<ResearchLead, 'name' | 'methods' | 'duplicateState'>) => Boolean(lead.name.trim()) && lead.duplicateState !== 'confirmed' && lead.methods.some(validResearchMethod);
 
-export function canViewResearchLead(viewer: User, lead: ResearchLead, users: User[]) {
-  if (viewer.role === 'admin') return true;
-  if (viewer.role === 'marketer') return lead.marketingOwnerId === viewer.id;
-  if (viewer.role !== 'manager' || viewer.department !== 'marketing') return false;
-  return users.find((user) => user.id === lead.marketingOwnerId)?.managerId === viewer.id;
+export function canViewResearchLead(viewer: User, _lead: ResearchLead, _users: User[]) {
+  return viewer.role === 'admin' || viewer.role === 'marketer' || (viewer.role === 'manager' && viewer.department === 'marketing');
 }
 
 export const seedResearchLeads: ResearchLead[] = [

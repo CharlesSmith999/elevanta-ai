@@ -7,8 +7,8 @@ This is the release checklist for the Gmail-to-Marketing research workflow appro
 ## Access and privacy
 
 - Admin can see every research item in the workspace.
-- A Marketing Agent can see only items assigned to that agent.
-- A Marketing Manager can see only items owned by agents reporting to that manager.
+- Every active Marketing Agent can see incoming items in their workspace (v1.9).
+- Every active Marketing Manager can see incoming items in their workspace (v1.9).
 - Sales Manager and Sales Agent cannot see the page, API data, masked payload, or connection health.
 - Masked phone and email values remain read-only source evidence and never become Sales contact methods.
 - Direct API and database access enforce the same restrictions as the interface.
@@ -53,6 +53,8 @@ This is the release checklist for the Gmail-to-Marketing research workflow appro
 
 ## Live Gmail activation gate
 
+The Apps Script has been supplied and reviewed. The following list remains an integration acceptance checklist, not a statement that the script is still missing.
+
 The following cases remain blocked until the current Apps Script is supplied and reviewed:
 
 - Gmail query/label scope and least-privilege account access.
@@ -62,3 +64,20 @@ The following cases remain blocked until the current Apps Script is supplied and
 - End-to-end Gmail ingestion in production.
 
 Live activation must not occur merely because fixture tests pass.
+
+## Shared queue local verification: 2026-09-19
+
+Connector follow-up: 78 application tests and 21 migration replays pass. Added checks verify encrypted token integrity/workspace binding, scheduler authentication, denied credential-table reads even by browser Admin, exclusive worker lease, invalid lease rejection, idempotent ingestion and unowned shared Marketing intake. Real Google OAuth, multi-page production retry and live scheduler delivery remain unverified; do not mark those cases passed.
+
+75 application tests passed, including eight parser/reader tests. All 20 migrations replayed in isolated PostgreSQL. Shared visibility, Sales/inactive access denial, stale-save/stale-handoff rejection, legacy-write bypass prevention, idempotent handoff and publisher attribution passed. Both application typechecks and production build passed. The v1.9 migration is not yet applied to production.
+
+## Verified release results: 2026-09-18
+
+- PASS: 67 application tests, API/web typechecks, production build, and GitHub Actions run 309.
+- PASS: all 19 migrations replayed in isolated PostgreSQL. Database checks cover scoped reads, denied Sales access, malformed/masked/duplicate methods, explicit readiness, immutable published items, Marketing Manager handoff, multiple-method preservation, and repeat-publication idempotency.
+- PASS: local browser sample research, Ready save, explicit Sales handoff, and resulting Lead Inbox record.
+- PASS: production migration ledger; rollback-only production handoff, two methods, and repeat publication.
+- PASS: released signed-in Admin directory and empty research queue load; no browser console errors observed. API health and readiness returned success.
+- NOT VERIFIED: complete phone/tablet/light/dark visual matrix, every keyboard interaction, and separate authenticated production sessions for every role. Database permission checks are not a substitute for these interface checks.
+- KNOWN LIMITATION: browser-only fixture research state resets when the queue remounts. Connected records use the database and reload from it.
+- BLOCKED: Gmail connector, actual parser/retry/backfill behavior, and live ingestion require the existing Apps Script, mailbox/label scope, redacted email samples, and the documented activation approvals. These are not marked passed.

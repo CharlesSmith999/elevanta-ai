@@ -9,6 +9,6 @@
     "dev:api": "pnpm --filter @elevanta/api dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "test:domain": "pnpm --filter @elevanta/api exec tsx --test src/connection.test.ts ../web/src/domain.test.ts ../web/src/navigation.test.ts ../web/src/xaviar.test.ts ../web/src/leadWorkflow.test.ts ../web/src/inboundResearch.test.ts"
+    "test:domain": "pnpm --filter @elevanta/api exec tsx --test src/connection.test.ts src/gmailIntake.test.ts src/gmailConnector.test.ts ../web/src/domain.test.ts ../web/src/navigation.test.ts ../web/src/xaviar.test.ts ../web/src/leadWorkflow.test.ts ../web/src/inboundResearch.test.ts"
   }
 }
