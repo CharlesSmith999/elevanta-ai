@@ -12,4 +12,11 @@ Automated PASS, September 23:
 - Opaque message namespace avoids exposing mailbox identity through message IDs; original legacy keys remain compatible.
 - 87 application tests; 23 isolated migrations; API/web typechecks.
 
-Production pending: migration ledger, deployment, Admin confirmation form/cancel, Marketing view without settings. Do not replace the owner's real mailbox during acceptance. No claim of Google grant revocation: only CRM token removal is implemented.
+Production PASS, September 23:
+- PR46 merged as `2ce66820287f4d90e28aa8a4e8e4948c0accc407`; Vercel deployment `EeCjQmx7Y9PGhupKaUnkvUVhJhKU` reported success.
+- Canonical ledger has exactly one `202609230001` entry. Authenticated browser role cannot execute the replacement RPC; service role can. Replacement audit count is zero.
+- Live signed-in Admin can open the replacement confirmation form. Confirm is disabled with blank address/unconfirmed checkbox. Cancel returns without replacement.
+- Marketing Agent and Marketing Manager role-preview research screens contain no Admin Gmail region or replacement controls. These are UI-preview checks, not separate authenticated user sessions; automated API denial tests cover non-admin request handling.
+- No browser-console errors observed during these checks. Admin view restored afterward.
+
+The actual production mailbox was not replaced during acceptance; destructive replacement behavior was tested only in the isolated database. No claim of Google grant revocation: only CRM token removal is implemented. Live intake remains Not connected with activation awaiting approvals; consent, activation and a fresh-message acceptance test are still outstanding. This post-release evidence is queued locally for the next grouped documentation release.

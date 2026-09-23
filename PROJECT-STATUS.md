@@ -1,14 +1,20 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-09-22
+Last updated: 2026-09-23
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.8.md](./CRM-DECISIONS-v1.8.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
 
 ## Approved inbound research extension: 2026-09-17
 
+### Gmail live activation approval, v1.12
+
+Owner approved separating Gmail activation from Xaviar sign-offs on September 23. See [CRM-DECISIONS-v1.12.md](./CRM-DECISIONS-v1.12.md). Google authorization is confirmed by the live Admin screen, which reports Connected, intake disabled. Production release-setting update, activation and worker checks are in progress. Real-message delivery remains unverified until a new qualifying message arrives after activation. Xaviar approvals remain outstanding independently.
+
 ### Admin-only mailbox replacement, v1.11
 
-Owner approved replacement controls and mailbox identity visible only to Admin. [CRM-DECISIONS-v1.11.md](./CRM-DECISIONS-v1.11.md) defines the contract. Implementation adds a confirmation form, Admin-only endpoint, atomic token/lease/OAuth invalidation, revision checking and opaque message namespaces. Existing leads remain unchanged. Validation: 87 application tests and all 23 isolated migrations passed; API/web typechecks passed. Production release and UI verification pending. No real mailbox replacement is authorized or performed as part of feature testing.
+Owner approved replacement controls and mailbox identity visible only to Admin. [CRM-DECISIONS-v1.11.md](./CRM-DECISIONS-v1.11.md) defines the contract. Implementation adds a confirmation form, Admin-only endpoint, atomic token/lease/OAuth invalidation, revision checking and opaque message namespaces. Existing leads remain unchanged. Validation: 87 application tests and all 23 isolated migrations passed; API/web typechecks passed.
+
+Production verified September 23: PR46 merged as `2ce66820287f4d90e28aa8a4e8e4948c0accc407`; existing Vercel deployment `EeCjQmx7Y9PGhupKaUnkvUVhJhKU` succeeded. Migration `202609230001` appears once in the canonical ledger. Direct authenticated RPC execution is denied; service-role execution is allowed. Live Admin confirmation opens, starts disabled and cancels without changing the mailbox. Marketing Agent and Marketing Manager role-preview research pages show no Gmail settings; automated API role-denial tests supplement this UI check (preview is not a separate authenticated session). No observed browser-console errors. Production replacement audit count is zero. No real mailbox replacement was performed. The live page still reports Not connected and activation awaiting approvals; mailbox-owner Google consent, activation and live-message acceptance remain separate outstanding work. Post-release documentation updates are queued locally for the next grouped release per the SOP.
 
 ### One-minute Gmail intake requested
 
