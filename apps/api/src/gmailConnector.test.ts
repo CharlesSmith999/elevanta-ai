@@ -1,8 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
-import {seal,unseal,validSchedulerSecret,gmailConfig,saveGmailMailbox,gmailHealth} from './gmailConnector.js';
+import {seal,unseal,validSchedulerSecret,gmailConfig,saveGmailMailbox,gmailHealth,replaceGmailMailbox,gmailMessageKey} from './gmailConnector.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
+test('replacement uses actor/workspace/revision and never returns a credential',async()=>{
+ const db={rpc:async(name:string,args:Record<string,unknown>)=>{assert.equal(name,'gmail_replace_mailbox');assert.deepEqual(args,{p_workspace:'w',p_actor:'a',p_mailbox:'new@example.invalid',p_expected_revision:'r'});return {error:null};}} as unknown as SupabaseClient;
+ assert.equal(await replaceGmailMailbox(db,'w','a','new@example.invalid','r'),undefined);
+ const bad={rpc:async()=>({error:{message:'sensitive internal detail'}})} as unknown as SupabaseClient;
+ await assert.rejects(()=>replaceGmailMailbox(bad,'w','a','new@example.invalid','r'),/Refresh status/);
+});
+test('message namespaces preserve legacy IDs and separate replacement mailboxes without exposing emails',()=>{
+ assert.equal(gmailMessageKey(undefined,'same-id'),'same-id');
+ assert.equal(gmailMessageKey('','same-id'),'same-id');
+ assert.notEqual(gmailMessageKey('opaque-a:','same-id'),gmailMessageKey('opaque-b:','same-id'));
+});
 test('saving a mailbox needs no Google authorization or token configuration',async()=>{
  let called=false;
  const db={rpc:async(name:string,args:Record<string,unknown>)=>{assert.equal(name,'gmail_save_mailbox');assert.equal(args.p_mailbox,'later@example.invalid');called=true;return {error:null};}} as unknown as SupabaseClient;

@@ -8,6 +8,8 @@ CRM readiness reference: [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE
 
 ## 1. Product vision
 
+Admin-only mailbox replacement is governed by [CRM-DECISIONS-v1.11.md](./CRM-DECISIONS-v1.11.md). Existing leads remain intact; each new mailbox requires fresh consent and explicit activation.
+
 The incoming research queue now follows [CRM-DECISIONS-v1.9.md](./CRM-DECISIONS-v1.9.md): shared Marketing/Admin visibility with no claim step. Normal CRM lead scope is unchanged.
 
 Direct Gmail research intake implementation and activation checklist: [GMAIL-INTAKE-IMPLEMENTATION.md](./docs/GMAIL-INTAKE-IMPLEMENTATION.md). Intake is new-email-only after activation and does not read the Google Sheet. The owner-approved one-minute checking requirement is governed by [CRM-DECISIONS-v1.10.md](./CRM-DECISIONS-v1.10.md); the daily deployed schedule does not satisfy this requirement.

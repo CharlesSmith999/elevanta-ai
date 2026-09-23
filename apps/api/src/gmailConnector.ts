@@ -61,10 +61,15 @@ export async function saveGmailMailbox(db:SupabaseClient,workspace:string,actor:
  const {error}=await db.rpc('gmail_save_mailbox',{p_workspace:workspace,p_actor:actor,p_mailbox:mailbox});check(error);
 }
 export async function gmailHealth(db: SupabaseClient, workspace: string) {
-  const { data, error } = await db.from('gmail_connections').select('mailbox,encrypted_refresh_token,enabled,activated_at,last_sync_at,last_error').eq('workspace_id',workspace).maybeSingle(); check(error);
+  const { data, error } = await db.from('gmail_connections').select('mailbox,settings_revision,encrypted_refresh_token,enabled,activated_at,last_sync_at,last_error').eq('workspace_id',workspace).maybeSingle(); check(error);
   let setupReady=false;try{gmailConfig();setupReady=true;}catch{}
-  return { mailbox:data?.mailbox ?? '', setupReady, connected: Boolean(data?.encrypted_refresh_token), enabled: data?.enabled ?? false, activatedAt:data?.activated_at, lastSyncAt:data?.last_sync_at, lastError:data?.last_error, activationApproved: process.env.GMAIL_LIVE_APPROVED === 'true' };
+  return { mailbox:data?.mailbox ?? '', settingsRevision:data?.settings_revision, setupReady, connected: Boolean(data?.encrypted_refresh_token), enabled: data?.enabled ?? false, activatedAt:data?.activated_at, lastSyncAt:data?.last_sync_at, lastError:data?.last_error, activationApproved: process.env.GMAIL_LIVE_APPROVED === 'true' };
 }
+export async function replaceGmailMailbox(db:SupabaseClient,workspace:string,actor:string,mailbox:string,revision:string) {
+ const {error}=await db.rpc('gmail_replace_mailbox',{p_workspace:workspace,p_actor:actor,p_mailbox:mailbox,p_expected_revision:revision});
+ if(error)throw new Error('Mailbox change failed. Refresh status and check the replacement email before trying again.');
+}
+export const gmailMessageKey = (prefix:string|undefined,id:string) => `${prefix ?? ''}${id}`;
 export async function setGmailEnabled(db: SupabaseClient, workspace: string, enabled: boolean) {
   if (enabled && process.env.GMAIL_LIVE_APPROVED !== 'true') throw new Error('Gmail activation requires the documented release approvals.');
   const now = new Date().toISOString();
@@ -81,15 +86,15 @@ export async function syncGmail(db: SupabaseClient, workspace: string) {
     const tokens = await tokenRequest({ grant_type:'refresh_token', refresh_token:unseal(connection.encrypted_refresh_token,config.key,workspace) });
     const reader = createGmailReader(tokens.access_token); await reader.verifyMailbox(connection.mailbox);
     const page = await reader.list(connection.scan_after ?? connection.activated_at, connection.page_token ?? undefined);
-    const {data:recorded,error:recordedError}=await db.rpc('gmail_recorded_ids',{p_workspace:workspace,p_lease:lease,p_ids:page.messages.map(m=>m.id)});check(recordedError);
+    const {data:recorded,error:recordedError}=await db.rpc('gmail_recorded_ids',{p_workspace:workspace,p_lease:lease,p_ids:page.messages.map(m=>gmailMessageKey(connection.message_prefix,m.id))});check(recordedError);
     const done=new Set((recorded ?? []).map((m:{provider_message_id:string})=>m.provider_message_id));
     for (const item of page.messages) {
-      if(done.has(item.id))continue;
+      if(done.has(gmailMessageKey(connection.message_prefix,item.id)))continue;
       if (Date.now()-started>40000) throw new GmailReadError('temporary');
       const message = await reader.message(item.id); const result = parseBarkMessage(message,connection.activated_at);
       const received = new Date(Number(message.internalDate));
       if (!Number.isFinite(received.getTime())) throw new GmailReadError('invalid_response');
-      const { error: persistError } = await db.rpc('gmail_record_message',{p_workspace:workspace,p_lease:lease,p_message_id:item.id,p_thread_id:message.threadId ?? null,p_received_at:received.toISOString(),p_outcome:result.state,p_payload:result.state==='parsed'?result.lead:{},p_failure:result.state==='parsed'?null:result.code}); check(persistError); processed++;
+      const { error: persistError } = await db.rpc('gmail_record_message',{p_workspace:workspace,p_lease:lease,p_message_id:gmailMessageKey(connection.message_prefix,item.id),p_thread_id:message.threadId ?? null,p_received_at:received.toISOString(),p_outcome:result.state,p_payload:result.state==='parsed'?result.lead:{},p_failure:result.state==='parsed'?null:result.code}); check(persistError); processed++;
     }
     const { error: finishError } = await db.from('gmail_connections').update({ page_token:page.nextPageToken ?? null, ...(page.nextPageToken?{}:{scan_after:new Date(Math.max(Date.parse(connection.activated_at),started-86400000)).toISOString()}),lease_id:null,lease_until:null,last_sync_at:new Date().toISOString(),last_error:null }).eq('workspace_id',workspace).eq('lease_id',lease).eq('enabled',true); check(finishError);
     return { state:'synced', processed };

@@ -17,10 +17,10 @@ test('deployment rewrite preserves nested CRM routes and query filters', () => {
 
 const profile = { id: '00000000-0000-4000-8000-000000000001', workspace_id: '00000000-0000-4000-8000-000000000002', role: 'sales_agent', full_name: 'Synthetic Test Agent', manager_id: null, department: 'sales', active: true };
 
-function fakeClient(mode: 'active' | 'invalid' | 'inactive' | 'error' = 'active', selections: string[] = []) {
+function fakeClient(mode: 'active' | 'invalid' | 'inactive' | 'error' = 'active', selections: string[] = [], role = 'sales_agent') {
   const query = {
     select(columns: string) { selections.push(columns); return query; }, eq() { return query; }, order() { return query; },
-    maybeSingle: async () => ({ data: { ...profile, active: mode !== 'inactive' }, error: null }),
+    maybeSingle: async () => ({ data: { ...profile, role, active: mode !== 'inactive' }, error: null }),
     then(resolve: (value: unknown) => unknown) { return Promise.resolve({ data: [profile], error: null }).then(resolve); },
   };
   return {
@@ -60,6 +60,7 @@ test('Sales users cannot read, edit, publish, or inspect health for masked resea
       ['/v1/admin/gmail', { headers }],
       ['/v1/admin/gmail/mailbox', { method:'PUT', headers, body:'{"mailbox":"synthetic@example.invalid"}' }],
       ['/v1/admin/gmail/connect', { method:'POST', headers }],
+      ['/v1/admin/gmail/replace-mailbox', { method:'POST', headers,body:'{}' }],
     ];
     for (const [path, options] of routes) {
       const response = await fetch(`${base}${path}`, { ...options, signal: AbortSignal.timeout(2000) });
@@ -69,6 +70,17 @@ test('Sales users cannot read, edit, publish, or inspect health for masked resea
     server.closeAllConnections();
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
+});
+
+for(const role of ['marketer','manager','sales_agent'])test(`${role} cannot see mailbox or manage any Gmail connection control`,async()=>{
+ const server=createApp(()=>fakeClient('active',[],role)).listen(0,'127.0.0.1');
+ try{
+  await new Promise<void>(resolve=>server.once('listening',resolve));
+  for(const [path,method] of [['','GET'],['/mailbox','PUT'],['/connect','POST'],['/replace-mailbox','POST'],['/enabled','POST'],['/sync','POST']]){
+   const r=await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/v1/admin/gmail${path}`,{method,headers:{Authorization:'Bearer synthetic','Content-Type':'application/json'},...(method==='GET'?{}:{body:'{}'})});
+   assert.equal(r.status,403);assert.deepEqual(await r.json(),{message:'Only Admin can manage Gmail.'});
+  }
+ }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
 });
 
 for (const [mode, expected] of [['active', 200], ['invalid', 401], ['inactive', 403], ['error', 500]] as const) {
