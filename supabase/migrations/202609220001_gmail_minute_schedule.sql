@@ -14,6 +14,7 @@ create table gmail_private.scheduler_state (
   state text not null default 'pending'
 );
 revoke all on gmail_private.scheduler_state from public, anon, authenticated, service_role;
+alter table gmail_private.scheduler_state enable row level security;
 insert into gmail_private.scheduler_state(singleton) values(true);
 
 create function gmail_private.dispatch() returns void
