@@ -37,6 +37,8 @@ The old script labels threads rather than individual messages, lacks a message-I
 
 ## Current status
 
+September 23 activation authority: [Decisions v1.12](../CRM-DECISIONS-v1.12.md) removes the Xaviar sign-off dependency for Gmail only. Owner consent is confirmed by the live Connected status. Enable the production release setting and perform explicit Admin activation for new messages only; scheduled Google access and actual message ingestion must each be verified, not inferred from authorization.
+
 Latest verified release: PR45 is deployed as production commit `5932b6af617828b437b2f16854e8dd9bf5be12a7`. Minute scheduler and draft-safe refresh are deployed; server credentials are effective. Google sole test-user entry and gmail.readonly scope are saved. Consecutive scheduler runs and a credential-authenticated HTTP200 idle response are verified. Consent by the mailbox owner, live activation and real-message acceptance are still pending. External Testing refresh tokens expire in seven days; durable production OAuth readiness must be addressed separately. See [GMAIL-MINUTE-ACCEPTANCE.md](./GMAIL-MINUTE-ACCEPTANCE.md). This supersedes the earlier pending implementation/configuration statements retained below.
 
 Latest instruction: connect the privately designated Gmail mailbox and check every minute, under [Decisions v1.10](../CRM-DECISIONS-v1.10.md). One-minute scheduling and draft-safe list refresh are pending, not deployed. The Vercel dashboard confirms the existing team is Hobby; an approved supported scheduler is needed rather than deploying an invalid minute-level Vercel cron. Google authorization is now requested by the owner but not yet granted.

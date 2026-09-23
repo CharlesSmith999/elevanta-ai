@@ -16,7 +16,8 @@ Authority: CRM-DECISIONS-v1.10. No credentials or mailbox addresses in this file
 - PASS: exactly one active minute job. Successful runs at 00:48, 00:49 and 00:50 UTC on 2026-09-23. State intake_disabled, enabled mailbox count zero. These prove scheduling, not Gmail ingestion.
 - PASS: PR45 merged as 5932b6af617828b437b2f16854e8dd9bf5be12a7. Production deployment 4SrYFWkaRyi3ukVTXK6BGzRbgbug is Ready. GitHub run319 passed. Live page shows minute schedule and draft-safe refresh copy; authorization button is enabled. Health/readiness pass; no browser console errors observed.
 - PASS: a diagnostic pg_net call to the fixed worker with the Vault credential returned HTTP200, no timeout, body {"state":"idle"}. No mailbox enabled or read by this check.
-- Pending: Google mailbox-owner consent. App is in External Testing; verify reconnect/expiry implications before claiming durable unattended service.
+- PASS: mailbox-owner reported consent complete on September 23; live Admin status refresh confirmed `Connected, intake disabled`. This verifies saved authorization, not successful Gmail ingestion. App remains in External Testing; seven-day token expiry still limits unattended service.
+- PASS: owner explicitly approved independent Gmail activation on September 23, recorded in Decisions v1.12. Xaviar sign-offs remain separate. Server configuration and live activation checks are in progress.
 - Pending: authenticated worker HTTP acceptance, fresh Bark message exactly once, Marketing visible / Sales denied, disable/retry checks.
 
 No live mailbox intake is claimed complete until these checks pass. Keep the server activation gate disabled until authorization and release approvals are satisfied.
