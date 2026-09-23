@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { GmailConnection } from './GmailConnection';
+import { researchRefresh } from './researchRefresh';
 import { IconArrowLeft, IconCircleCheck, IconExternalLink, IconMail, IconPhone, IconSearch, IconSend, IconShieldLock, IconTrash } from '@tabler/icons-react';
 import type { Session } from '@supabase/supabase-js';
 import type { LeadCategory, User } from './domain';
@@ -19,10 +20,16 @@ export function LeadResearchQueue({ viewer, users, session, onPublished, onNotic
 
   useEffect(() => {
     if (!session) { setLoading(false); return; }
-    let active = true; setLoading(true); setError('');
-    loadResearchLeads(session).then((records) => { if (active) setItems(records); }).catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Research leads could not be loaded.'); }).finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [session]);
+    if (selectedId || saving) return;
+    setLoading(true); setError('');
+    return researchRefresh({
+      load: () => loadResearchLeads(session),
+      apply: records => { setItems(records); setError(''); },
+      fail: reason => setError(reason instanceof Error ? reason.message : 'Research leads could not be loaded.'),
+      settled: () => setLoading(false),
+      schedule: (tick, ms) => { const timer = window.setInterval(tick, ms); return () => window.clearInterval(timer); },
+    });
+  }, [session, selectedId, saving]);
 
   async function save(next: ResearchLead) {
     if (next.state === 'ready_for_sales' && !isReadyForSales(next)) {
@@ -60,7 +67,7 @@ export function LeadResearchQueue({ viewer, users, session, onPublished, onNotic
   const counts = Object.fromEntries(researchStates.map((state) => [state, items.filter((item) => canViewResearchLead(viewer, item, users) && item.state === state).length]));
   return <section className="research-page">
     {viewer.role === 'admin' && session && <GmailConnection session={session} />}
-    <header className="research-hero"><div><span className="eyebrow">MARKETING / INBOUND RESEARCH</span><h2>Lead Research Queue</h2><p>Shared Marketing queue. Anyone in Marketing can add details and send a ready lead to Sales. No claim step is required.</p></div><div className="research-connection"><IconMail size={20} /><span><b>Gmail activation pending</b><small>Safe test data only</small></span></div></header>
+    <header className="research-hero"><div><span className="eyebrow">MARKETING / INBOUND RESEARCH</span><h2>Lead Research Queue</h2><p>Shared Marketing queue. Anyone in Marketing can add details and send a ready lead to Sales. No claim step is required.</p></div><div className="research-connection"><IconMail size={20} /><span><b>{session ? 'Shared CRM research' : 'Demo research'}</b><small>{session ? 'List refreshes every minute; open drafts stay unchanged' : 'Safe test data only'}</small></span></div></header>
     <div className="research-metrics"><article><strong>{visible.length}</strong><span>Visible items</span></article><article><strong>{counts.researching ?? 0}</strong><span>Researching</span></article><article><strong>{(counts.found ?? 0) + (counts.connected ?? 0)}</strong><span>Information found</span></article><article><strong>{counts.ready_for_sales ?? 0}</strong><span>Ready for Sales</span></article></div>
     <div className="research-toolbar"><label>Status<select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)}><option value="all">All research states</option>{researchStates.map((state) => <option key={state} value={state}>{researchStateLabels[state]}</option>)}</select></label><span>{visible.length} result{visible.length === 1 ? '' : 's'}</span></div>
     {error && <p className="warning" role="alert">{error}</p>}{loading ? <p className="research-loading">Loading research queue…</p> : <div className="research-list"><div className="research-row research-head"><span>Lead</span><span>Category</span><span>Research state</span><span>Contact readiness</span><span>Received</span></div>{visible.map((lead) => <button key={lead.id} className="research-row" onClick={() => setSelectedId(lead.id)}><span><b>{lead.name}</b><small>{lead.maskedEmail ?? lead.maskedPhone ?? 'Masked contact unavailable'}</small></span><span>{leadCategoryLabels[lead.category]}</span><span><i className={`research-status ${lead.state}`}>{researchStateLabels[lead.state]}</i></span><span className={isReadyForSales(lead) ? 'research-ready' : ''}>{isReadyForSales(lead) ? 'Usable contact found' : 'Research required'}</span><span>{new Date(lead.receivedAt).toLocaleString()}</span></button>)}{!visible.length && <p className="research-loading">No research leads match this view.</p>}</div>}
