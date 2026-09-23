@@ -6,7 +6,13 @@ Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.
 
 ## Approved inbound research extension: 2026-09-17
 
+### Admin-only mailbox replacement, v1.11
+
+Owner approved replacement controls and mailbox identity visible only to Admin. [CRM-DECISIONS-v1.11.md](./CRM-DECISIONS-v1.11.md) defines the contract. Implementation adds a confirmation form, Admin-only endpoint, atomic token/lease/OAuth invalidation, revision checking and opaque message namespaces. Existing leads remain unchanged. Validation: 87 application tests and all 23 isolated migrations passed; API/web typechecks passed. Production release and UI verification pending. No real mailbox replacement is authorized or performed as part of feature testing.
+
 ### One-minute Gmail intake requested
+
+Production update, September 22 local / September 23 UTC: PR45 merged as `5932b6af617828b437b2f16854e8dd9bf5be12a7`, deployed to existing Vercel as `4SrYFWkaRyi3ukVTXK6BGzRbgbug`. Migration `202609220001` and exactly one active minute job are confirmed. Three consecutive minute runs succeeded; protected Vault-to-Vercel diagnostic returned HTTP200 idle. API health/readiness pass; live research page shows revised schedule and enabled authorization button with no observed console errors. Google test-user and read-only scope setup is saved. Mailbox consent, activation and fresh-message acceptance remain outstanding. External Testing has a seven-day Google refresh-token limit; durable production authorization is not yet complete. This supersedes the pending deployment/scheduler statements below. Full evidence: [GMAIL-MINUTE-ACCEPTANCE.md](./docs/GMAIL-MINUTE-ACCEPTANCE.md).
 
 Implementation update: minute scheduler migration and draft-safe research list refresh are implemented locally. 82 application tests, both typechecks, build and 22 isolated migration replays passed. Real scheduler/network checks remain distinct from the local test doubles. See [GMAIL-MINUTE-ACCEPTANCE.md](./docs/GMAIL-MINUTE-ACCEPTANCE.md) for release gates. No mailbox connection or live ingestion is claimed yet.
 
