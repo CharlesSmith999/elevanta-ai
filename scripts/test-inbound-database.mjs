@@ -3,8 +3,19 @@ import { readFile, readdir } from 'node:fs/promises';
 const db = new PGlite();
 await db.exec(`create role anon; create role authenticated; create role service_role bypassrls; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; grant usage on schema auth,public to authenticated,anon; grant execute on function auth.uid() to authenticated,anon;`);
 const dir = new URL('../supabase/migrations', import.meta.url);
+// PGlite cannot run background workers. These doubles test SQL/control flow only;
+// real pg_cron/pg_net timing and HTTP delivery require production acceptance.
+await db.exec(`create schema cron; create schema net; create schema vault;
+create table cron.job(jobname text primary key,schedule text,command text);
+create function cron.schedule(text,text,text) returns bigint language sql as $$
+ insert into cron.job values($1,$2,$3) on conflict(jobname) do update set schedule=$2,command=$3 returning 1::bigint $$;
+create table vault.decrypted_secrets(name text,decrypted_secret text);
+create table net._http_response(id bigint,status_code integer,timed_out boolean,error_msg text);
+create table net.test_requests(id bigint generated always as identity,url text,headers jsonb,timeout_milliseconds integer);
+create function net.http_get(url text,params jsonb default '{}',headers jsonb default '{}',timeout_milliseconds integer default 2000) returns bigint language sql as $$
+ insert into net.test_requests(url,headers,timeout_milliseconds) values($1,$3,$4) returning id $$;`);
 for (const file of (await readdir(dir)).filter(x=>x.endsWith('.sql')).sort()) {
-  const sql=(await readFile(new URL(file, new URL(dir.href + '/')),'utf8')).replace('create extension if not exists pgcrypto;', '');
+  const sql=(await readFile(new URL(file, new URL(dir.href + '/')),'utf8')).replace(/create extension if not exists (pgcrypto|pg_cron|pg_net);/g, '');
   try { await db.exec(sql); console.log('PASS migration',file); }
   catch(e) { console.error('FAIL migration',file,e.message); process.exit(1); }
 }
@@ -90,4 +101,22 @@ await asUser(other);
 check((await db.query("select * from inbound_lead_candidates where name='Inbound Synthetic'")).rows.length===1,'unowned incoming lead visible to Marketing');
 await asUser(sales);
 check((await db.query("select * from inbound_lead_candidates where name='Inbound Synthetic'")).rows.length===0,'unowned incoming lead hidden from Sales');
+await denied('select gmail_private.dispatch()',[],'Sales cannot call scheduler');
+await db.exec('reset role');
+check((await db.query("select * from cron.job where jobname='elevanta-gmail-minute' and schedule='* * * * *'")).rows.length===1,'one minute job registered');
+await db.exec('update gmail_connections set enabled=false; select gmail_private.dispatch();');
+check((await db.query('select * from net.test_requests')).rows.length===0,'disabled intake sends no network request');
+await db.exec('update gmail_connections set enabled=true; select gmail_private.dispatch();');
+check((await db.query('select state from gmail_private.scheduler_state')).rows[0].state==='missing_secret','missing scheduler credential fails closed');
+await db.query('insert into vault.decrypted_secrets values($1,$2)',['elevanta_gmail_cron_secret','synthetic-not-a-secret-for-testing-only']);
+await db.exec('select gmail_private.dispatch();');
+const dispatched=(await db.query('select * from net.test_requests')).rows[0];
+check(dispatched.url==='https://elevanta-ai-pipeline.vercel.app/api/v1/internal/gmail/sync'&&dispatched.headers.Authorization==='Bearer synthetic-not-a-secret-for-testing-only'&&dispatched.timeout_milliseconds===55000,'fixed endpoint and Vault Bearer used');
+await db.exec(`insert into net._http_response values(${dispatched.id},401,false,null); select gmail_private.dispatch();`);
+check((await db.query('select state from gmail_private.scheduler_state')).rows[0].state==='http_error','HTTP auth failure not mistaken for cron success');
+const nextRequest=(await db.query('select request_id from gmail_private.scheduler_state')).rows[0].request_id;
+await db.exec(`insert into net._http_response values(${nextRequest},200,false,null); select gmail_private.dispatch();`);
+check((await db.query('select state from gmail_private.scheduler_state')).rows[0].state==='delivered','HTTP result tracked separately from ingestion outcome');
+await db.exec('set role service_role');
+await denied('select * from gmail_private.scheduler_state',[],'ordinary backend cannot read scheduler state');
 await db.close();

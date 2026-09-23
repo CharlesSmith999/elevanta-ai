@@ -23,7 +23,7 @@ export function GmailConnection({session}:{session:Session}) {
   }catch(error){setMessage(error instanceof Error?error.message:'Gmail operation failed.');}
   finally{setBusy(false);}
  }
- return <section className="research-card" aria-label="Admin Gmail connection"><h3>Gmail intake</h3><p>{health?.enabled?'Automatic intake enabled':health?.connected?'Connected, intake disabled':'Not connected'}. Direct Gmail intake, not Google Sheets. Daily scheduled sync; use Sync now for an immediate check.</p>
+ return <section className="research-card" aria-label="Admin Gmail connection"><h3>Gmail intake</h3><p>{health?.enabled?'Automatic intake enabled':health?.connected?'Connected, intake disabled':'Not connected'}. Direct Gmail intake, not Google Sheets. Once activated, scheduled checks run every minute; delivery can take longer. Use Sync now for an immediate check.</p>
  <form onSubmit={save} className="research-mailbox-form">
  <label htmlFor="gmail-mailbox">Lead inbox email</label>
  <div className="research-mailbox-controls"><input id="gmail-mailbox" name="mailbox" type="email" autoComplete="email" required maxLength={254} value={mailbox} onChange={event=>setMailbox(event.target.value)} placeholder="Enter the email address when ready" disabled={busy||!health||health.connected} aria-describedby="gmail-mailbox-help" /><button className="primary" type="submit" disabled={busy||!health||health.connected||!mailbox.trim()}>{busy?'Please wait…':'Save email for later'}</button></div>

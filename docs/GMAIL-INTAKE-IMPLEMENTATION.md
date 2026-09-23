@@ -14,6 +14,12 @@ Authority: [Decisions v1.8](../CRM-DECISIONS-v1.8.md). The owner approved direct
 
 ## Delivery sequence and acceptance
 
+### One-minute implementation work (2026-09-22)
+
+Use the existing Supabase Cron and pg_net extensions to invoke the fixed production worker URL every minute. Read the Bearer secret from Vault at execution, never embed its value in job SQL. The database function is restricted to the database administrator, skips HTTP while intake is disabled, and records request IDs for checking HTTP results separately from cron success. Remove the old Vercel daily job in the same release. No release gate is relaxed.
+
+Research-list refresh runs every minute only while the list is open. Opening a record cancels delivery of pending refresh results; no background reload can replace an unsaved draft. Returning to the list reloads current records. Test initial load, overlap, failures, cleanup and delayed results before release.
+
 1. Implement a bounded parser and read-only Gmail message reader with synthetic tests.
 2. Configure the existing project's Google OAuth client, exact callback URL and server-side encrypted credential storage. Consent must be granted by the mailbox owner. An email address alone is not authorization.
 3. Add connection state, activation time, durable polling lease/cursor, per-message retry/review records, and scoped transactional persistence. Do not use broad service-role access in ordinary CRM requests.
@@ -31,11 +37,25 @@ The old script labels threads rather than individual messages, lacks a message-I
 
 ## Current status
 
+Latest instruction: connect the privately designated Gmail mailbox and check every minute, under [Decisions v1.10](../CRM-DECISIONS-v1.10.md). One-minute scheduling and draft-safe list refresh are pending, not deployed. The Vercel dashboard confirms the existing team is Hobby; an approved supported scheduler is needed rather than deploying an invalid minute-level Vercel cron. Google authorization is now requested by the owner but not yet granted.
+
+Setup verification (2026-09-22): the owner-designated address is saved in the production Admin form. The earlier Google 2-step-verification blocker is resolved. The OAuth client is created and server credentials are saved as detailed below. Supabase Vault is already installed and the scheduler credential is stored there. Supabase Cron remains to be configured and tested in the existing project. Reference: https://supabase.com/docs/guides/cron . No paid upgrade or new hosting instance was created.
+
 Owner update: provide an Admin form to save the mailbox later without Google authorization or OAuth server configuration. Saving is not connecting or activating. The saved address is workspace-scoped and validated server-side. Once connected, changing the mailbox is blocked to prevent silently replacing credentials. OAuth callbacks must match the saved mailbox and settings revision. Release may proceed with intake disabled; live Google acceptance is deferred by the owner.
 
-Parser/reader, OAuth/PKCE callback, encrypted token storage, worker leases/cursor, idempotent persistence, scheduler and Admin controls are implemented locally. They are not deployed or connected. Mailbox identity is supplied privately by the owner and must not be hardcoded in public source. Google Cloud was inspected and blocks setup until the signed-in account enables 2-step verification. Live OAuth consent, configuration, production migration and real-message acceptance remain pending.
+The implementation and Admin form were deployed through PR #44 on 2026-09-21, production commit `bad78de7c405611af3a5d016bd6d4a522c6797fb`. Both production migrations are confirmed. The form was initially blank; the owner-designated address has since been saved. A rollback-only production persistence test passed. Gmail remains disconnected and intake disabled. Live OAuth consent and real-message acceptance are outstanding. Mailbox identity must not be hardcoded in public source.
 
 ## Server implementation contract
+
+Google setup progress (2026-09-22): security access is restored. Created the single integration project `canvas-hybrid-509321-m7` (Elevanta AI Gmail Intake) and verified Gmail API is Enabled. With explicit owner permission, the Google User Data Policy was accepted and the Elevanta AI consent application was created, with the existing Cloud administrator as support/developer contact and External testing audience. After exact owner approval for credential creation and storage, created one Web application client named Elevanta AI Production Gmail with only `https://elevanta-ai-pipeline.vercel.app/api/v1/inbound/gmail/callback` as its redirect. Creation was confirmed by Google's success dialog.
+
+Credential storage verified on 2026-09-22:
+
+- Existing Vercel project, Production only, Secret type: `GOOGLE_GMAIL_CLIENT_ID`, `GOOGLE_GMAIL_CLIENT_SECRET`, `GMAIL_REDIRECT_URI`, `GMAIL_TOKEN_KEY`, `CRON_SECRET`. Encryption key generated with cryptographically secure 32-byte randomness; independent scheduler secret generated with 48-byte randomness.
+- Existing Supabase project Vault: `elevanta_gmail_cron_secret`, matching Vercel `CRON_SECRET`. Supabase confirmed successful save. No OAuth client secret or encryption key duplicated into ordinary database tables.
+- Values were not printed in chat, written to source files, or committed. No existing credentials were replaced. No new Supabase/Vercel project or paid service was created.
+- Vercel states a new deployment is needed for environment changes to take effect. Deployment of this configuration is not yet verified. `GMAIL_LIVE_APPROVED` was not enabled.
+- Still outstanding: Google test-user/scope setup, mailbox-owner consent, minute scheduler, draft-safe queue refresh and live-message acceptance. Credential creation is not mailbox connection or activation.
 
 - Gmail connection operations require an authenticated active workspace Admin. OAuth uses PKCE, a ten-minute single-use state, and an HttpOnly same-site browser cookie. Callback validates the configured mailbox.
 - Refresh tokens use AES-256-GCM encryption with workspace-bound authenticated data and a server-only 32-byte key. No token is returned to the browser or included in health responses.

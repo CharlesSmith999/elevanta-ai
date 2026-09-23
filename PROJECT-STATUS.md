@@ -1,10 +1,32 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-09-19
+Last updated: 2026-09-22
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.8.md](./CRM-DECISIONS-v1.8.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
 
 ## Approved inbound research extension: 2026-09-17
+
+### One-minute Gmail intake requested
+
+Implementation update: minute scheduler migration and draft-safe research list refresh are implemented locally. 82 application tests, both typechecks, build and 22 isolated migration replays passed. Real scheduler/network checks remain distinct from the local test doubles. See [GMAIL-MINUTE-ACCEPTANCE.md](./docs/GMAIL-MINUTE-ACCEPTANCE.md) for release gates. No mailbox connection or live ingestion is claimed yet.
+
+Owner approved connecting the designated Gmail account and checking every minute. See [CRM-DECISIONS-v1.10.md](./CRM-DECISIONS-v1.10.md). Documents updated first. The existing Vercel team is confirmed Hobby; its native daily scheduler cannot meet the requirement. Gmail consent, secure server configuration, supported minute scheduling, draft-safe list refresh and live delivery acceptance remain pending. The deployed inactive form is not a completed live intake connection.
+
+The designated address is saved in the live Admin form. The Google 2-step-verification blocker is resolved. On September 22, with explicit owner approval, the production Gmail OAuth client was created, five server configuration/secret values were saved in existing Vercel Production settings, and the matching scheduler secret was saved in existing Supabase Vault. Save confirmations were verified. Values are not stored in project documents or Git. See [credential storage record](./docs/GMAIL-INTAKE-IMPLEMENTATION.md).
+
+These settings still need deployment. Google test-user/scope setup, mailbox-owner consent, minute scheduling, draft-safe queue refresh and a real-message acceptance test remain outstanding. Intake is not enabled. No new hosting project or paid upgrade was activated. This update supersedes the older Google setup-blocked statements in the historical entries below.
+
+### Production release verified: 2026-09-21
+
+This update supersedes the September 19 pending-deployment statements below. PR #44 merged to `main` as `bad78de7c405611af3a5d016bd6d4a522c6797fb`. The existing Vercel project successfully deployed it as `4yZxdNz3nmvDAhuFd73YDB69gAJB`. Both production API health and readiness checks passed.
+
+- The Admin form is live under Lead research > Gmail intake > Lead inbox email. It was blank at release; the designated email has since been saved. Saving is separate from Google authorization and activation.
+- Both migrations `202609190001` and `202609190002` are confirmed in the production ledger. A rollback-only production test verified mailbox persistence with no refresh token and intake disabled; no test mailbox was retained.
+- The signed-in Admin form loaded successfully without browser console errors. The Admin role switcher confirmed Marketing can see the research page without Admin settings, and Sales has no research navigation. These UI checks are not separate authenticated-role security tests; automated API and database permission tests provide that coverage.
+- Release validation: 80 application tests, API/web typechecks, production build, and all 21 isolated migration replays passed before release. GitHub Actions run 314 passed.
+- Gmail is NOT connected or importing. OAuth configuration, owner consent, live-message acceptance and activation remain deliberately deferred. Google Sheets is not an intermediary. No real workbook migration occurred.
+
+Post-release verification documentation is recorded locally for the next grouped documentation update, avoiding a documentation-only production deployment under the SOP.
 
 ### Shared incoming queue update: 2026-09-19
 
