@@ -10,6 +10,8 @@ CRM readiness reference: [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE
 
 Gmail live activation may proceed independently of Xaviar sign-offs under owner-approved [CRM-DECISIONS-v1.12.md](./CRM-DECISIONS-v1.12.md). This does not waive Gmail security or end-to-end verification requirements.
 
+New-work audio alerts are governed by [CRM-DECISIONS-v1.13.md](./CRM-DECISIONS-v1.13.md). Eligible Marketing users receive a bell for new Research items, and only the assigned Sales Agent receives a bell for a new Sales assignment. The CRM provides a reduced-volume option but no in-app mute.
+
 Admin-only mailbox replacement is governed by [CRM-DECISIONS-v1.11.md](./CRM-DECISIONS-v1.11.md). Existing leads remain intact; each new mailbox requires fresh consent and explicit activation.
 
 The incoming research queue now follows [CRM-DECISIONS-v1.9.md](./CRM-DECISIONS-v1.9.md): shared Marketing/Admin visibility with no claim step. Normal CRM lead scope is unchanged.
