@@ -6,6 +6,7 @@ import type { Session } from '@supabase/supabase-js';
 import type { LeadCategory, User } from './domain';
 import { leadCategoryLabels, leadCategoryOptions } from './domain';
 import { loadResearchLeads, publishResearchLead, updateResearchLead } from './api';
+import { researchAlertRefreshEvent } from './LeadAlertController';
 import { canViewResearchLead, isReadyForSales, researchStateLabels, researchStates, seedResearchLeads, validResearchMethod, researchMethodKey, validEvidenceUrl, type ResearchLead, type ResearchMethod, type ResearchState } from './inboundResearch';
 
 export function LeadResearchQueue({ viewer, users, session, onPublished, onNotice }: { viewer: User; users: User[]; session?: Session; onPublished: (lead: ResearchLead, salesOwnerId: string) => Promise<void> | void; onNotice: (message: string) => void }) {
@@ -29,6 +30,17 @@ export function LeadResearchQueue({ viewer, users, session, onPublished, onNotic
       settled: () => setLoading(false),
       schedule: (tick, ms) => { const timer = window.setInterval(tick, ms); return () => window.clearInterval(timer); },
     });
+  }, [session, selectedId, saving]);
+
+  useEffect(() => {
+    if (!session || selectedId || saving) return;
+    let active = true;
+    const refresh = () => {
+      void loadResearchLeads(session).then((records) => { if (active) { setItems(records); setError(''); } })
+        .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Research leads could not be loaded.'); });
+    };
+    window.addEventListener(researchAlertRefreshEvent, refresh);
+    return () => { active = false; window.removeEventListener(researchAlertRefreshEvent, refresh); };
   }, [session, selectedId, saving]);
 
   async function save(next: ResearchLead) {

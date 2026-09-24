@@ -1,5 +1,5 @@
 // Read-only primitives. No polling or persistence is enabled by importing this module.
-export const barkParserVersion = 'bark-plain-v1';
+export const barkParserVersion = 'bark-mime-v2';
 export type GmailPart = { mimeType?: string; body?: { data?: string; size?: number }; parts?: GmailPart[]; headers?: { name: string; value: string }[] };
 export type GmailMessage = { id: string; threadId?: string; internalDate: string; labelIds?: string[]; payload?: GmailPart };
 export type BarkLead = { name: string; category: 'app' | 'web' | 'smm'; receivedAt: string; maskedPhone?: string; maskedEmail?: string; address?: string; credits?: number; description?: string; details?: string };
@@ -9,14 +9,27 @@ function header(message: GmailMessage, name: string) {
   return message.payload?.headers?.find(h => h.name.toLowerCase() === name)?.value ?? '';
 }
 
-function plainText(part: GmailPart, depth = 0): string {
+export function htmlEmailText(html: string): string {
+  // Convert inert text only. Never render email HTML or fetch embedded resources.
+  const entities: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”', ndash: '–', mdash: '—', colon: ':' };
+  return html.replace(/<!--[\s\S]*?-->/g, '').replace(/<(script|style|head)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
+    .replace(/<(?:br|hr)\b[^>]*>|<\/(?:p|div|tr|table|h[1-6]|li|section)\s*>/gi, '\n')
+    .replace(/<\/(?:td|th)\s*>/gi, ' ').replace(/<[^>]*>/g, '')
+    .replace(/&(#x[\da-f]+|#\d+|[a-z]+);/gi, (original, code: string) => {
+      if (!code.startsWith('#')) return entities[code.toLowerCase()] ?? original;
+      const point = code[1].toLowerCase() === 'x' ? parseInt(code.slice(2), 16) : Number(code.slice(1));
+      return point > 0 && point <= 0x10ffff && !(point >= 0xd800 && point <= 0xdfff) ? String.fromCodePoint(point) : '';
+    }).replace(/[ \t]+/g, ' ').replace(/ *\n */g, '\n');
+}
+
+function mimeText(part: GmailPart, mime: 'text/plain' | 'text/html', depth = 0): string {
   if (depth > 12) throw new Error('mime_depth');
-  if (part.mimeType === 'text/plain' && part.body?.data) {
+  if (part.mimeType === mime && part.body?.data) {
     if (part.body.data.length > 700000) throw new Error('body_too_large');
     return Buffer.from(part.body.data, 'base64url').toString('utf8');
   }
   if ((part.parts?.length ?? 0) > 100) throw new Error('mime_parts');
-  return (part.parts ?? []).map(p => plainText(p, depth + 1)).filter(Boolean).join('\n');
+  return (part.parts ?? []).map(p => mimeText(p, mime, depth + 1)).filter(Boolean).join('\n');
 }
 
 export function parseBarkMessage(message: GmailMessage, activatedAt: string): ParseResult {
@@ -30,13 +43,16 @@ export function parseBarkMessage(message: GmailMessage, activatedAt: string): Pa
   const sender = (from.match(/<([^<>]+)>$/)?.[1] ?? from).toLowerCase();
   if (!/^[^\s<>@]+@(?:[a-z0-9-]+\.)*bark\.com$/.test(sender)) return { state: 'ignored', code: 'not_bark_sender' };
   let body: string;
-  try { body = plainText(message.payload ?? {}); } catch { return { state: 'needs_review', code: 'unsupported_mime_size' }; }
-  if (!body.trim()) return { state: 'needs_review', code: 'plain_text_missing' };
+  try {
+    body = mimeText(message.payload ?? {}, 'text/plain');
+    if (!body.trim()) body = htmlEmailText(mimeText(message.payload ?? {}, 'text/html'));
+  } catch { return { state: 'needs_review', code: 'unsupported_mime_size' }; }
+  if (!body.trim()) return { state: 'needs_review', code: 'message_text_missing' };
   if (body.length > 500000) return { state: 'needs_review', code: 'body_too_large' };
   body = body.replace(/[\u200B\u200C\u200D\uFEFF\u00AD]/g, '').replace(/\u00A0/g, ' ').replace(/\r\n?/g, '\n');
   // Strip paired emphasis, never the asterisks inside masked contacts.
   const text = body.replace(/(?<![\w*])\*\*([^*\n]*\p{L}[^*\n]*)\*\*(?!\*)/gu, '$1');
-  const match = text.match(/^\s*([^\n]{1,160}?)\s+is looking for (?:a |an )?(Mobile Software Developer|Software Developer|Web Developer|Web Designer|Social Media Marketing Expert)\s*$/im);
+  const match = text.match(/^\s*([^\n]{1,160}?)\s+is looking for\s+(?:a\s+|an\s+)?(Mobile Software Developer|Software Developer|Web Developer|Web Designer|Social Media Marketing Expert)\b/im);
   if (!match) return { state: 'needs_review', code: 'unrecognized_lead_template' };
   const name = match[1].trim();
   const role = match[2].toLowerCase();

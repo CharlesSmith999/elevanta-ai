@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { IconActivityHeartbeat, IconAlertTriangle, IconArrowUpRight, IconBriefcase, IconBulb, IconCalendar, IconChartBar, IconChartPieFilled, IconChecklist, IconChevronDown, IconCircleCheck, IconClock, IconCurrencyDollar, IconFilter, IconFlag, IconHome, IconMenu2, IconMoonStars, IconReportAnalytics, IconRobot, IconRocket, IconSearch, IconSparkles, IconSun, IconTarget, IconTargetArrow, IconTrophy, IconTrendingUp, IconUserCircle, IconUsers, IconX } from '@tabler/icons-react';
 import { Area, AreaChart, Bar as RechartsBar, BarChart as RechartsBarChart, CartesianGrid, Cell, Funnel, FunnelChart, LabelList, Line, LineChart, RadialBar, RadialBarChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from 'recharts';
 import {
@@ -13,6 +13,7 @@ import { XaviarWorkspace } from './XaviarWorkspace';
 import { navigationFor } from './navigation';
 import { LeadWorkspace } from './LeadWorkspace';
 import { LeadResearchQueue } from './LeadResearchQueue';
+import { LeadAlertController } from './LeadAlertController';
 import type { Session } from '@supabase/supabase-js';
 
 const storageKey = 'elevanta-test-workspace-v1';
@@ -66,6 +67,8 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   const [dashboardScope, setDashboardScope] = useState<DashboardScope>('company');
   const [theme, setTheme] = useState<'light' | 'dark'>(() => localStorage.getItem(themeStorageKey) === 'dark' ? 'dark' : 'light');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const receiveAlertLeads = useCallback((nextLeads: Lead[]) => setLeads(nextLeads), []);
+  const receiveAlertNotice = useCallback((message: string) => setNotice(message), []);
   const viewer = workspaceDirectory.find((user) => user.id === viewerId) ?? workspaceDirectory[0] ?? workspaceUsers[0];
   const signedInUser = session ? workspaceDirectory.find((user) => user.id === session.user.id) : undefined;
   const switchableUsers = signedInUser && signedInUser.role !== 'admin' ? [signedInUser] : workspaceDirectory;
@@ -317,6 +320,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
       {page === 'User management' && viewer.role === 'admin' && session && <AdminUserManagement session={session} onNotice={setNotice} />}
       </>}
     </section>
+    <LeadAlertController session={session} user={signedInUser} onLeads={receiveAlertLeads} onNotice={receiveAlertNotice} />
     {showCreate && <CreateLead error={createError} saving={creatingLead} viewer={viewer} salesAgents={workspaceDirectory.filter((user) => user.role === 'sales_agent')} crmReady={!session || remoteLoaded} onReconnect={session ? onSignOut : undefined} onClose={() => setShowCreate(false)} onSubmit={createLead} />}
   </main>;
 }

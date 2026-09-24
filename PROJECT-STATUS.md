@@ -1,10 +1,18 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-09-23
-Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.8.md](./CRM-DECISIONS-v1.8.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
+Last updated: 2026-09-24
+Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.13.md](./CRM-DECISIONS-v1.13.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
 
 ## Approved inbound research extension: 2026-09-17
+
+### Gmail HTML recovery: September 24
+
+Live Admin diagnostics confirm intake enabled and scheduled sync running, but 35 messages are held with `plain_text_missing`. HTML-only email support and safe retry of legacy parser failures are implemented locally. All 89 application tests, production build, and all 24 isolated migration replays passed, including exactly-one recovery and Research role restrictions. Release and live recovery verification remain pending. Apply the recovery migration only after the v2 parser deployment. See [GMAIL-HTML-RECOVERY.md](./docs/GMAIL-HTML-RECOVERY.md). This incident record supersedes earlier activation-in-progress snapshots below.
+
+### New-work bell approved, v1.13
+
+The owner approved an in-app bell for new Research leads and new Sales assignments. The implementation is locally complete and the web typecheck and production build pass. It uses existing role-scoped APIs, a 15-second open-app check, a 15% to 100% volume control with no in-app mute, initial-load suppression, multiple-tab deduplication, and a visual count. Git release, production deployment, and live two-user acceptance remain pending. See [CRM-DECISIONS-v1.13.md](./CRM-DECISIONS-v1.13.md).
 
 ### Gmail live activation approval, v1.12
 
