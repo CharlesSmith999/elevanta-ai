@@ -171,6 +171,28 @@ test('lead identity requires a name plus at least one contact method', () => {
   assert.equal(isLeadIdentity('   ', '+1 555 0100'), false);
 });
 
+test('a researched lead becomes visible only to its assigned Sales Agent with its handoff context', () => {
+  const handoff = {
+    ...structuredClone(seedLeads[0]),
+    id: 'research-handoff-visibility',
+    name: 'Research handoff sample',
+    marketingOwnerId: 'muzammil',
+    discoveredContactMethods: [
+      { type: 'phone' as const, value: '+1 555 0188', label: 'Research discovery' },
+      { type: 'email' as const, value: 'sample@example.com', label: 'Research discovery' },
+    ],
+    address: 'Austin, TX',
+    originalDetails: 'A website project with a short timeline.',
+    researchSummary: 'Website confirmed. Call the direct number first.',
+    sourceReceivedAt: '2026-09-25T12:00:00.000Z',
+    assignments: [{ id: 'research-assignment', ownerId: 'owais', assignedBy: 'muzammil', at: '2026-09-25T12:05:00.000Z', visibility: 'full_context' as const, reason: 'Research handoff' }],
+  };
+  assert.equal(canViewLead(user('owais'), handoff), true);
+  assert.equal(canViewLead(user('asad'), handoff), false);
+  assert.equal(handoff.discoveredContactMethods?.some((method) => method.type === 'email'), true);
+  assert.equal(handoff.researchSummary, 'Website confirmed. Call the direct number first.');
+});
+
 test('duplicate matching normalizes phone formatting but does not fuzzy-match values', () => {
   const leads = structuredClone(seedLeads);
   leads.push({ ...structuredClone(leads[0]), id: 'phone-format-copy', phone: '(1) 555-0101', email: undefined, assignments: [], activities: [], followUps: [], incorrectReports: [] });

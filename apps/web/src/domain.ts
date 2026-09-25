@@ -63,6 +63,11 @@ export type Lead = {
   source: string;
   category?: LeadCategory;
   description?: string;
+  /** Research handoff context. Present only when an inbound research item became this lead. */
+  address?: string;
+  originalDetails?: string;
+  researchSummary?: string;
+  sourceReceivedAt?: string;
   marketingOwnerId: string;
   sourceDate: string;
   status: OpportunityStatus;

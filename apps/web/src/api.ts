@@ -21,6 +21,10 @@ type OpportunityRecord = {
   lead_category?: LeadCategory | null;
   marketing_owner_id?: string | null;
   description?: string;
+  lead_address?: string | null;
+  original_details?: string | null;
+  research_summary?: string | null;
+  source_received_at?: string | null;
   created_at: string;
   updated_at: string;
   contacts?: { name: string; normalized_phone?: string | null; normalized_email?: string | null } | null;
@@ -141,6 +145,10 @@ function mapOpportunity(record: OpportunityRecord): Lead {
     source: record.source ?? 'Other',
     category: record.lead_category ?? 'not_available',
     description: record.description ?? undefined,
+    address: record.lead_address ?? undefined,
+    originalDetails: record.original_details ?? undefined,
+    researchSummary: record.research_summary ?? undefined,
+    sourceReceivedAt: record.source_received_at ?? undefined,
     marketingOwnerId: record.marketing_owner_id ?? 'shariq',
     sourceDate: record.created_at,
     status: record.status,

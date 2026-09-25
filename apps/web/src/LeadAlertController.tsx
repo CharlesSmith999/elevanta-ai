@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { IconBellRinging, IconVolume } from '@tabler/icons-react';
+import { IconBellRinging, IconVolume, IconX } from '@tabler/icons-react';
 import type { Session } from '@supabase/supabase-js';
 import { loadRemoteLeads, loadResearchLeads } from './api';
 import { ownerId, type Lead, type User } from './domain';
@@ -68,6 +68,7 @@ export function LeadAlertController({ session, user, onLeads, onNotice }: {
 }) {
   const [volume, setVolume] = useState(savedVolume);
   const [audioReady, setAudioReady] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const audioContext = useRef<AudioContext | undefined>(undefined);
   const volumeRef = useRef(volume);
   const pendingBell = useRef(false);
@@ -175,9 +176,8 @@ export function LeadAlertController({ session, user, onLeads, onNotice }: {
   useEffect(() => () => { void audioContext.current?.close(); }, []);
 
   if (!eligible) return null;
-  return <aside className="lead-bell-control" aria-label="New lead bell settings">
-    <button type="button" className="lead-bell-test" onClick={() => { pendingBell.current = true; void unlockAudio(); }} title="Play the lead bell"><IconBellRinging size={19} /><span>Test bell</span></button>
-    <label><IconVolume size={17} /><span>Bell volume</span><input aria-label="Lead bell volume" type="range" min={minimumVolume} max="100" step="5" value={volume} onChange={(event) => setVolume(Number(event.target.value))} /><b>{volume}%</b></label>
-    <small>{audioReady ? 'Lead bell active' : 'Click once to enable sound'}</small>
+  return <aside className={`lead-bell-control ${settingsOpen ? 'open' : ''}`} aria-label="New lead bell settings">
+    <button type="button" className="lead-bell-launcher" onClick={() => setSettingsOpen((open) => !open)} aria-expanded={settingsOpen} title="Lead notification settings"><IconBellRinging size={19} /><span className="sr-only">Lead notification settings</span></button>
+    {settingsOpen && <div className="lead-bell-settings"><header><b>New lead bell</b><button type="button" className="quiet" onClick={() => setSettingsOpen(false)} aria-label="Close bell settings"><IconX size={15} /></button></header><button type="button" className="lead-bell-test" onClick={() => { pendingBell.current = true; void unlockAudio(); }}><IconBellRinging size={17} /><span>Test bell</span></button><label><IconVolume size={17} /><span>Bell volume</span><input aria-label="Lead bell volume" type="range" min={minimumVolume} max="100" step="5" value={volume} onChange={(event) => setVolume(Number(event.target.value))} /><b>{volume}%</b></label><small>{audioReady ? 'Active for new work' : 'Click Test bell once to enable sound'}</small></div>}
   </aside>;
 }
