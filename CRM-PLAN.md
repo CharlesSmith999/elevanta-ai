@@ -14,7 +14,7 @@ New-work audio alerts are governed by [CRM-DECISIONS-v1.13.md](./CRM-DECISIONS-v
 
 Admin-only mailbox replacement is governed by [CRM-DECISIONS-v1.11.md](./CRM-DECISIONS-v1.11.md). Existing leads remain intact; each new mailbox requires fresh consent and explicit activation.
 
-The incoming research queue now follows [CRM-DECISIONS-v1.9.md](./CRM-DECISIONS-v1.9.md): shared Marketing/Admin visibility with no claim step. Normal CRM lead scope is unchanged.
+The incoming research queue now follows [CRM-DECISIONS-v1.9.md](./CRM-DECISIONS-v1.9.md): shared Marketing/Admin visibility with no claim step. Normal CRM lead scope is unchanged. Research-to-Sales context and the supporting agent workflow UX follow [CRM-DECISIONS-v1.14.md](./CRM-DECISIONS-v1.14.md).
 
 Direct Gmail research intake implementation and activation checklist: [GMAIL-INTAKE-IMPLEMENTATION.md](./docs/GMAIL-INTAKE-IMPLEMENTATION.md). Intake is new-email-only after activation and does not read the Google Sheet. The owner-approved one-minute checking requirement is governed by [CRM-DECISIONS-v1.10.md](./CRM-DECISIONS-v1.10.md); the daily deployed schedule does not satisfy this requirement.
 
@@ -106,6 +106,7 @@ When three different agents report the same contact/opportunity as incorrect:
 - Explainable AI-generated coaching summaries using CRM data.
 - Audit log, exports, and data-quality reporting.
 - A Marketing-only Lead Research Queue for safe masked inbound lead research and explicit Sales handoff.
+- Research handoff preserves the Sales-useful context: discovered phone/email methods, source, category, address, description, original request details, received time, and Marketing summary. Evidence, masked source values, provider metadata, credits, and duplicate-review detail remain restricted to Marketing, managers, and Admin.
 
 ### Deferred to later phases
 

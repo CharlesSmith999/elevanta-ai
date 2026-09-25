@@ -56,7 +56,8 @@ All Manager and Admin corrections create an audit event. Department scope and on
 4. Research states are `New`, `Researching`, `Found`, `Not Found`, `Connected`, `Ready for Sales`, `Sent to Sales`, and `Rejected`.
 5. `Found`, `Not Found`, and `Connected` are research outcomes only. They never update the opportunity lifecycle.
 6. `Ready for Sales` requires a name plus at least one usable, unmasked, valid phone number or email address.
-7. Marketing selects an active Sales Agent and explicitly publishes the item. The transaction creates or links the Contact, creates one Opportunity, records provenance, creates the assignment, and marks the research item `Sent to Sales`.
+7. Marketing selects an active Sales Agent and explicitly publishes the item. The transaction creates or links the Contact, creates one Opportunity, records provenance, creates the assignment, and marks the research item `Sent to Sales`. Sales receives the discovered phone/email methods, source, category, address, description, original request details, received time, and a concise Marketing research summary.
+   - Evidence links, masked source contact values, provider identifiers, credits, parser state, and duplicate-review detail remain in the Marketing/Manager/Admin research record and are not exposed to Sales.
 8. Retrying message capture or publication is idempotent and cannot create a second research item or Opportunity.
 
 ### 3.1 Marketing creates and assigns
@@ -159,7 +160,7 @@ If all useful methods fail, or the user has other clear evidence, any authorized
 ### 4.2 Marketing Agent / Lead Generator
 
 1. **Lead Research Queue:** masked inbound leads, research state, completeness, duplicate warning, owner, and next action.
-2. **Research Workspace:** immutable original payload plus editable discovered contact methods, evidence links, notes, category, and Sales handoff controls.
+2. **Research Workspace:** immutable original payload plus separately visible phone and email discovery controls, evidence links, a Sales handoff summary, category, and Sales handoff controls.
 3. **Lead Overview:** lead identity, marketing owner, source, MQL, assigned Sales owner, Sales Engagement state, latest Sales activity summary, and next follow-up summary.
 4. **Contact Quality:** separate Active, Secondary, and Removed groups. Removed rows show health reason, Sales Agent, assignment, and timestamp.
 5. **Sales Progress:** read-only first-work, Connected, SQL, stage, follow-up, and activity history. Marketing does not log Sales activities.
