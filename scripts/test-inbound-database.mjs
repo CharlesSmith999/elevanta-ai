@@ -150,4 +150,16 @@ await denied(ingest,[workspace,admin,'stale-after-switch',payload],'old worker c
 const audit=(await db.query("select after_json from audit_events where action='gmail_mailbox_replaced'")).rows;
 check(audit.length===1&&!JSON.stringify(audit).includes('@'),'one audit event with no private mailbox');
 await asUser(admin);await denied(replaceMailbox,[workspace,admin,'third@example.invalid',afterSwitch.settings_revision],'browser Admin cannot bypass API actor validation');
+await asUser(marketer);
+const multiCreate = 'select create_opportunity_v21($1,$2::jsonb,$3,$4,$5,$6,$7) id';
+const multiArgs = ['Multi-contact synthetic', JSON.stringify([{type:'phone',value:'2025550181'},{type:'phone',value:'2025550182'},{type:'email',value:'multi@example.test'}]),'Other',marketer,sales,'Synthetic request','web'];
+const multiId = (await db.query(multiCreate,multiArgs)).rows[0].id;
+check(Boolean(multiId),'atomic multi-contact creation succeeds');
+await asUser(sales);
+check((await db.query('select id from opportunities where id=$1',[multiId])).rows.length===1,'assigned Sales user sees multi-contact lead');
+await denied(multiCreate,multiArgs,'Sales cannot create leads through multi-contact RPC');
+await asUser(marketer);
+for (const invalid of [[{type:'phone',value:'abc2025550181'}],[{type:'email',value:'masked***@example.test'}],[{type:'phone',value:'2025550181'},{type:'phone',value:'(202) 555-0181'}]]) {
+  await denied(multiCreate,[...multiArgs.slice(0,1),JSON.stringify(invalid),...multiArgs.slice(2)],'invalid or duplicate methods rejected by database');
+}
 await db.close();

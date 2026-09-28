@@ -1,0 +1,56 @@
+/* Shared flow hierarchy uses the application's existing theme tokens. */
+.compact-connection { padding: 8px 14px; margin: 8px 0 16px; font-size: 12px; }
+.compact-connection span { display:none; }
+.focused-lead-form { width:min(760px,calc(100vw - 32px)); max-height:90dvh; padding:24px; overflow:auto; color:var(--text); background:var(--surface); }
+.focused-lead-form h2:focus { outline:none; }
+.creation-fields { border:0; margin:0; padding:0; display:grid; gap:18px; min-width:0; }
+.creation-fields[hidden] { display:none; }
+.creation-fields label,.creation-review label { display:grid; gap:8px; font-size:14px; font-weight:600; }
+.creation-fields input,.creation-fields select,.creation-fields textarea,.creation-review select { width:100%; min-height:44px; padding:10px 12px; border:1px solid var(--border-strong); border-radius:10px; background:var(--surface); color:var(--text); font:inherit; box-sizing:border-box; }
+.creation-contacts { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.creation-contacts h3,.review-contact-list p { display:flex; gap:8px; align-items:center; }
+.creation-contacts h3 { font-size:14px; }
+.contact-input-row { display:flex; gap:6px; margin-bottom:8px; }
+.contact-input-row input { min-width:0; }
+.creation-footer { position:sticky; bottom:-24px; background:var(--surface); border-top:1px solid var(--border); margin-top:22px; padding:16px 0; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.creation-footer button { display:inline-flex; align-items:center; gap:8px; }
+.creation-footer small { max-width:240px; color:var(--muted); }
+.creation-review { display:grid; gap:12px; }
+.review-contact-list { background:var(--surface-muted); border:1px solid var(--border); padding:12px; border-radius:12px; overflow-wrap:anywhere; }
+.review-description { white-space:pre-wrap; max-height:160px; overflow:auto; }
+.lead-inbox-filters,.research-filters { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+.lead-inbox-filters .lead-search,.research-search { flex:1 1 260px; }
+.queue-filter-details { position:relative; }
+.queue-filter-details summary,.admin-intake-settings summary { cursor:pointer; padding:12px; border:1px solid var(--border); border-radius:10px; color:var(--text); font-weight:600; }
+.queue-filter-fields { display:flex; flex-wrap:wrap; gap:12px; padding-top:12px; }
+.queue-filter-details[open] { flex:1 1 100%; }
+.queue-filter-fields label { flex:1 1 150px; }
+.admin-intake-settings { margin-bottom:14px; }
+.admin-intake-settings summary { font-size:12px; color:var(--muted); }
+.research-columns[data-workspace-tab="contacts"] .research-original { display:none; }
+.research-columns[data-workspace-tab="request"] .research-edit,.research-columns[data-workspace-tab="request"] .research-side { display:none; }
+.research-columns[data-workspace-tab="request"] { grid-template-columns:1fr; }
+.handoff-dialog { width:min(540px,calc(100vw - 36px)); max-height:85dvh; overflow:auto; border:1px solid var(--border); border-radius:18px; padding:24px; color:var(--text); background:var(--surface); box-shadow:0 24px 80px #0005; }
+.handoff-dialog::backdrop { background:#09051b99; }
+.handoff-dialog header { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.handoff-dialog form { display:grid; gap:18px; }
+.handoff-dialog p,.handoff-dialog li { overflow-wrap:anywhere; }
+.contact-summary .lead-context-card { margin-top:20px; }
+.lead-context-card details p { max-height:260px; overflow:auto; white-space:pre-wrap; }
+@media(max-width:620px) {
+ .creation-contacts,.creation-fields .detail-grid { grid-template-columns:1fr; }
+ .focused-lead-form { padding:18px; max-height:94dvh; }
+ .creation-footer { bottom:-18px; }
+ .creation-footer small { display:none; }
+ .lead-row.lead-button { grid-template-columns:1fr 1fr; padding:16px 8px; gap:10px; }
+ .lead-row.lead-button > :nth-child(n) { display:block; text-align:left; }
+ .lead-row.header { display:none; }
+ .lead-row.lead-button > :first-child { grid-column:1 / -1; }
+ .mobile-nav-toggle { position:sticky; top:8px; margin:8px 12px; }
+ .topbar { gap:10px; padding-bottom:10px; }
+ .research-metrics { gap:8px; }
+ .research-metrics article { padding:10px; }
+}
+.queue-shortcuts { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.queue-shortcuts button[aria-pressed="true"] { background:var(--accent); color:white; border-color:var(--accent); }
+.lead-inbox-filters select { min-height:40px; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px; }

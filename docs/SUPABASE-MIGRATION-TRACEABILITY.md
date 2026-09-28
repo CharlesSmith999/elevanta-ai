@@ -1,6 +1,16 @@
 # Supabase Migration Traceability
 
+## September 28 multi-contact creation
+
+`202609280001_multi_contact_creation_v21.sql` applied to existing project `jayxyikgefnzitxcbdov` and recorded in the canonical ledger. Function installed; anonymous execution denied. A production transaction under authenticated Admin identity created a synthetic lead assigned to an eligible Sales Agent with two phones and one email, asserted three linked contact methods, and rolled back successfully. No test lead was retained. All 26 migrations also replayed in isolated PostgreSQL.
+
+## September 24 Gmail recovery
+
+`202609240001_gmail_html_recovery` is applied and appears once in the canonical ledger. Both v2 ingestion routines were verified after application. Authenticated users cannot execute ingestion, service_role can, and 82 held messages were recovered without duplicate candidates. Application commit `ca4396cca839fb2f14d8c541ae7749df3511ad40` was deployed first. See [GMAIL-HTML-RECOVERY.md](./GMAIL-HTML-RECOVERY.md).
+
 ## Inbound research migration
+
+- `202609250001_research_handoff_context_v20.sql`: pending production application. Adds Sales-safe Research handoff context to the normal Opportunity: address, original request details, source received time, and Marketing summary. It keeps masked source contacts, evidence links, provider metadata, credits, parser state, and duplicate-review detail in the Marketing-only Research record. The v19 revision-checked publication routine remains the only client-callable publication path.
 
 - `202609190001_shared_research_v19.sql`: locally verified against all migrations; production application pending. Expands incoming-queue reads to active Marketing users within the workspace only, leaves normal CRM scope unchanged, and requires revision-checked write functions.
 
