@@ -16,7 +16,17 @@ const researchState = z.enum(['new','researching','found','not_found','connected
 const duplicateState = z.enum(['clear','possible','confirmed']);
 
 const id = z.string().uuid();
-const newLead = z.object({ name: z.string().trim().min(1).max(160), phone: z.string().trim().max(60).optional(), email: z.string().trim().email().max(254).optional(), source: z.enum(sourceOptions).default('Other'), category: z.enum(leadCategories).default('not_available'), marketingOwnerId: id.optional(), salesOwnerId: id.optional(), description: z.string().trim().max(4000).optional() }).refine((value) => Boolean(value.phone || value.email), { message: 'A lead needs a phone number or email address.' });
+export const newLead = z.object({ contactMethods: z.array(z.object({ type: z.enum(['phone','email']), value: z.string().trim().min(1).max(254) })).min(1).max(20).optional(), name: z.string().trim().min(1).max(160), phone: z.string().trim().max(60).optional(), email: z.string().trim().email().max(254).optional(), source: z.enum(sourceOptions).default('Other'), category: z.enum(leadCategories).default('not_available'), marketingOwnerId: id.optional(), salesOwnerId: id.optional(), description: z.string().trim().max(4000).optional() }).refine((value) => Boolean(value.phone || value.email || value.contactMethods?.length), { message: 'A lead needs a phone number or email address.' }).superRefine((value, context) => {
+  const seen = new Set<string>();
+  for (const [index, method] of (value.contactMethods ?? []).entries()) {
+    const normalized = method.type === 'phone' ? method.value.replace(/\D/g, '') : method.value.toLowerCase();
+    const valid = method.type === 'phone' ? /^\+?[\d\s().-]+$/.test(method.value) && normalized.length >= 7 && normalized.length <= 15 : /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(method.value);
+    if (!valid || method.value.includes('*')) context.addIssue({ code: z.ZodIssueCode.custom, path: ['contactMethods', index, 'value'], message: 'Enter a valid unmasked contact method.' });
+    const key = method.type + ':' + normalized;
+    if (seen.has(key)) context.addIssue({ code: z.ZodIssueCode.custom, path: ['contactMethods', index, 'value'], message: 'Repeated contact method.' });
+    seen.add(key);
+  }
+});
 const leadDetailsUpdate = z.object({ name: z.string().trim().min(1).max(160), source: z.enum(sourceOptions), category: z.enum(leadCategories), description: z.string().trim().max(4000).default('') });
 const lostReasonOptions = ['Price or budget', 'No response', 'Timing or priority', 'Competitor selected', 'Not a fit', 'Proposal declined', 'Other'] as const;
 const statusUpdate = z.object({ status: z.enum(['assigned', 'contacted', 'connected', 'follow_up_required', 'qualified', 'proposal_sent', 'won', 'lost', 'not_interested', 'incorrect', 'duplicate', 'do_not_contact']), qualification: z.enum(['mql', 'sql', 'not_available']).optional(), totalProjectCost: z.number().nonnegative().optional(), upfrontPaymentAmount: z.number().nonnegative().optional(), lostReason: z.enum(lostReasonOptions).optional() });
@@ -307,7 +317,7 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
   }));
   app.post('/v1/opportunities', ...protectedRoute(async (request, response) => {
     const value = parse(newLead, request.body);
-    const { data, error } = await request.supabase!.rpc('create_opportunity_v17', { p_name: value.name, p_phone: value.phone ?? null, p_email: value.email ?? null, p_source: value.source ?? null, p_marketing_owner_id: value.marketingOwnerId ?? null, p_sales_owner_id: value.salesOwnerId ?? null, p_description: value.description ?? null, p_lead_category: value.category });
+    const { data, error } = value.contactMethods ? await request.supabase!.rpc('create_opportunity_v21', { p_name: value.name, p_methods: value.contactMethods, p_source: value.source, p_marketing_owner_id: value.marketingOwnerId ?? null, p_sales_owner_id: value.salesOwnerId ?? null, p_description: value.description ?? null, p_lead_category: value.category }) : await request.supabase!.rpc('create_opportunity_v17', { p_name: value.name, p_phone: value.phone ?? null, p_email: value.email ?? null, p_source: value.source ?? null, p_marketing_owner_id: value.marketingOwnerId ?? null, p_sales_owner_id: value.salesOwnerId ?? null, p_description: value.description ?? null, p_lead_category: value.category });
     if (error) throw error; response.status(201).json({ opportunityId: data });
   }));
   app.get('/v1/opportunities/:id', ...protectedRoute(async (request, response) => {

@@ -2,6 +2,8 @@
 
 Status: Planning baseline, approved from stakeholder answers
 
+Current lead/research UX delivery: [CRM-DECISIONS-v1.15.md](./CRM-DECISIONS-v1.15.md) and [screen contract](./docs/LEAD-UX-REFINEMENT-PROPOSAL.md). Creation uses a two-step contact/review flow; research editing and Sales handoff are separate. Multiple-contact creation is transactional. Existing role permissions and immediate assignment remain unchanged. Verification and release evidence: [UX acceptance](./docs/LEAD-UX-ACCEPTANCE.md).
+
 Branding: The product is named **Elevanta AI**. Its embedded AI sales companion is named **Xaviar**. Xaviar is advisory in Phase 1 and supports lead analysis, follow-up guidance, agent and marketer coaching, and performance reporting. Autonomous outbound communication remains deferred to Phase 2.
 
 CRM readiness reference: [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md). Shared dashboard definitions are in [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), the released dashboard baseline is in [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), and the approved redesign decisions are in [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md). The current lead-workflow authority is [CRM-DECISIONS-v1.8.md](./CRM-DECISIONS-v1.8.md), extending [CRM-DECISIONS-v1.7.md](./CRM-DECISIONS-v1.7.md), with its full role, screen, data, API, security, and Xaviar contract in [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md). Xaviar evaluation reference: [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md).

@@ -366,3 +366,6 @@ Xaviar must:
 13. Release through the existing Git-connected Vercel deployment only after approval.
 
 Real Excel data remains out of scope until Milestone 5.
+# Current UX refinement
+
+The approved v1.15 [screen contract](docs/LEAD-UX-REFINEMENT-PROPOSAL.md) extends presentation of this workflow without changing ownership or permission rules. Creation accepts multiple contact methods in one transaction, followed by review and routing. Research separates original request, contact editing, and final handoff review. Sales sees contacts before long descriptions, with activity logging kept separate. See [acceptance evidence](docs/LEAD-UX-ACCEPTANCE.md) for implementation and release gates.
