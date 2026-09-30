@@ -79,6 +79,7 @@ export type RemoteContactMethod = {
 
 export type RemoteActivity = {
   id: string;
+  actor_id?: string | null;
   type: string;
   outcome?: string | null;
   body?: string | null;
