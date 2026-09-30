@@ -1,8 +1,26 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-09-25
+Last updated: 2026-09-30
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.14.md](./CRM-DECISIONS-v1.14.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
+
+## Sales Agent lead workflow v2: September 30, 2026
+
+Local development and verification are complete for the approved Sales Agent workflow refinement. The Lead Inbox is now a role-aware work queue with new-assignment, due-today, overdue, and waiting summaries; action queues; contact readiness; latest activity; next action; urgency sorting; and a clear Open action. The Sales Agent no longer sees a repeated Owner column, while management views retain it.
+
+The Lead Workspace is now action-first. It shows the next best action, due state, primary contact, latest interaction, lifecycle and qualification, lead brief, active contact methods, retained removed methods, and a readable history. Activity logging has no preselected outcome and can save the activity and its next follow-up together. Mobile provides a persistent Contact, Log, and Follow-up action bar. Existing role permissions and the three-Sales-agent incorrect-review rule are unchanged.
+
+No database migration is required because the existing activity and follow-up workflow already stores the combined operation. Verification passed: 93 automated application tests, web TypeScript, production build, repository whitespace validation, desktop and 390 px mobile checks, and light/dark theme checks. No activity was submitted and no live or test lead data was changed during visual acceptance. Evidence is recorded in [the Sales workflow audit](docs/audits/sales-lead-workflow-2026-09-29/AUDIT.md) and [lead UX acceptance](docs/LEAD-UX-ACCEPTANCE.md).
+
+Release status: verified locally, not yet published or deployed. This grouped change should be released only after explicit approval under the deployment SOP.
+
+## Lead/research UX release: September 29, 2026
+
+Approved v1.15 implementation merged through [PR #51](https://github.com/CharlesSmith999/elevanta-ai/pull/51), commit `1f3446e1042b83661c71d329b60415e9036bf7ff`. Includes two-step multiple-phone/email creation, review and routing, work queue shortcuts, urgency sorting, contacts-first detail, research tabs, dedicated handoff review, and accurate loading states.
+
+Verification: 93 application tests passed, both typechecks and production build passed, all 26 migrations replayed successfully. GitHub CI passed. Live v21 database update is applied and recorded; rollback-only production test verified three contact methods without retaining a test lead. Local synthetic creation, assigned Sales visibility and research handoff passed.
+
+Vercel production deployment `89MU4BpFjVjJcjvXhwdwMtEXpjs6` is Ready and Current on the existing production domain, sourced from the merged commit above. Production health and readiness return OK/valid. Authenticated UI acceptance is not complete because the browser session is signed out. See [acceptance evidence](docs/LEAD-UX-ACCEPTANCE.md). This section supersedes older pending-release entries for the same functionality, but does not close untested visual/pointer acceptance checks.
 
 ## Research handoff and agent workflow refinement: 2026-09-25
 
@@ -323,10 +341,3 @@ Milestones 1–3, lead workflow v1.6, and lead details/reporting v1.7 are releas
 - A follow-up main-branch release at `f81c46bfdd0135f404c5fdb7aac9fee663f3665a` strengthens every modal and drawer overlay with an opaque theme-aware surface, blur, contrast, and stacking isolation so popup content cannot appear transparent. The connected Vercel project will deploy this commit automatically.
 - A session-recovery follow-up at `2901cd387d6ee021670c85206423b6da9e9e7dea` now coordinates token refresh across simultaneous CRM requests and signs out a stale session after a confirmed second 401, preventing the UI from remaining in a misleading disconnected state. Web TypeScript and production build checks passed.
 - Lead creation now includes a visible Reconnect action when a stale session blocks CRM access, taking the user directly back through sign-in instead of leaving a disabled form without recovery guidance.
-# Current update: September 28, 2026
-
-Approved v1.15 lead/research UX is implemented locally and being release-verified. Multiple phone/email creation, review-and-route, task queue shortcuts, urgency sorting, contacts-first detail, research tabs, handoff review, and truthful loading states are included. Existing role rules remain unchanged.
-
-Checks: 93 automated application tests passed; web/API typechecks and web production build passed. All 26 migrations replayed successfully in isolated PostgreSQL. Database tests passed, including multi-contact creation, assigned Sales visibility, invalid/duplicate contact rejection, research revision guards and access restrictions. Local browser creation and research-to-Sales handoff were exercised using synthetic data only.
-
-Live v21 database update is applied and recorded. A rollback-only production test confirmed three contact methods and retained no synthetic lead. Git publication, existing Vercel application deployment and production UI verification remain pending. Detailed record: [LEAD-UX-ACCEPTANCE.md](docs/LEAD-UX-ACCEPTANCE.md). Older entries below are historical and must not be used as proof of this release.
