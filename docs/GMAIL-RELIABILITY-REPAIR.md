@@ -32,6 +32,8 @@ PR53 merged as `5010f9e1e43f3ba25e54ae0a6bfe2fa04b2bdde4`. GitHub Actions run337
 
 ## Remaining acceptance and blockers
 
+Website ownership verified by Google Search Console on October 1, 2026 at approximately 21:35 UTC using the exact HTML file. PR54 merged as `e9206ea49fb35c4ff76c61703c98f3acb9c43595`; CI run339 and existing Vercel production deployment `ECKEE5j5cCQ4d5WPx64g81Dh5fKV` passed. Live verification file and API health returned successfully. Google instructs waiting 24 hours after ownership before retrying Branding, so retry no earlier than October 2 at approximately 21:35 UTC. Restricted Gmail review is still outstanding. This final ownership evidence is saved locally for the next grouped documentation release.
+
 Latest acceptance supersedes the earlier outage/access entries: Supabase access restored. Exact guarded checkpoint repair applied with one audit event. At 21:24:02.998 UTC, scheduled sync completed with no error and no pending pages. Database integrity: 608 messages, 608 research candidates, 608 distinct provider IDs, zero unresolved outcomes. Of these, 108 were received in the outage window and ingested during recovery. Existing row security on audit_events and gmail_connections remains enabled.
 
 Google automated branding check failed because homepage ownership is not verified. Existing URL-prefix property was added to Search Console under the Google Cloud owner account. Google supplied `google7908c4a709a1821d.html`; deploying that exact file is the next step. Once ownership succeeds, Google's issue screen instructs waiting 24 hours before branding retry. No consent scopes or CRM permissions change.

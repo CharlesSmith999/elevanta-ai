@@ -1,0 +1,4 @@
+.research-arrivals-bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:14px 18px;border:1px solid var(--border);border-radius:14px;background:color-mix(in srgb,var(--accent) 7%,var(--surface));color:var(--text)}
+.research-arrivals-bar>div{display:grid;gap:4px}.research-arrivals-bar small{color:var(--muted)}
+.research-arrival-badge{display:inline-flex;width:max-content;font-size:11px;font-weight:750;color:var(--accent-strong);background:color-mix(in srgb,var(--accent) 12%,var(--surface));border-radius:999px;padding:3px 8px}
+.research-row.recent-arrival{box-shadow:inset 3px 0 var(--accent)}
