@@ -6,7 +6,9 @@ Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.
 
 ## Gmail reliability repair: October 1, 2026
 
-Same-browser reconnection succeeded; intake enabled, manual sync 20:43:45 UTC and scheduled sync 20:45 UTC verified, Research increased from 495 to 496. Same-mailbox continuity repair preserves activation/checkpoints instead of silently resetting them. Replacement still starts a new window. All 97 application tests, API/web typechecks and build passed. Public privacy disclosures and operator/contact details were approved by the owner. See [Gmail reliability repair](docs/GMAIL-RELIABILITY-REPAIR.md). Release and Google production setup remain pending. Earlier outage recovery remains unverified; no permanent-connection claim is made.
+Latest acceptance supersedes prior recovery/access blockers: Supabase access restored; audited repair recovered 108 outage leads. At 5:24:02 PM America/New_York scheduled sync passed with no error and no pending pages. Integrity confirms 608 messages, 608 research candidates, 608 distinct provider IDs, zero unresolved outcomes and row security retained. Google branding check identified missing homepage ownership; website verification file is prepared for the existing URL. Branding retry requires 24 hours after ownership verification, per Google's issue screen. Full Google verification is not complete.
+
+PR53 merged (`5010f9e`); CI run337 and existing Vercel production deployment `4iLLdfKc7t2TTq7kuX6KToCKKmCz` succeeded. Health/readiness and public page checks pass. Google Audience shows **In production** and fresh owner consent completed. Automatic intake is enabled. Same-mailbox repair retains activation/checkpoints; replacing a mailbox starts a new window. All 97 application tests, API/web typechecks and build passed. See [Gmail reliability repair](docs/GMAIL-RELIABILITY-REPAIR.md). Google branding/data-access verification remains open; no permanent-connection guarantee is made.
 
 ## Sales Agent lead workflow v2: September 30, 2026
 
