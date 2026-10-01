@@ -54,7 +54,9 @@ export async function finishGmailConnection(db: SupabaseClient, state: string, c
   const tokens = await tokenRequest({ code, grant_type: 'authorization_code', redirect_uri: config.redirect, code_verifier: unseal(data.verifier_cipher, config.key, data.workspace_id) });
   if (!tokens.refresh_token || !tokens.scope?.split(' ').includes(scope)) throw new Error('Read-only Gmail consent was not completed.');
   await createGmailReader(tokens.access_token).verifyMailbox(data.mailbox);
-  const { data: saved, error: saveError } = await db.from('gmail_connections').update({ encrypted_refresh_token: seal(tokens.refresh_token,config.key,data.workspace_id), enabled:false, activated_at:null, scan_after:null, page_token:null, lease_id:null, lease_until:null, last_error:null, connected_by:data.actor_id, updated_at:new Date().toISOString() }).eq('workspace_id',data.workspace_id).eq('mailbox',data.mailbox).eq('settings_revision',data.settings_revision).select('workspace_id'); check(saveError);
+  // Same-mailbox refresh must retain its approved window and recovery checkpoint.
+  // Replacement already clears these fields atomically in gmail_replace_mailbox.
+  const { data: saved, error: saveError } = await db.from('gmail_connections').update({ encrypted_refresh_token: seal(tokens.refresh_token,config.key,data.workspace_id), enabled:false, page_token:null, lease_id:null, lease_until:null, last_error:null, connected_by:data.actor_id, updated_at:new Date().toISOString() }).eq('workspace_id',data.workspace_id).eq('mailbox',data.mailbox).eq('settings_revision',data.settings_revision).select('workspace_id'); check(saveError);
   if(!saved?.length)throw new Error('Mailbox settings changed. Start authorization again.');
 }
 export async function saveGmailMailbox(db:SupabaseClient,workspace:string,actor:string,mailbox:string) {
@@ -73,7 +75,12 @@ export const gmailMessageKey = (prefix:string|undefined,id:string) => `${prefix 
 export async function setGmailEnabled(db: SupabaseClient, workspace: string, enabled: boolean) {
   if (enabled && process.env.GMAIL_LIVE_APPROVED !== 'true') throw new Error('Gmail activation requires the documented release approvals.');
   const now = new Date().toISOString();
-  const { data, error } = await db.from('gmail_connections').update({ enabled, lease_id:null,lease_until:null,page_token:null, ...(enabled ? { activated_at:now,scan_after:now } : {}), updated_at:now }).eq('workspace_id',workspace).eq('enabled',!enabled).not('encrypted_refresh_token','is',null).select('workspace_id'); check(error);
+  const {data:current,error:readError}=await db.from('gmail_connections').select('settings_revision,activated_at').eq('workspace_id',workspace).maybeSingle();check(readError);
+  if(!current)throw new Error('Connect Gmail first, or refresh the connection status.');
+  let update = db.from('gmail_connections').update({ enabled, lease_id:null,lease_until:null,page_token:null, ...(enabled && !current.activated_at ? { activated_at:now,scan_after:now } : {}), updated_at:now }).eq('workspace_id',workspace).eq('settings_revision',current.settings_revision).eq('enabled',!enabled).not('encrypted_refresh_token','is',null);
+  // Reject a stale first activation or a concurrent replacement.
+  update = current.activated_at ? update.eq('activated_at',current.activated_at) : update.is('activated_at',null);
+  const { data, error } = await update.select('workspace_id'); check(error);
   if (!data?.length) throw new Error('Connect Gmail first, or refresh the connection status.');
 }
 export async function syncGmail(db: SupabaseClient, workspace: string) {

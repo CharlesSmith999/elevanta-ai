@@ -8,6 +8,8 @@ Source of truth: [CRM-PLAN.md](../CRM-PLAN.md), [CRM-DECISIONS-v1.1.md](../CRM-D
 
 ## 1. Purpose
 
+Gmail authorization recovery: start and finish consent in the same regular browser profile within ten minutes; do not copy intermediate Google sign-in URLs between browsers or weaken cookie validation. Same-mailbox reconnection/resume preserves the intake window after the reliability repair. Verify successful manual and scheduled sync separately. See [Gmail reliability repair](GMAIL-RELIABILITY-REPAIR.md).
+
 This is the single operating procedure for deploying Elevanta AI. It keeps one clean deployment path, protects private lead data, and prevents duplicate Vercel projects or manual uploads from creating confusion.
 
 ## 2. Approved deployment architecture
