@@ -1,5 +1,7 @@
 # Lead CRM — Phase 1 Product and Technical Plan
 
+Gmail reliability execution reference: [GMAIL-RELIABILITY-REPAIR.md](docs/GMAIL-RELIABILITY-REPAIR.md). Same-mailbox reconnect/resume preserves the approved intake window; replacement starts a new one. Google production publishing and applicable verification remain separate requirements.
+
 Status: Planning baseline, approved from stakeholder answers
 
 Current lead/research UX delivery: [CRM-DECISIONS-v1.15.md](./CRM-DECISIONS-v1.15.md) and [screen contract](./docs/LEAD-UX-REFINEMENT-PROPOSAL.md). Creation uses a two-step contact/review flow; research editing and Sales handoff are separate. Multiple-contact creation is transactional. Existing role permissions and immediate assignment remain unchanged. Verification and release evidence: [UX acceptance](./docs/LEAD-UX-ACCEPTANCE.md).
