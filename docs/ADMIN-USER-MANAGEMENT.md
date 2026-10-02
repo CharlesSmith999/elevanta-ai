@@ -2,6 +2,16 @@
 
 This feature is part of the Phase 1 CRM foundation and follows the approved role model in `CRM-PLAN.md`.
 
+## Repair scope, October 2, 2026
+
+Live inspection found legacy accounts with unset departments. The creation form offers these managers even though the API rejects them. It also labels every manager as Sales Manager and hides validation errors outside the dialog.
+
+The repair keeps the approved hierarchy and inactive-account policy. Offer five explicit role choices, derive the department, require an eligible same-department manager only for agents, show actionable errors in the form, and prevent duplicate submissions. Managers with missing departments must be explicitly configured by Admin, never assigned a department by guessing their name. Permit repairing a missing manager department when existing reports belong to that department.
+
+Admin can edit profiles and set Active/Inactive, then reactivate when appropriate. Do not permanently delete users. Preserve history, block deactivation with active assignments or direct reports, and prevent removing the last Admin through either deactivation or role changes. Existing-role setup defects must not block a name-only edit or safe deactivation.
+
+Validation: creation for all five roles; missing/wrong/inactive manager; role/department mismatch; duplicate email; cross-workspace and non-Admin denial; editing; self/last-Admin protection; direct-report and assignment blockers; inactive API denial. Production account creation or role changes for real people are not part of diagnostic testing.
+
 ## What Admin can do
 
 - View all profiles in the current workspace, including account email, role, department, manager, active status, and last sign-in.

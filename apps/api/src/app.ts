@@ -93,6 +93,8 @@ const createUser = z.object({
   if (value.role === 'admin' && (value.managerId || value.department)) ctx.addIssue({ code: 'custom', path: ['role'], message: 'Admins cannot have a department or manager.' });
   if (value.role !== 'admin' && !value.department) ctx.addIssue({ code: 'custom', path: ['department'], message: 'Choose a department for this user.' });
   if (value.role !== 'admin' && value.role !== 'manager' && !value.managerId) ctx.addIssue({ code: 'custom', path: ['managerId'], message: 'Choose a manager for this user.' });
+  if ((value.role === 'sales_agent' && value.department !== 'sales') || (value.role === 'marketer' && value.department !== 'marketing')) ctx.addIssue({ code: 'custom', path: ['department'], message: 'The department must match the agent role.' });
+  if (value.role === 'manager' && value.managerId) ctx.addIssue({ code: 'custom', path: ['managerId'], message: 'Department managers do not have another manager.' });
 });
 const updateUser = z.object({
   fullName: z.string().trim().min(2).max(160).optional(),
@@ -174,7 +176,7 @@ async function persistXaviarReport(subject: XaviarProfile, report: ReturnType<ty
   return { ...report, recommendations: report.recommendations.map((item) => ({ ...item, id: storedIds.get(item.id) ?? item.id })) };
 }
 
-export function createApp(clientForToken: (token: string) => SupabaseClient = configuredClient) {
+export function createApp(clientForToken: (token: string) => SupabaseClient = configuredClient, adminClient: () => SupabaseClient = serviceClient) {
   const app = express();
   app.use(cors({ origin: process.env.WEB_ORIGIN?.split(',') ?? true }));
   app.use(express.json({ limit: '100kb' }));
@@ -403,7 +405,7 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
   }));
   app.get('/v1/admin/users', ...protectedRoute(async (request, response) => {
     if (request.profile!.role !== 'admin') { response.status(403).json({ message: 'Only Admin can manage users.' }); return; }
-    const admin = serviceClient();
+    const admin = adminClient();
     const [{ data: profiles, error: profileError }, { data: authUsers, error: authError }] = await Promise.all([
       admin.from('profiles').select('id, workspace_id, role, full_name, manager_id, department, active, created_at').eq('workspace_id', request.profile!.workspace_id).order('created_at', { ascending: true }),
       admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
@@ -416,7 +418,7 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
   app.post('/v1/admin/users', ...protectedRoute(async (request, response) => {
     if (request.profile!.role !== 'admin') { response.status(403).json({ message: 'Only Admin can create users.' }); return; }
     const value = parse(createUser, request.body);
-    const admin = serviceClient();
+    const admin = adminClient();
     const { data: manager, error: managerError } = value.managerId ? await admin.from('profiles').select('id, workspace_id, role, department, active').eq('id', value.managerId).maybeSingle() : { data: null, error: null };
     if (managerError) throw managerError;
     if (value.managerId && (!manager || manager.workspace_id !== request.profile!.workspace_id || manager.role !== 'manager' || !manager.active)) { response.status(422).json({ message: 'Choose an active manager in this workspace.' }); return; }
@@ -430,31 +432,36 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
   }));
   app.patch('/v1/admin/users/:id', ...protectedRoute(async (request, response) => {
     if (request.profile!.role !== 'admin') { response.status(403).json({ message: 'Only Admin can edit users.' }); return; }
-    const targetId = parse(id, request.params.id); const value = parse(updateUser, request.body); const admin = serviceClient();
+    const targetId = parse(id, request.params.id); const value = parse(updateUser, request.body); const admin = adminClient();
     const { data: before, error: beforeError } = await admin.from('profiles').select('id, workspace_id, role, full_name, manager_id, department, active, created_at').eq('id', targetId).maybeSingle();
     if (beforeError) throw beforeError;
     if (!before || before.workspace_id !== request.profile!.workspace_id) { response.status(404).json({ message: 'User not found in this workspace.' }); return; }
     if (targetId === request.profile!.id && value.active === false) { response.status(422).json({ message: 'You cannot deactivate your own admin account.' }); return; }
     const nextRole = value.role ?? before.role; const nextDepartment = nextRole === 'admin' ? null : (value.department === undefined ? before.department : value.department); const nextManagerId = nextRole === 'admin' ? null : (value.managerId === undefined ? before.manager_id : value.managerId);
-    if (nextRole !== 'admin' && !nextDepartment) { response.status(422).json({ message: 'Choose a department for this user.' }); return; }
-    if (nextRole !== 'admin' && nextRole !== 'manager' && !nextManagerId) { response.status(422).json({ message: 'Choose a manager for this user.' }); return; }
+    const hierarchyChanged = nextRole !== before.role || nextDepartment !== before.department || nextManagerId !== before.manager_id || (value.active === true && !before.active);
+    if (targetId === request.profile!.id && nextRole !== 'admin') { response.status(422).json({ message: 'You cannot remove your own Admin role.' }); return; }
+    if (hierarchyChanged && nextRole !== 'admin' && !nextDepartment) { response.status(422).json({ message: 'Choose a department for this user.' }); return; }
+    if (hierarchyChanged && ((nextRole === 'sales_agent' && nextDepartment !== 'sales') || (nextRole === 'marketer' && nextDepartment !== 'marketing'))) { response.status(422).json({ message: 'The department must match the agent role.' }); return; }
+    if (hierarchyChanged && nextRole !== 'admin' && nextRole !== 'manager' && !nextManagerId) { response.status(422).json({ message: 'Choose a manager for this user.' }); return; }
+    if (hierarchyChanged && nextRole === 'manager' && nextManagerId) { response.status(422).json({ message: 'Department managers do not have another manager.' }); return; }
     if (nextManagerId === targetId) { response.status(422).json({ message: 'A user cannot manage themselves.' }); return; }
-    if (nextManagerId) {
+    if (hierarchyChanged && nextManagerId) {
       const { data: manager, error: managerError } = await admin.from('profiles').select('id, workspace_id, role, department, active').eq('id', nextManagerId).maybeSingle();
       if (managerError) throw managerError;
       if (!manager || manager.workspace_id !== before.workspace_id || manager.role !== 'manager' || !manager.active || manager.department !== nextDepartment) { response.status(422).json({ message: 'Choose an active manager in the same department.' }); return; }
     }
-    if (before.role === 'manager' && (nextRole !== 'manager' || nextDepartment !== before.department)) {
-      const { count, error: reportError } = await admin.from('profiles').select('id', { count: 'exact', head: true }).eq('workspace_id', before.workspace_id).eq('manager_id', targetId).eq('active', true);
+    if (value.active === false || nextRole !== before.role || nextDepartment !== before.department) {
+      const { data: reports, error: reportError } = await admin.from('profiles').select('id, role, department').eq('workspace_id', before.workspace_id).eq('manager_id', targetId).eq('active', true);
       if (reportError) throw reportError;
-      if ((count ?? 0) > 0) { response.status(422).json({ message: 'Reassign this manager’s active team members before changing their department or role.' }); return; }
+      const repairingDepartment = before.role === 'manager' && !before.department && nextRole === 'manager' && value.active !== false && (reports ?? []).every((report) => (report.department ?? (report.role === 'sales_agent' ? 'sales' : report.role === 'marketer' ? 'marketing' : null)) === nextDepartment);
+      if ((reports ?? []).length > 0 && !repairingDepartment) { response.status(422).json({ message: 'Reassign this user’s active team members before changing their department, role, or active access.' }); return; }
     }
-    if (value.active === false) {
+    if (value.active === false || nextRole !== before.role) {
       const { count, error: assignmentError } = await admin.from('assignments').select('id', { count: 'exact', head: true }).eq('assigned_to', targetId).is('ended_at', null);
       if (assignmentError) throw assignmentError;
-      if ((count ?? 0) > 0) { response.status(422).json({ message: 'Reassign this user’s active leads before deactivation.' }); return; }
+      if ((count ?? 0) > 0) { response.status(422).json({ message: 'Reassign this user’s active leads before deactivation or changing their role.' }); return; }
     }
-    if (value.active === false && before.role === 'admin') {
+    if ((value.active === false || nextRole !== 'admin') && before.role === 'admin' && before.active) {
       const { count, error: adminCountError } = await admin.from('profiles').select('id', { count: 'exact', head: true }).eq('workspace_id', before.workspace_id).eq('role', 'admin').eq('active', true);
       if (adminCountError) throw adminCountError;
       if ((count ?? 0) <= 1) { response.status(422).json({ message: 'The workspace must retain at least one active Admin.' }); return; }
