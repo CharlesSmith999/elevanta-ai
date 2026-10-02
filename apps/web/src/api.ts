@@ -123,7 +123,8 @@ async function request<T>(session: Session, path: string, init?: RequestInit): P
     }
   }
   if (!response.ok) {
-    const body = await response.json().catch(() => ({})) as { message?: string };
+    const body = await response.json().catch(() => ({})) as { message?: string; issues?: Array<{ message?: string }> };
+    if (body.issues?.length) body.message = body.issues.map((issue) => issue.message).filter(Boolean).join(' ');
     throw new ApiError(response.status, body.message ?? `CRM request failed (${response.status})`);
   }
   if (response.status === 204) return undefined as T;

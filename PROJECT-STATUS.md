@@ -1,7 +1,7 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-10-01
+Last updated: 2026-10-02
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.14.md](./CRM-DECISIONS-v1.14.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
 
 ## Gmail reliability repair: October 1, 2026
@@ -37,6 +37,10 @@ Vercel production deployment `89MU4BpFjVjJcjvXhwdwMtEXpjs6` is Ready and Current
 Approved Decision v1.14 records the new Research-to-Sales context contract. The pending release adds searchable Research and Sales queues, separately visible Phone and Email discovery, clearer lead creation and Sales assignment, a compact notification-bell control, and a Sales lead context panel. Migration `202609250001_research_handoff_context_v20.sql` preserves address, original request details, received time, and the Marketing summary on the normal Opportunity while keeping evidence links, masked source values, provider metadata, credits, parser state, and duplicate-review detail restricted to Research users.
 
 Local validation is complete: web/API typechecks and production web build pass; 89 automated application checks pass, including a new assignment visibility test that confirms a researched lead and its allowed handoff context are visible to the selected Sales Agent and hidden from another Sales Agent. Production database migration, Git publish, and deployment verification remain required before this entry can be marked released.
+
+## User management repair: 2026-10-02
+
+Owner requested repair of user creation and clearer editing/inactive controls. Live inspection found legacy missing manager departments and misleading manager options. Repair follows [ADMIN-USER-MANAGEMENT.md](./docs/ADMIN-USER-MANAGEMENT.md), retains the existing role model, and does not delete accounts. Five explicit role choices, eligible manager filtering, inline validation, submission locking, access filtering, immediate directory refresh, and API checks for role/department, active reports, assignments, self access, and last-Admin preservation are implemented. Eight new account-management scenarios pass alongside eleven existing connection/security tests; both typechecks and the web build pass. Release and live acceptance pending. No real account or permission has been changed during testing.
 
 ## Approved inbound research extension: 2026-09-17
 
