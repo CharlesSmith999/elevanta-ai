@@ -3,6 +3,12 @@ import type { Activity, Assignment, FollowUp, IncorrectReport, Lead, LeadCategor
 import type { ContactFocus, ContactHealth, ContactMethodType } from './leadWorkflow';
 import type { ResearchLead, ResearchMethod, ResearchState } from './inboundResearch';
 import { supabase } from './auth';
+import type { connectionAnalytics } from '../../api/src/connectionAnalytics';
+
+export function loadConnectionAnalytics(session: Session, filter: {viewerId: string; start?: string; end: string; source: string; timezone: string}) {
+  const params = new URLSearchParams(Object.entries(filter).filter((entry): entry is [string,string] => typeof entry[1] === 'string'));
+  return request<ReturnType<typeof connectionAnalytics>>(session,`/v1/analytics/connections?${params}`);
+}
 
 /**
  * Production is a single Vercel deployment, so API calls must stay on the

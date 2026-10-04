@@ -1,5 +1,9 @@
 # Supabase Migration Traceability
 
+## October 4 connection analytics
+
+`202610030001_connection_dashboard_evidence.sql` applied to existing project `jayxyikgefnzitxcbdov` after owner approval. Verification returned one ledger entry, two new first-found columns, two triggers, reporting reads enabled and row security retained. All 27 migrations replayed locally before application. No lead content, assignment or historical evidence was changed or backfilled. Live application acceptance follows the GitHub/Vercel release.
+
 ## September 28 multi-contact creation
 
 `202609280001_multi_contact_creation_v21.sql` applied to existing project `jayxyikgefnzitxcbdov` and recorded in the canonical ledger. Function installed; anonymous execution denied. A production transaction under authenticated Admin identity created a synthetic lead assigned to an eligible Sales Agent with two phones and one email, asserted three linked contact methods, and rolled back successfully. No test lead was retained. All 26 migrations also replayed in isolated PostgreSQL.
