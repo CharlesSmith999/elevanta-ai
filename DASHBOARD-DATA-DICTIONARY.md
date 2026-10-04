@@ -1,5 +1,7 @@
 # Elevanta AI — Dashboard Data Dictionary
 
+The additional October 3 research/connection charts use [CONNECTION-DASHBOARDS.md](docs/CONNECTION-DASHBOARDS.md). They distinguish first successful conversation from broader Sales Engagement, use dated assignment cohorts for ratios, and preserve missing historical evidence.
+
 Status: Step 1 of dashboard redesign — working baseline
 
 This document locks the shared definitions used by every dashboard. It supports [CRM-PLAN.md](./CRM-PLAN.md), [CRM-DECISIONS-v1.6.md](./CRM-DECISIONS-v1.6.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), and [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md). No dashboard may calculate the same metric differently by role.

@@ -1,8 +1,14 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-10-02
+Last updated: 2026-10-04
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.14.md](./CRM-DECISIONS-v1.14.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
+
+## Connection and lead-quality graphs: October 3, 2026
+
+Implementation prepared in [CONNECTION-DASHBOARDS.md](docs/CONNECTION-DASHBOARDS.md): role-scoped App/Web/Game/SMM research comparison, first-found marketer bars, first Sales connection attribution and ratios, per-agent daily trends including zero days and qualification snapshots, App received-versus-found, loss reasons and Marketing-to-Sales handoffs. Existing dashboard designs and themes are retained. Historical first-found dates and qualification snapshots are not invented.
+
+Local validation: 117 application tests passed together again on October 4; API/web typechecks and production build passed. All 27 migrations replayed in isolated PostgreSQL, including immutable finder attribution and qualification snapshot checks. The owner approved the server-only read permission expansion and deployment. Production migration `202610030001` is applied: one ledger entry, two columns, two triggers, reporting grants and retained row security verified. GitHub/Vercel publication and live visual acceptance are in progress; do not mark this release complete until verified.
 
 ## Gmail reliability repair: October 1, 2026
 

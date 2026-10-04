@@ -44,6 +44,8 @@ await denied(update,[candidate,'sent_to_sales','[]'],'direct sent state rejected
 await denied(update,[candidate,'ready_for_sales',JSON.stringify([{type:'phone',value:'555***1234567'}])],'masked phone rejected');
 await denied(update,[candidate,'ready_for_sales',JSON.stringify([{type:'phone',value:'5551234567'},{type:'phone',value:'(555) 123-4567'}])],'formatted duplicate rejected');
 await db.query(update,[candidate,'ready_for_sales',JSON.stringify([{type:'phone',value:'5551234567'},{type:'email',value:'alexx@example.com'},{type:'phone',value:'5551234568'}])]);
+const firstFound=(await db.query('select first_found_at,first_found_by from inbound_lead_candidates where id=$1',[candidate])).rows[0];
+check(Boolean(firstFound.first_found_at)&&firstFound.first_found_by===marketer,'first valid research save records finder and timestamp');
 for(const who of [sales,salesmanager,inactive]){
  await asUser(who);
  check((await db.query('select * from inbound_lead_candidates')).rows.length===0,'research rows hidden from '+who);
@@ -162,4 +164,11 @@ await asUser(marketer);
 for (const invalid of [[{type:'phone',value:'abc2025550181'}],[{type:'email',value:'masked***@example.test'}],[{type:'phone',value:'2025550181'},{type:'phone',value:'(202) 555-0181'}]]) {
   await denied(multiCreate,[...multiArgs.slice(0,1),JSON.stringify(invalid),...multiArgs.slice(2)],'invalid or duplicate methods rejected by database');
 }
+await db.exec('reset role');
+await db.query('update inbound_lead_candidates set first_found_by=$1,first_found_at=now()+interval \'1 day\' where id=$2',[other,candidate]);
+const stableFound=(await db.query('select first_found_at,first_found_by from inbound_lead_candidates where id=$1',[candidate])).rows[0];
+check(String(stableFound.first_found_at)===String(firstFound.first_found_at)&&stableFound.first_found_by===marketer,'first-found attribution cannot be overwritten');
+await db.query("update opportunities set qualification='mql' where id=$1",[multiId]);
+await db.query("insert into activities(opportunity_id,actor_id,type,outcome,metadata) values($1,$2,'call','connected','{\"qualification_at_connection\":\"sql\"}')",[multiId,sales]);
+check((await db.query("select metadata->>'qualification_at_connection' q from activities where opportunity_id=$1 and outcome='connected'",[multiId])).rows[0].q==='mql','connection captures database qualification, not client-supplied snapshot');
 await db.close();

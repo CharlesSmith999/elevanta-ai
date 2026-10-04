@@ -4,6 +4,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { ConfigurationError, supabaseConfig } from './config.js';
 import { startGmailConnection, finishGmailConnection, gmailHealth, saveGmailMailbox, replaceGmailMailbox, setGmailEnabled, syncGmail, validSchedulerSecret } from './gmailConnector.js';
 import { z, ZodError } from 'zod';
+import { readConnectionReport } from './connectionReporting.js';
 import { buildApiXaviarReport, canRequestXaviar, opportunityBelongsToSubject, type XaviarOpportunity, type XaviarProfile } from './xaviar.js';
 
 type Profile = { id: string; workspace_id: string; role: 'admin' | 'manager' | 'sales_agent' | 'marketer'; full_name: string; manager_id: string | null; department?: 'marketing' | 'sales' | null; active: boolean };
@@ -209,6 +210,22 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
   const protectedRoute = (handler: (request: AuthenticatedRequest, response: Response) => Promise<void>) => [requireUser, asyncRoute(async (request, response) => { if (!response.locals.ready) return; await handler(request, response); })];
 
   app.get('/v1/me', ...protectedRoute(async (request, response) => { response.json({ profile: request.profile }); }));
+  app.get('/v1/analytics/connections', ...protectedRoute(async (request,response) => {
+    const query = parse(z.object({ start: z.string().datetime({offset:true}).optional(), end: z.string().datetime({offset:true}), timezone: z.string().max(100), source: z.string().max(160).optional(), viewerId: id.optional() }),request.query);
+    try { new Intl.DateTimeFormat('en-US',{timeZone:query.timezone}).format(); } catch { response.status(400).json({message:'Choose a valid timezone.'}); return; }
+    if (query.start && Date.parse(query.start) > Date.parse(query.end)) { response.status(400).json({message:'Start date must precede end date.'}); return; }
+    let viewer = request.profile!;
+    if (query.viewerId && query.viewerId !== viewer.id) {
+      if (viewer.role !== 'admin') { response.status(403).json({message:'Only Admin can preview another role.'}); return; }
+      const {data,error} = await request.supabase!.from('profiles').select('id,workspace_id,role,full_name,manager_id,department,active').eq('workspace_id',viewer.workspace_id).eq('id',query.viewerId).maybeSingle();
+      if (error) throw error;
+      if (!data?.active) { response.status(404).json({message:'The selected user is unavailable.'}); return; }
+      viewer = data as Profile;
+    }
+    if (viewer.role === 'manager' && !viewer.department) { response.status(403).json({message:'A department is required for manager reporting.'}); return; }
+    response.setHeader('Cache-Control','no-store');
+    response.json(await readConnectionReport(adminClient(),{...viewer,department:viewer.department ?? null},query));
+  }));
   app.get('/v1/admin/gmail', ...protectedRoute(async (request, response) => {
     if (request.profile!.role !== 'admin') { response.status(403).json({ message:'Only Admin can manage Gmail.' }); return; }
     const {data:failures,error:failureError}=await request.supabase!.from('inbound_messages').select('provider_message_id,failure_code,received_at').eq('processing_state','needs_review').order('received_at',{ascending:false}).limit(20);

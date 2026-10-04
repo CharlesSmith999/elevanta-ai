@@ -58,7 +58,7 @@ Set these values in Vercel. Keep the values secret. Add each variable to both Pr
 | `WEB_ORIGIN` | Node API | Exact allowed web origins, comma-separated | Yes. |
 | `PORT` | Local API only | Local development port; Vercel supplies production routing | Yes. |
 
-`SUPABASE_SERVICE_ROLE_KEY` must not be used by normal lead, dashboard, or workflow requests. It is permitted only inside the narrowly scoped Admin user-management endpoints documented in [ADMIN-USER-MANAGEMENT.md](./ADMIN-USER-MANAGEMENT.md), and must never be exposed through a `VITE_` variable, browser bundle, Git commit, log, or response payload.
+`SUPABASE_SERVICE_ROLE_KEY` must not be used by normal lead or workflow requests. Exceptions are the narrowly scoped Admin user-management endpoints, Gmail connector routines below, and the read-only `/v1/analytics/connections` aggregate reader described in [CONNECTION-DASHBOARDS.md](./CONNECTION-DASHBOARDS.md). That reader constrains every query to the authenticated workspace, validates Admin-only role preview, applies agent/team visibility before returning aggregates, and never returns raw research/contact/activity records. The production reporting grants require owner approval before application. The key must never be exposed through a `VITE_` variable, browser bundle, Git commit, log, or response payload.
 
 ## 6. Required first-time configuration
 
