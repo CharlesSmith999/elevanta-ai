@@ -323,7 +323,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
       {page === 'Xaviar' && <XaviarWorkspace leads={leads} viewer={viewer} />}
       {page === 'User management' && viewer.role === 'admin' && session && <AdminUserManagement session={session} onNotice={setNotice} onChanged={() => setConnectionAttempt((value) => value + 1)} />}
       </>}
-      {page === 'Dashboard' && <ConnectionAnalyticsPanel session={session} viewerId={viewer.id} start={selectedRange.start} end={selectedRange.end} source={dashboardSource} />}
+      {page === 'Dashboard' && (viewer.role === 'admin' || viewer.role === 'manager') && <ConnectionAnalyticsPanel session={session} viewerId={viewer.id} start={selectedRange.start} end={selectedRange.end} source={dashboardSource} />}
     </section>
     <LeadAlertController session={session} user={signedInUser} onLeads={receiveAlertLeads} onNotice={receiveAlertNotice} />
     {showCreate && <CreateLeadForm error={createError} saving={creatingLead} viewer={viewer} salesAgents={workspaceDirectory.filter((user) => user.role === 'sales_agent')} crmReady={!session || remoteLoaded} onReconnect={session ? onSignOut : undefined} onClose={() => setShowCreate(false)} onSubmit={createLead} />}
