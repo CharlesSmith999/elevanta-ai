@@ -2,6 +2,8 @@
 
 Approved October 3, 2026. Implements the owner's category, research-found, connection, loss-reason and daily-trend graphs before historical workbook import.
 
+October 5 additions and validation: [AGENT-GRAPH-ADDITIONS.md](AGENT-GRAPH-ADDITIONS.md).
+
 ## Definitions
 
 - A connection is the first successful Sales activity (Connected, Replied or Meeting Booked) for an opportunity, with an actor and valid assignment interval. MQL/SQL alone and the Research Connected label are not connection evidence. Repeated conversations never add another first connection.

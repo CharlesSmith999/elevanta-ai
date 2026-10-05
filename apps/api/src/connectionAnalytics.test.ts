@@ -49,3 +49,44 @@ test('Timezone boundaries, exact source period and invalid ranges',()=>{
  const report=connectionAnalytics(admin,data,{...range,timezone:'America/New_York'});assert.equal(report.daily.find(d=>d.day==='2026-10-01')?.connected,1);
  assert.throws(()=>connectionAnalytics(admin,data,{...range,start:'bad'}));assert.throws(()=>connectionAnalytics(admin,data,{...range,timezone:'invalid'}));
 });
+test('Daily App, other and all-category arrivals reconcile; discoveries are scoped and duplicates excluded',()=>{
+ const data=fixture();
+ data.research.push({...data.research[0],id:'web',lead_category:'web'}, {...data.research[0],id:'seo',lead_category:'seo',first_found_by:'other'}, {...data.research[0],id:'dup',duplicate_state:'confirmed'});
+ const report=connectionAnalytics(marketer,data,range), day=report.daily[0];
+ assert.equal(day.received,2);assert.equal(day.otherReceived,2);assert.equal(day.allReceived,4);
+ assert.equal(day.allFound,2);assert.equal(day.found,1);assert.equal(report.daily[1].appConnected,1);
+ assert.equal(report.daily[2].allReceived,0);assert.equal(report.researchFunnel?.excludedDuplicates,1);
+});
+test('Research funnel uses arrival cohort with personal finder and named connecting agent',()=>{
+ const data=fixture();
+ data.research.push({...data.research[0],id:'pending',first_found_at:null,first_found_by:null,published_opportunity_id:null}, {...data.research[0],id:'legacy',first_found_at:null,first_found_by:null,discovered_methods:['legacy'],published_opportunity_id:null}, {...data.research[0],id:'peer',first_found_by:'other',published_opportunity_id:null}, {...data.research[0],id:'old',inbound_messages:{received_at:'2026-09-01T00:00:00Z'}});
+ const funnel=connectionAnalytics(marketer,data,range).researchFunnel!;
+ assert.equal(funnel.received,4);assert.equal(funnel.notFound,1);assert.equal(funnel.unknown,1);assert.equal(funnel.found,1);assert.equal(funnel.routed,1);assert.equal(funnel.connected,1);
+ assert.deepEqual(funnel.finders,[{name:'m',found:1,routed:1,connected:1}]);assert.deepEqual(funnel.connections,[{finder:'m',salesperson:'s',connected:1}]);
+ assert.equal(connectionAnalytics(seller,data,range).researchFunnel,null);
+ assert.ok(connectionAnalytics(seller,data,range).daily.every(row=>row.allReceived===0&&row.allFound===0&&row.appConnected===0));
+});
+test('Connected-to-Won counts one documented outcome and never infers a win from current status',()=>{
+ const data=fixture();data.opportunities[0].status='won';
+ assert.equal(connectionAnalytics(seller,data,range).conversion.won,0);
+ data.events.push(event('win',3,{type:'status_change',to_status:'won',outcome:null}), event('winAgain',4,{type:'status_change',to_status:'won',outcome:null}));
+ assert.deepEqual(connectionAnalytics(seller,data,range).conversion,{connected:1,won:1,wonByOther:0,rate:100});
+});
+test('Win evidence before connection, after period, from wrong actor or assignment is excluded',()=>{
+ for(const extra of [{occurred_at:'2026-10-01T10:00:00Z'}, {occurred_at:'2026-10-05T10:00:00Z'}, {actor_id:'m'}, {assignment_id:'wrong'}]){
+  const data=fixture();data.events.push(event('win',3,{type:'status_change',to_status:'won',outcome:null,...extra}));
+  assert.equal(connectionAnalytics(seller,data,range).conversion.won,0);
+ }
+});
+test('Reassigned win is disclosed but not credited to the first Sales Agent',()=>{
+ const data=fixture();data.assignments[0].ended_at='2026-10-03T00:00:00Z';data.assignments.push({id:'a2',opportunity_id:'o',assigned_to:'s2',started_at:'2026-10-03T00:00:00Z',ended_at:null});
+ data.events.push(event('win',4,{type:'status_change',to_status:'won',outcome:null,actor_id:'s2',assignment_id:'a2'}));
+ assert.deepEqual(connectionAnalytics(seller,data,range).conversion,{connected:1,won:0,wonByOther:1,rate:0});
+ assert.equal(connectionAnalytics(admin,data,range).conversion.won,1);
+});
+test('New comparisons honor source, workspace, timezone and empty cohorts',()=>{
+ const data=fixture();data.research[0].inbound_messages={received_at:'2026-10-02T01:00:00Z'};
+ const local=connectionAnalytics(marketer,data,{...range,timezone:'America/New_York'});assert.equal(local.daily.find(row=>row.day==='2026-10-01')?.allReceived,1);
+ const empty=connectionAnalytics(marketer,data,{...range,source:'SEO'});assert.equal(empty.researchFunnel?.received,0);assert.equal(empty.conversion.rate,null);
+ const foreign=connectionAnalytics({...admin,workspace_id:'foreign'},data,range);assert.equal(foreign.researchFunnel?.received,0);assert.equal(foreign.conversion.connected,0);
+});

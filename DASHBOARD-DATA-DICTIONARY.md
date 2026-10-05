@@ -1,5 +1,7 @@
 # Elevanta AI — Dashboard Data Dictionary
 
+October 5 additions: [AGENT-GRAPH-ADDITIONS.md](docs/AGENT-GRAPH-ADDITIONS.md). Research progress uses the received cohort; daily comparisons use actual event dates. Connected-to-Won uses first connections in the period and subsequent evidenced wins, protecting personal credit across reassignment.
+
 The additional October 3 research/connection charts use [CONNECTION-DASHBOARDS.md](docs/CONNECTION-DASHBOARDS.md). They distinguish first successful conversation from broader Sales Engagement, use dated assignment cohorts for ratios, and preserve missing historical evidence.
 
 Status: Step 1 of dashboard redesign — working baseline
