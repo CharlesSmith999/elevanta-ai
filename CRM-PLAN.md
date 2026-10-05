@@ -4,6 +4,8 @@ Research and Sales connection graphs follow [CONNECTION-DASHBOARDS.md](docs/CONN
 
 Research arrival visibility: [RESEARCH-ARRIVALS-UX.md](docs/RESEARCH-ARRIVALS-UX.md). Show newest received emails first and a labeled last-24-hours arrivals view; preserve drafts, records and role scope.
 
+Agent dashboard ordering and focused graph placement: [AGENT-DASHBOARD-ARRANGEMENT.md](docs/AGENT-DASHBOARD-ARRANGEMENT.md), aligned with the approved role-screen and connection-analytics specifications.
+
 Gmail reliability execution reference: [GMAIL-RELIABILITY-REPAIR.md](docs/GMAIL-RELIABILITY-REPAIR.md). Same-mailbox reconnect/resume preserves the approved intake window; replacement starts a new one. Google production publishing and applicable verification remain separate requirements.
 
 Status: Planning baseline, approved from stakeholder answers

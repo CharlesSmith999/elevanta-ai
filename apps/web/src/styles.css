@@ -462,14 +462,20 @@
 @media (min-width: 1241px) {
   .role-reference-section { margin-top: 0; }
   .role-marketing-manager,.role-sales-manager { display: grid; grid-template-rows: 82px auto auto minmax(300px, 1fr); }
-  .role-marketing-agent { display: grid; grid-template-rows: 82px auto auto auto minmax(260px, 1fr); }
-  .role-sales-agent { display: grid; grid-template-rows: 72px auto auto auto minmax(150px, 1fr); }
+  .role-marketing-agent,.role-sales-agent { display: flex; flex-direction: column; gap: 8px; }
 }
+.role-reference-dashboard>.connection-analytics { margin: 0; }
+.sales-agent-conversion { display: grid; grid-template-columns: 1fr; margin-top: 8px; }
+.sales-agent-conversion .role-reference-panel { min-height: 200px; }
+.sales-agent-conversion .sales-path { max-width: 900px; }
+.sales-agent-execution .role-reference-metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.marketing-agent-insights+.connection-analytics { margin-top: 8px; }
+.connection-analytics+.marketing-agent-insights { margin-top: 0; }
 @media (max-width: 1240px) {
-  .role-reference-metrics { grid-template-columns: repeat(3, 1fr); }.marketing-manager-grid,.sales-manager-main-grid,.marketing-agent-insights,.sales-agent-insights { grid-template-columns: repeat(2, 1fr); }.role-recognition-grid { grid-template-columns: repeat(3, 1fr); }.marketing-agent-queue { grid-template-columns: repeat(3, 1fr); }.marketing-agent-bottom { grid-template-columns: 1fr; }
+  .role-reference-metrics,.sales-agent-execution .role-reference-metrics { grid-template-columns: repeat(3, 1fr); }.marketing-manager-grid,.sales-manager-main-grid,.marketing-agent-insights,.sales-agent-insights { grid-template-columns: repeat(2, 1fr); }.role-recognition-grid { grid-template-columns: repeat(3, 1fr); }.marketing-agent-queue { grid-template-columns: repeat(3, 1fr); }.marketing-agent-bottom { grid-template-columns: 1fr; }
 }
 @media (max-width: 860px) {
-  .role-reference-dashboard { padding: 10px 13px 28px; }.role-reference-topbar,.role-reference-title,.admin-reference-controls { align-items: flex-start; flex-direction: column; }.role-reference-topbar { padding: 12px 2px; }.role-reference-title { gap: 10px; }.role-reference-title h1 { white-space: normal; }.role-reference-metrics,.marketing-manager-grid,.sales-manager-main-grid,.marketing-agent-insights,.sales-agent-insights,.role-recognition-grid,.marketing-agent-queue { grid-template-columns: 1fr; }.priority-table { overflow-x: auto; }.priority-row { min-width: 920px; }.impact-journey,.sales-path { overflow-x: auto; grid-template-columns: repeat(6, 90px); }.growth-grid { grid-template-columns: repeat(2, 1fr); }
+  .role-reference-dashboard { padding: 10px 13px 28px; }.role-reference-topbar,.role-reference-title,.admin-reference-controls { align-items: flex-start; flex-direction: column; }.role-reference-topbar { padding: 12px 2px; }.role-reference-title { gap: 10px; }.role-reference-title h1 { white-space: normal; }.role-reference-metrics,.marketing-manager-grid,.sales-manager-main-grid,.marketing-agent-insights,.sales-agent-insights,.role-recognition-grid,.marketing-agent-queue,.sales-agent-execution .role-reference-metrics { grid-template-columns: 1fr; }.priority-table { overflow-x: auto; }.priority-row { min-width: 920px; }.impact-journey,.sales-path { overflow-x: auto; grid-template-columns: repeat(6, 90px); }.growth-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* Shared safe role switcher: identical control and behavior across every reference dashboard. */
