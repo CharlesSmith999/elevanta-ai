@@ -1,14 +1,14 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-10-04
+Last updated: 2026-10-05
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.14.md](./CRM-DECISIONS-v1.14.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
 
 ## Connection and lead-quality graphs: October 3, 2026
 
-Implementation prepared in [CONNECTION-DASHBOARDS.md](docs/CONNECTION-DASHBOARDS.md): role-scoped App/Web/Game/SMM research comparison, first-found marketer bars, first Sales connection attribution and ratios, per-agent daily trends including zero days and qualification snapshots, App received-versus-found, loss reasons and Marketing-to-Sales handoffs. Existing dashboard designs and themes are retained. Historical first-found dates and qualification snapshots are not invented.
+Released and verified through [PR #57](https://github.com/CharlesSmith999/elevanta-ai/pull/57), production commit `33424274ba251f1f32b3c4b55ce455f3a79ef2db`, and the existing Vercel deployment `FM831U3wCn9vW2CaUKhsu3NPfrcw`. Production migration `202610030001` is applied once: two columns, two triggers, reporting grants, and retained row security verified. The live Admin dashboard loads category comparisons, marketer research-found results, first-connection trends and ratios, App arrivals, loss reasons, and handoff attribution. Current live records show no qualifying first Sales connection yet; historic status labels were not treated as contact evidence. No historical activity dates or qualification snapshots were invented.
 
-Local validation: 117 application tests passed together again on October 4; API/web typechecks and production build passed. All 27 migrations replayed in isolated PostgreSQL, including immutable finder attribution and qualification snapshot checks. The owner approved the server-only read permission expansion and deployment. Production migration `202610030001` is applied: one ledger entry, two columns, two triggers, reporting grants and retained row security verified. GitHub/Vercel publication and live visual acceptance are in progress; do not mark this release complete until verified.
+Validation passed on October 4: 117 application tests, API/web typechecks, production build, and all 27 migrations replayed in isolated PostgreSQL. The October 5 grouped visual correction aligns the analytics section with the existing reference-dashboard side spacing on desktop and mobile. Marketing Manager is covered by automated role-scope checks; no live Marketing Manager account is available in the role preview, so that account-specific screen was not separately checked. See [CONNECTION-DASHBOARDS.md](docs/CONNECTION-DASHBOARDS.md) for definitions, limits, and release evidence.
 
 ## Gmail reliability repair: October 1, 2026
 
