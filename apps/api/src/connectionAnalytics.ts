@@ -43,14 +43,14 @@ export function connectionAnalytics(viewer: Person, input: AnalyticsInput, filte
   const visibleIds = new Set(visibleOpportunities.map((item) => item.id));
   const connections = [...firstConnection.values()].filter((event) => visibleIds.has(event.opportunity_id) && within(validTime(event.occurred_at ?? event.created_at)) && (marketing || permitted(event.actor_id)));
   const research = marketing ? input.research.filter((item) => item.workspace_id === viewer.workspace_id && sourceMatches(item.source)) : [];
-  const found = research.filter((item) => within(validTime(item.first_found_at)) && permitted(item.first_found_by));
+  const found = research.filter((item) => item.duplicate_state !== 'confirmed' && within(validTime(item.first_found_at)) && permitted(item.first_found_by));
   const times = [...connections.map((item) => validTime(item.occurred_at ?? item.created_at)), ...cohort.filter((item) => visibleIds.has(item.opportunity_id)).map((item) => validTime(item.started_at)), ...research.map((item) => validTime(item.inbound_messages?.received_at)), ...found.map((item) => validTime(item.first_found_at))].filter((time) => Number.isFinite(time) && time <= end);
   const firstDay = dayKey(Number.isFinite(start) ? start : times.length ? times.reduce((a,b) => Math.min(a,b),end) : end - 13 * 86400000, filter.timezone);
   const lastDay = dayKey(end, filter.timezone);
-  const daily = [] as Array<{ day: string; connected: number; mql: number; sql: number; unqualified: number; unknown: number; received: number; found: number }>;
+  const daily = [] as Array<{ day: string; connected: number; mql: number; sql: number; unqualified: number; unknown: number; received: number; found: number; otherReceived: number; allReceived: number; allFound: number; appConnected: number }>;
   for (let date = Date.parse(`${firstDay}T12:00:00Z`); date <= Date.parse(`${lastDay}T12:00:00Z`); date += 86400000) {
     if (daily.length >= 4000) throw new Error('Choose a reporting range shorter than 4000 days.');
-    daily.push({ day: new Date(date).toISOString().slice(0,10), connected: 0, mql: 0, sql: 0, unqualified: 0, unknown: 0, received: 0, found: 0 });
+    daily.push({ day: new Date(date).toISOString().slice(0,10), connected: 0, mql: 0, sql: 0, unqualified: 0, unknown: 0, received: 0, found: 0, otherReceived: 0, allReceived: 0, allFound: 0, appConnected: 0 });
   }
   const days = new Map(daily.map((row) => [row.day,row]));
   for (const event of connections) {
@@ -59,11 +59,17 @@ export function connectionAnalytics(viewer: Person, input: AnalyticsInput, filte
     const q = event.metadata?.qualification_at_connection;
     if (q === 'mql' || q === 'sql') row[q]++; else if (q === 'not_available') row.unqualified++; else row.unknown++;
   }
-  for (const item of research.filter((item) => item.lead_category === 'app' && within(validTime(item.inbound_messages?.received_at)))) {
-    const row = days.get(dayKey(validTime(item.inbound_messages?.received_at),filter.timezone)); if (row) row.received++;
+  for (const item of research.filter((item) => within(validTime(item.inbound_messages?.received_at)))) {
+    const row = days.get(dayKey(validTime(item.inbound_messages?.received_at),filter.timezone));
+    if (row) { row.allReceived++; if (item.lead_category === 'app') row.received++; else row.otherReceived++; }
   }
-  for (const item of found.filter((item) => item.lead_category === 'app')) {
-    const row = days.get(dayKey(validTime(item.first_found_at),filter.timezone)); if (row) row.found++;
+  for (const item of found) {
+    const row = days.get(dayKey(validTime(item.first_found_at),filter.timezone));
+    if (row) { row.allFound++; if (item.lead_category === 'app') row.found++; }
+  }
+  const appResearchIds = new Set(research.filter((item) => item.lead_category === 'app' && item.duplicate_state !== 'confirmed' && permitted(item.first_found_by)).map((item) => item.published_opportunity_id));
+  for (const event of connections.filter((item) => appResearchIds.has(item.opportunity_id))) {
+    const row = days.get(dayKey(validTime(event.occurred_at ?? event.created_at),filter.timezone)); if (row) row.appConnected++;
   }
   function agentRows(kind: 'marketing' | 'sales') {
     const relevantPeople = people.filter((person) => permitted(person.id) && (kind === 'marketing' ? ['marketer','admin'].includes(person.role) || (person.role === 'manager' && person.department === 'marketing') : person.role === 'sales_agent'));
@@ -109,6 +115,37 @@ export function connectionAnalytics(viewer: Person, input: AnalyticsInput, filte
     else if (evidence.some((event) => event.opportunity_id === id && (marketing || permitted(event.actor_id)))) attempted++;
   }
   const received = research.filter((item) => within(validTime(item.inbound_messages?.received_at)));
+  // Research progress uses one arrival cohort; shared backlog and personal output stay explicitly separate.
+  const researchCohort = received.filter((item) => item.duplicate_state !== 'confirmed');
+  const discoveredByEnd = (item: Research) => Number.isFinite(validTime(item.first_found_at)) && validTime(item.first_found_at) <= end;
+  const ownFound = researchCohort.filter((item) => discoveredByEnd(item) && permitted(item.first_found_by));
+  const routedByEnd = (item: Research) => !!item.published_opportunity_id && assignments.some((assignment) => assignment.opportunity_id === item.published_opportunity_id && validTime(assignment.started_at) <= end);
+  const funnelAgents = new Map<string, { name: string; found: number; routed: number; connected: number }>();
+  const funnelPairs = new Map<string, { finder: string; salesperson: string; connected: number }>();
+  const connectedResearch = new Set<string>();
+  for (const item of ownFound) {
+    const row = funnelAgents.get(item.first_found_by!) ?? { name: names.get(item.first_found_by!) ?? 'Not available', found: 0, routed: 0, connected: 0 };
+    row.found++; if (routedByEnd(item)) row.routed++;
+    const connection = item.published_opportunity_id ? firstConnection.get(item.published_opportunity_id) : undefined;
+    if (connection && routedByEnd(item) && validTime(connection.occurred_at ?? connection.created_at) >= validTime(item.first_found_at) && !connectedResearch.has(item.published_opportunity_id!)) {
+      row.connected++; connectedResearch.add(item.published_opportunity_id!);
+      const key = `${item.first_found_by}:${connection.actor_id}`;
+      const pair = funnelPairs.get(key) ?? { finder: row.name, salesperson: names.get(connection.actor_id ?? '') ?? 'Not available', connected: 0 };
+      pair.connected++; funnelPairs.set(key, pair);
+    }
+    funnelAgents.set(item.first_found_by!, row);
+  }
+  // Connected cohort outcomes require dated Won evidence and a valid Sales assignment.
+  let won = 0, wonByOther = 0;
+  for (const connection of connections) {
+    const wins = input.events.filter((event) => {
+      const at = validTime(event.occurred_at ?? event.created_at);
+      if (event.opportunity_id !== connection.opportunity_id || event.to_status !== 'won' || at < validTime(connection.occurred_at ?? connection.created_at) || !Number.isFinite(at) || at > end) return false;
+      return assignments.some((assignment) => assignment.opportunity_id === event.opportunity_id && assignment.assigned_to === event.actor_id && (!event.assignment_id || event.assignment_id === assignment.id) && at >= validTime(assignment.started_at) && (!assignment.ended_at || at < validTime(assignment.ended_at)));
+    });
+    if (wins.some((event) => marketing || permitted(event.actor_id))) won++;
+    else if (wins.length) wonByOther++;
+  }
   return {
     marketing, sales, timezone: filter.timezone, days: daily.length,
     totals: { assigned: visibleCohort.size, connected, attempted, notAttempted: visibleCohort.size-connected-attempted-connectedByOther, connectedByOther, rate: fraction(connected,visibleCohort.size), periodConnections: connections.length, dailyAverage: daily.length ? Math.round(connections.length / daily.length * 100) / 100 : null },
@@ -116,6 +153,8 @@ export function connectionAnalytics(viewer: Person, input: AnalyticsInput, filte
     excludedCategories: received.filter((item) => !['app','web','game','smm'].includes(item.lead_category)).length,
     marketingAgents: marketing ? agentRows('marketing') : [], salesAgents: sales ? agentRows('sales') : [],
     daily, losses: [...losses].map(([name,count])=>({name,count})), handoffs: [...pairs.values()],
+    conversion: { connected: connections.length, won, wonByOther, rate: fraction(won, connections.length) },
+    researchFunnel: marketing ? { received: researchCohort.length, excludedDuplicates: received.length-researchCohort.length, notFound: researchCohort.filter((item) => !discoveredByEnd(item) && item.discovered_methods.length === 0).length, unknown: researchCohort.filter((item) => !discoveredByEnd(item) && item.discovered_methods.length > 0).length, found: ownFound.length, routed: ownFound.filter(routedByEnd).length, connected: connectedResearch.size, finders: [...funnelAgents.values()], connections: [...funnelPairs.values()] } : null,
     missing: { foundEvidence: research.filter((item) => !item.first_found_at && item.discovered_methods?.length && permitted(item.marketing_owner_id)).length, qualification: connections.filter((item) => !item.metadata?.qualification_at_connection).length, lossDates: missingLossDates },
   };
 }

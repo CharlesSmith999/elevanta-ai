@@ -1,5 +1,7 @@
 # Lead CRM — Phase 1 Product and Technical Plan
 
+October 5 requested agent graph additions follow [AGENT-GRAPH-ADDITIONS.md](docs/AGENT-GRAPH-ADDITIONS.md). Add graphs first, review removals/layout next, then finalize Milestone 5 data import.
+
 Research and Sales connection graphs follow [CONNECTION-DASHBOARDS.md](docs/CONNECTION-DASHBOARDS.md), approved October 3, 2026: first-success connection attribution, research discovery evidence, role-scoped charts and loss reasons.
 
 Research arrival visibility: [RESEARCH-ARRIVALS-UX.md](docs/RESEARCH-ARRIVALS-UX.md). Show newest received emails first and a labeled last-24-hours arrivals view; preserve drafts, records and role scope.
