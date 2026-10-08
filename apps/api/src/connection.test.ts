@@ -13,6 +13,7 @@ test('deployment rewrite preserves nested CRM routes and query filters', () => {
     assert.equal(normalizeCrmPath(`https://example.com/api/${path}?source=Bark%20Paid`), `/${path}?source=Bark+Paid`);
   }
   assert.equal(normalizeCrmPath('/api/v1/me?__crm_path=v1/admin/users'), '/v1/me');
+  assert.equal(normalizeCrmPath('/api/v1/imports/example/rows?offset=0&__crm_path=v1/imports/example/rows&path=v1/imports/example/rows'), '/v1/imports/example/rows?offset=0');
 });
 
 const profile = { id: '00000000-0000-4000-8000-000000000001', workspace_id: '00000000-0000-4000-8000-000000000002', role: 'sales_agent', full_name: 'Synthetic Test Agent', manager_id: null, department: 'sales', active: true };
