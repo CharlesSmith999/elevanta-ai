@@ -33,6 +33,7 @@ test('rejects hidden activation fields and unbounded review pagination', () => {
   assert.equal(importPageQuery.safeParse({ offset: -1 }).success, false);
   assert.equal(importPageQuery.safeParse({ offset: 100001 }).success, false);
   assert.deepEqual(importPageQuery.parse({}), { offset: 0 });
+  assert.deepEqual(importPageQuery.parse({ offset: '50', disposition: 'review' }), { offset: 50, disposition: 'review' });
   assert.deepEqual(historicalActivationRequest.parse({ batchId: '00000000-0000-4000-8000-000000000001' }), { batchId: '00000000-0000-4000-8000-000000000001', limit: 100 });
   assert.equal(historicalActivationRequest.safeParse({ batchId: '00000000-0000-4000-8000-000000000001', limit: 101 }).success, false);
   assert.equal(historicalActivationRequest.safeParse({ batchId: '00000000-0000-4000-8000-000000000001', limit: 0 }).success, false);
