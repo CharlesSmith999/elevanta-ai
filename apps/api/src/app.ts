@@ -511,7 +511,7 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
   }));
   app.get('/v1/imports/:id/rows', ...protectedRoute(async (request, response) => {
     if (request.profile!.role !== 'admin') { response.status(403).json({ message: 'Only Admin may inspect historical imports.' }); return; }
-    const batchId = parse(id, request.params.id); const query = importPageQuery.parse(request.query);
+    const batchId = parse(id, request.params.id); const query = importPageQuery.parse({ offset: request.query.offset, disposition: request.query.disposition });
     const { data: batch, error: batchError } = await request.supabase!.from('lead_import_batches').select('id').eq('id', batchId).eq('workspace_id', request.profile!.workspace_id).maybeSingle();
     if (batchError) throw batchError;
     if (!batch) { response.status(404).json({ message: 'Import batch not found.' }); return; }
