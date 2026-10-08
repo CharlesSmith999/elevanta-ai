@@ -1,8 +1,18 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-10-05
+Last updated: 2026-10-07
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [AGENT-DASHBOARD-ARRANGEMENT.md](./docs/AGENT-DASHBOARD-ARRANGEMENT.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.14.md](./CRM-DECISIONS-v1.14.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
+
+## Historical import: October 7, 2026
+
+Owner approved historical import rules, recorded as CRM-DECISIONS-v1.16.md because v1.14 and v1.15 were already used on main. Existing decisions remain unchanged. Reuse of the existing Ali, Owais and Muzammil profiles is approved; duplicate person profiles must not be mapped twice.
+
+Implemented Admin-only, workspace-scoped staging with complete normalized rows and linked source copies, retry idempotency, immutable payloads, exact-count sealing, paginated review, and audit events. The proposed additive migration is 202610070001. No contacts, opportunities, assignments, or Gmail records are changed by staging.
+
+Local validation: 129 application tests, 12 synthetic PostgreSQL transaction/RLS checks, API/web TypeScript checks, and the web production build passed. Build reports the existing large-bundle warning. Production migration, deployment, and upload have not yet been verified.
+
+Activation remains unimplemented and fails closed. Required next work includes historical status semantics, owner mapping, collision/DNC checks, transactional activation, full-data dashboard pagination/reconciliation, and exact backed-up test-lead cleanup. No real leads have been uploaded or deleted by this release preparation. See docs/HISTORICAL-IMPORT-OPERATIONS.md. Milestone 5 is in progress, not complete.
 
 ## Connection and lead-quality graphs: October 3, 2026
 
