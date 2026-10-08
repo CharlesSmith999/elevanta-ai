@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { request } from './api';
+import { importChunks } from './importChunks';
 
 type Batch = { id: string; workbook_name: string; expected_rows: number; state: string };
 type StagedRow = { record_id: string; group_id: string; disposition: string; source_sheet: string; source_row: number; payload: { name: string; values: Record<string, unknown> } };
@@ -32,11 +33,13 @@ export function HistoricalImports({ session }: { session: Session }) {
       const bundle = JSON.parse(await file.text()) as Bundle;
       if (bundle.manifest?.format !== 'elevanta-history-v1' || !Array.isArray(bundle.rows) || !Number.isInteger(bundle.manifest.expectedRows) || bundle.rows.length !== bundle.manifest.expectedRows) throw new Error('Use a validated Elevanta historical import JSON file.');
       let batchId = '';
-      // Small chunks bound serverless request size; same-file retries are idempotent.
-      for (let start = 0; start < bundle.rows.length; start += 10) {
-        const response = await request<{ batchId: string }>(session, '/v1/imports/stage', { method: 'POST', body: JSON.stringify({ manifest: bundle.manifest, rows: bundle.rows.slice(start, start + 10) }) });
+      // Bound both row count and bytes. Same-file retries remain idempotent.
+      let stored = 0;
+      for (const rows of importChunks(bundle.manifest, bundle.rows)) {
+        const response = await request<{ batchId: string }>(session, '/v1/imports/stage', { method: 'POST', body: JSON.stringify({ manifest: bundle.manifest, rows }) });
         batchId = response.batchId;
-        setNotice(`Stored ${Math.min(start + 10, bundle.rows.length).toLocaleString()} of ${bundle.rows.length.toLocaleString()} records. No leads activated.`);
+        stored += rows.length;
+        setNotice(`Stored ${stored.toLocaleString()} of ${bundle.rows.length.toLocaleString()} records. No leads activated.`);
       }
       const result = await request<{ rows: number; readyCandidates: number; review: number }>(session, '/v1/imports/validate', { method: 'POST', body: JSON.stringify({ batchId }) });
       setNotice(`Preserved ${result.rows.toLocaleString()} records: ${result.readyCandidates.toLocaleString()} ready candidates and ${result.review.toLocaleString()} for review. No leads activated or deleted.`);

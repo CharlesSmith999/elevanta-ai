@@ -1,10 +1,14 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-10-07
+Last updated: 2026-10-08
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [AGENT-DASHBOARD-ARRANGEMENT.md](./docs/AGENT-DASHBOARD-ARRANGEMENT.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.14.md](./CRM-DECISIONS-v1.14.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
 
 ## Historical import: October 7, 2026
+
+October 8 release progress: PR #62 merged as `2d560386e93b564533cbd9345abdffcd8de7d257`. GitHub validation run 355 passed. The production Admin import panel is visible and connected. API health/readiness passed. Additive migration `202610070001` is applied to the existing Supabase project. Live verification returned one ledger entry, two RLS-enabled staging tables, anonymous RPC execution denied, and direct authenticated row insertion denied. Preflight counted 14 existing opportunities; none were deleted or changed by this migration. All 28 migrations replayed locally and 12 dedicated staging database tests passed.
+
+The private bundle independently reconciles 18,885 canonical rows, 4,137 ready candidates, 14,748 review rows, and 36,470 source links. Every upload chunk passed the API schema before submission. Original workbook checksum remained unchanged. Live staging upload has started but is not yet sealed or reconciled. A follow-up upload optimization uses up to 100 rows per request with a 900 KB UTF-8 bound, preserving retry safety. Two batching tests and web typecheck/build pass. Activation and test-data retirement remain unimplemented/pending.
 
 Owner approved historical import rules, recorded as CRM-DECISIONS-v1.16.md because v1.14 and v1.15 were already used on main. Existing decisions remain unchanged. Reuse of the existing Ali, Owais and Muzammil profiles is approved; duplicate person profiles must not be mapped twice.
 
