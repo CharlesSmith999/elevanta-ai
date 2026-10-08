@@ -31,6 +31,7 @@ type OpportunityRecord = {
   original_details?: string | null;
   research_summary?: string | null;
   source_received_at?: string | null;
+  historical_source_date?: string | null;
   created_at: string;
   updated_at: string;
   contacts?: { name: string; normalized_phone?: string | null; normalized_email?: string | null } | null;
@@ -158,7 +159,7 @@ function mapOpportunity(record: OpportunityRecord): Lead {
     researchSummary: record.research_summary ?? undefined,
     sourceReceivedAt: record.source_received_at ?? undefined,
     marketingOwnerId: record.marketing_owner_id ?? 'shariq',
-    sourceDate: record.created_at,
+    sourceDate: record.historical_source_date ?? record.created_at,
     status: record.status,
     qualification: record.qualification,
     priority: 0,
