@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { stageImportRequest, importPageQuery } from './historicalImport.js';
+import { stageImportRequest, importPageQuery, historicalActivationRequest } from './historicalImport.js';
 import { createApp } from './app.js';
 import type { AddressInfo } from 'node:net';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -33,6 +33,9 @@ test('rejects hidden activation fields and unbounded review pagination', () => {
   assert.equal(importPageQuery.safeParse({ offset: -1 }).success, false);
   assert.equal(importPageQuery.safeParse({ offset: 100001 }).success, false);
   assert.deepEqual(importPageQuery.parse({}), { offset: 0 });
+  assert.deepEqual(historicalActivationRequest.parse({ batchId: '00000000-0000-4000-8000-000000000001' }), { batchId: '00000000-0000-4000-8000-000000000001', limit: 100 });
+  assert.equal(historicalActivationRequest.safeParse({ batchId: '00000000-0000-4000-8000-000000000001', limit: 101 }).success, false);
+  assert.equal(historicalActivationRequest.safeParse({ batchId: '00000000-0000-4000-8000-000000000001', limit: 0 }).success, false);
 });
 
 test('import routes deny every non-Admin role before database access', async () => {

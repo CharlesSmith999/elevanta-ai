@@ -12,7 +12,9 @@ export type OpportunityStatus =
   | 'not_interested'
   | 'incorrect'
   | 'duplicate'
-  | 'do_not_contact';
+  | 'do_not_contact'
+  | 'not_available'
+  | 'no_answer';
 export type Qualification = 'mql' | 'sql' | 'not_available';
 export type VisibilityMode = 'full_context' | 'fresh_start';
 export type FollowUpStatus = 'open' | 'completed' | 'cancelled';
@@ -26,7 +28,7 @@ export const statusLabels: Record<OpportunityStatus, string> = {
   new: 'New', assigned: 'Assigned', contacted: 'Contacted', connected: 'Connected',
   follow_up_required: 'Follow-up Required', qualified: 'Qualified', proposal_sent: 'Proposal Sent',
   won: 'Won', lost: 'Lost', not_interested: 'Not Interested', incorrect: 'Incorrect',
-  duplicate: 'Duplicate', do_not_contact: 'Do Not Contact',
+  duplicate: 'Duplicate', do_not_contact: 'Do Not Contact', not_available: 'Not available', no_answer: 'No Answer',
 };
 
 export const qualificationLabels: Record<Qualification, string> = {

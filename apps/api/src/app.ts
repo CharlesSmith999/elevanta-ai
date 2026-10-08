@@ -4,7 +4,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { ConfigurationError, supabaseConfig } from './config.js';
 import { startGmailConnection, finishGmailConnection, gmailHealth, saveGmailMailbox, replaceGmailMailbox, setGmailEnabled, syncGmail, validSchedulerSecret } from './gmailConnector.js';
 import { z, ZodError } from 'zod';
-import { stageImportRequest, sealImportRequest, importPageQuery } from './historicalImport.js';
+import { stageImportRequest, sealImportRequest, importPageQuery, historicalActivationRequest } from './historicalImport.js';
 import { readConnectionReport } from './connectionReporting.js';
 import { buildApiXaviarReport, canRequestXaviar, opportunityBelongsToSubject, type XaviarOpportunity, type XaviarProfile } from './xaviar.js';
 
@@ -31,7 +31,7 @@ export const newLead = z.object({ contactMethods: z.array(z.object({ type: z.enu
 });
 const leadDetailsUpdate = z.object({ name: z.string().trim().min(1).max(160), source: z.enum(sourceOptions), category: z.enum(leadCategories), description: z.string().trim().max(4000).default('') });
 const lostReasonOptions = ['Price or budget', 'No response', 'Timing or priority', 'Competitor selected', 'Not a fit', 'Proposal declined', 'Other'] as const;
-const statusUpdate = z.object({ status: z.enum(['assigned', 'contacted', 'connected', 'follow_up_required', 'qualified', 'proposal_sent', 'won', 'lost', 'not_interested', 'incorrect', 'duplicate', 'do_not_contact']), qualification: z.enum(['mql', 'sql', 'not_available']).optional(), totalProjectCost: z.number().nonnegative().optional(), upfrontPaymentAmount: z.number().nonnegative().optional(), lostReason: z.enum(lostReasonOptions).optional() });
+const statusUpdate = z.object({ status: z.enum(['assigned', 'contacted', 'connected', 'follow_up_required', 'qualified', 'proposal_sent', 'won', 'lost', 'not_interested', 'incorrect', 'duplicate', 'do_not_contact', 'not_available', 'no_answer']), qualification: z.enum(['mql', 'sql', 'not_available']).optional(), totalProjectCost: z.number().nonnegative().optional(), upfrontPaymentAmount: z.number().nonnegative().optional(), lostReason: z.enum(lostReasonOptions).optional() });
 const assignment = z.object({ assignedTo: id, visibility: z.enum(['full_context', 'fresh_start']), reason: z.string().trim().min(1).max(1000) });
 const researchMethod = z.object({ type: z.enum(['phone','email']), value: z.string().trim().min(1).max(254), label: z.string().trim().max(80).optional() }).superRefine((method, ctx) => {
   if (/\*/.test(method.value)) ctx.addIssue({ code: 'custom', path: ['value'], message: 'Masked contact details cannot be sent to Sales.' });
@@ -332,9 +332,15 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
   }));
   app.get('/v1/opportunities', ...protectedRoute(async (request, response) => {
     const status = typeof request.query.status === 'string' ? request.query.status : undefined;
-    let query = request.supabase!.from('opportunities').select('*, contacts(*), assignments(*), activities(*), follow_ups(*), incorrect_reports(*), incorrect_reviews(*)').order('updated_at', { ascending: false });
-    if (status) query = query.eq('status', status);
-    const { data, error } = await query; if (error) throw error; response.json({ opportunities: data });
+    const data: Array<Record<string, unknown>> = [];
+    for (let offset = 0; ; offset += 1000) {
+      let query = request.supabase!.from('opportunities').select('*, contacts(*), assignments(*), activities(*), follow_ups(*), incorrect_reports(*), incorrect_reviews(*)').order('updated_at', { ascending: false }).order('id').range(offset, offset + 999);
+      if (status) query = query.eq('status', status);
+      const page = await query; if (page.error) throw page.error;
+      data.push(...(page.data ?? []));
+      if ((page.data ?? []).length < 1000) break;
+    }
+    response.json({ opportunities: data });
   }));
   app.post('/v1/opportunities', ...protectedRoute(async (request, response) => {
     const value = parse(newLead, request.body);
@@ -513,7 +519,11 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     if (query.disposition) db = db.eq('disposition', query.disposition);
     const { data, count, error } = await db;
     if (error) throw error;
-    response.json({ rows: data, count, offset: query.offset });
+    const rowIds = (data ?? []).map(row => row.record_id);
+    const activationResult = rowIds.length ? await request.supabase!.from('lead_import_activations').select('record_id,state,reason').eq('batch_id', batchId).in('record_id', rowIds) : { data: [], error: null };
+    if (activationResult.error) throw activationResult.error;
+    const decisions = new Map((activationResult.data ?? []).map(item => [item.record_id, { state: item.state, reason: item.reason }]));
+    response.json({ rows: (data ?? []).map(row => ({ ...row, activation: decisions.get(row.record_id) ?? null })), count, offset: query.offset });
   }));
   app.post('/v1/imports/stage', ...protectedRoute(async (request, response) => {
     if (request.profile!.role !== 'admin') { response.status(403).json({ message: 'Only Admin may stage historical imports.' }); return; }
@@ -531,7 +541,32 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
   }));
   app.post('/v1/imports/commit', ...protectedRoute(async (request, response) => {
     if (request.profile!.role !== 'admin') { response.status(403).json({ message: 'Only Admin may activate historical imports.' }); return; }
-    response.status(409).json({ message: 'Historical activation is not implemented yet. Staging preserves records but does not activate or replace leads.' });
+    const value = historicalActivationRequest.parse(request.body);
+    const { data: profiles, error: profilesError } = await request.supabase!.from('profiles').select('id,full_name,role,department,active').eq('workspace_id', request.profile!.workspace_id).eq('active', true);
+    if (profilesError) throw profilesError;
+    const aliases: Record<string, { department: 'marketing' | 'sales'; role: 'manager' | 'marketer' | 'sales_agent'; fullName: string }> = {
+      'marketing:Shariq': { department: 'marketing', role: 'manager', fullName: 'MShariq' },
+      'marketing:Muzammil': { department: 'marketing', role: 'marketer', fullName: 'Muzammil' },
+      'marketing:Yasir': { department: 'marketing', role: 'marketer', fullName: 'Muhammad Yasir' },
+      'marketing:Shayan': { department: 'marketing', role: 'marketer', fullName: 'shayan Sheikh' },
+      'marketing:Hamza': { department: 'marketing', role: 'marketer', fullName: 'Hamza' },
+      'marketing:Sami': { department: 'marketing', role: 'marketer', fullName: 'Sami' },
+      'sales:Ali': { department: 'sales', role: 'manager', fullName: 'Ali' },
+      'sales:Mustabeen': { department: 'sales', role: 'sales_agent', fullName: 'Mustabeen Shah' },
+      'sales:Asad': { department: 'sales', role: 'sales_agent', fullName: 'Muhammad Asad Polani' },
+      'sales:Obaid': { department: 'sales', role: 'sales_agent', fullName: 'Obaid' },
+      'sales:Owais': { department: 'sales', role: 'sales_agent', fullName: 'Owais' },
+    };
+    const ownerMap: { marketing: Record<string, string>; sales: Record<string, string> } = { marketing: {}, sales: {} };
+    for (const [sourceName, target] of Object.entries(aliases)) {
+      const [department, alias] = sourceName.split(':') as ['marketing' | 'sales', string];
+      const matches = (profiles ?? []).filter(profile => profile.full_name === target.fullName && profile.department === target.department && profile.role === target.role);
+      if (matches.length !== 1) { response.status(422).json({ message: `The approved ${department} owner mapping for ${alias} does not resolve to exactly one active profile.` }); return; }
+      ownerMap[department][alias] = matches[0].id;
+    }
+    const { data, error } = await request.supabase!.rpc('activate_historical_import', { p_batch_id: value.batchId, p_owner_map: ownerMap, p_limit: value.limit });
+    if (error) throw error;
+    response.json(data);
   }));
   app.get('/v1/coaching/:userId', ...protectedRoute(async (request, response) => {
     const targetId = parse(id, request.params.userId); const viewer = request.profile!;
@@ -543,9 +578,14 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
       ? await request.supabase!.from('profiles').select('id').eq('manager_id', subject.id).eq('active', true)
       : { data: [], error: null };
     if (managedError) throw managedError;
-    const { data, error } = await request.supabase!.from('opportunities').select('id,status,qualification,source,marketing_owner_id,created_at,updated_at,won_at,lost_reason,assignments(assigned_to,started_at,ended_at),follow_ups(id,owner_id,due_at,status),activities(id,type,actor_id,created_at,occurred_at,from_status,to_status,outcome,contact_method_id),opportunity_contact_methods(health,focus,contact_method_id)').order('updated_at', { ascending: false });
-    if (error) throw error;
-    const scoped = ((data ?? []) as XaviarOpportunity[]).filter((item) => opportunityBelongsToSubject(item, subject as XaviarProfile, (managed ?? []).map((profile) => profile.id)));
+    const data: XaviarOpportunity[] = [];
+    for (let offset = 0; ; offset += 1000) {
+      const page = await request.supabase!.from('opportunities').select('id,status,qualification,source,marketing_owner_id,created_at,updated_at,won_at,lost_reason,assignments(assigned_to,started_at,ended_at),follow_ups(id,owner_id,due_at,status),activities(id,type,actor_id,created_at,occurred_at,from_status,to_status,outcome,contact_method_id),opportunity_contact_methods(health,focus,contact_method_id)').order('updated_at', { ascending: false }).order('id').range(offset, offset + 999);
+      if (page.error) throw page.error;
+      data.push(...((page.data ?? []) as XaviarOpportunity[]));
+      if ((page.data ?? []).length < 1000) break;
+    }
+    const scoped = data.filter((item) => opportunityBelongsToSubject(item, subject as XaviarProfile, (managed ?? []).map((profile) => profile.id)));
     const report = buildApiXaviarReport(subject as XaviarProfile, scoped);
     response.json({ report: await persistXaviarReport(subject as XaviarProfile, report) });
   }));
@@ -589,11 +629,19 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     const role = parse(dashboardRoles, request.params.role); const profile = request.profile!;
     const permitted = profile.role === 'admin' || (role === 'agent' && profile.role === 'sales_agent') || profile.role === role || (role === 'manager' && profile.role === 'manager');
     if (!permitted) { response.status(403).json({ message: 'This dashboard is outside your permitted role scope.' }); return; }
-    const filters = parse(dashboardQuery, request.query); let query = request.supabase!.from('opportunities').select('id,status,qualification,source,total_project_cost,upfront_payment_amount,won_at,lost_reason,first_contacted_at,qualified_at,proposal_sent_at,created_at').order('created_at', { ascending: false });
-    if (filters.source) query = query.eq('source', filters.source);
-    if (filters.start) query = query.gte('created_at', `${filters.start}T00:00:00.000Z`);
-    if (filters.end) query = query.lte('created_at', `${filters.end}T23:59:59.999Z`);
-    const { data, error } = await query; if (error) throw error; const opportunities = data ?? [];
+    const filters = parse(dashboardQuery, request.query);
+    const all: Array<Record<string, unknown>> = [];
+    for (let offset = 0; ; offset += 1000) {
+      let query = request.supabase!.from('opportunities').select('id,status,qualification,source,total_project_cost,upfront_payment_amount,won_at,lost_reason,first_contacted_at,qualified_at,proposal_sent_at,created_at,historical_source_date').order('created_at', { ascending: false }).order('id').range(offset, offset + 999);
+      if (filters.source) query = query.eq('source', filters.source);
+      const page = await query; if (page.error) throw page.error;
+      all.push(...(page.data ?? []));
+      if ((page.data ?? []).length < 1000) break;
+    }
+    const opportunities = all.filter(item => {
+      const date = String(item.historical_source_date ?? item.created_at).slice(0, 10);
+      return (!filters.start || date >= filters.start) && (!filters.end || date <= filters.end);
+    });
     const bySource = sourceOptions.map((source) => opportunities.filter((item) => item.source === source)).filter((items) => items.length).map((items) => ({ source: items[0].source, sampleSize: items.length, won: items.filter((item) => item.status === 'won').length, mql: items.filter((item) => item.qualification === 'mql').length, sql: items.filter((item) => item.qualification === 'sql').length }));
     response.json({ role, period: filters.period, source: filters.source ?? 'all', sampleSize: opportunities.length, bySource, opportunities });
   }));

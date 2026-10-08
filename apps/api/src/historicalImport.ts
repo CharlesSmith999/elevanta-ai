@@ -31,6 +31,7 @@ export const stageImportRequest = z.object({
   if (input.rows.length > input.manifest.expectedRows) ctx.addIssue({ code: 'custom', message: 'Chunk exceeds declared workbook count.' });
 });
 export const sealImportRequest = z.object({ batchId: z.string().uuid() }).strict();
+export const historicalActivationRequest = z.object({ batchId: z.string().uuid(), limit: z.number().int().min(1).max(100).default(100) }).strict();
 export const importPageQuery = z.object({
   offset: z.coerce.number().int().min(0).max(100000).default(0),
   disposition: z.enum(['ready', 'review']).optional(),
