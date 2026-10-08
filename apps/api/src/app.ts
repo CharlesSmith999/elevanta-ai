@@ -4,6 +4,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { ConfigurationError, supabaseConfig } from './config.js';
 import { startGmailConnection, finishGmailConnection, gmailHealth, saveGmailMailbox, replaceGmailMailbox, setGmailEnabled, syncGmail, validSchedulerSecret } from './gmailConnector.js';
 import { z, ZodError } from 'zod';
+import { stageImportRequest, sealImportRequest, importPageQuery } from './historicalImport.js';
 import { readConnectionReport } from './connectionReporting.js';
 import { buildApiXaviarReport, canRequestXaviar, opportunityBelongsToSubject, type XaviarOpportunity, type XaviarProfile } from './xaviar.js';
 
@@ -180,6 +181,7 @@ async function persistXaviarReport(subject: XaviarProfile, report: ReturnType<ty
 export function createApp(clientForToken: (token: string) => SupabaseClient = configuredClient, adminClient: () => SupabaseClient = serviceClient) {
   const app = express();
   app.use(cors({ origin: process.env.WEB_ORIGIN?.split(',') ?? true }));
+  app.use('/v1/imports/stage', express.json({ limit: '1500kb' }));
   app.use(express.json({ limit: '100kb' }));
   // Keep the shared app resilient if a platform adapter forwards the
   // deployment prefix instead of removing it first.
@@ -495,8 +497,42 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     const value = parse(reviewDecision, request.body); const opportunityId = parse(id, request.params.id);
     const { error } = await request.supabase!.rpc('decide_incorrect_review', { p_opportunity_id: opportunityId, p_decision: value.decision, p_reason: value.reason ?? null }); if (error) throw error; response.status(204).end();
   }));
-  app.post('/v1/imports/validate', ...protectedRoute(async (_request, response) => { response.status(409).json({ message: 'Production Excel import is deferred until Milestone 5.' }); }));
-  app.post('/v1/imports/commit', ...protectedRoute(async (_request, response) => { response.status(409).json({ message: 'Production Excel import is deferred until Milestone 5.' }); }));
+  app.get('/v1/imports', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'admin') { response.status(403).json({ message: 'Only Admin may manage historical imports.' }); return; }
+    const { data, error } = await request.supabase!.from('lead_import_batches').select('id,workbook_name,source_sha256,expected_rows,state,created_at,sealed_at').eq('workspace_id', request.profile!.workspace_id).order('created_at', { ascending: false }).limit(100);
+    if (error) throw error;
+    response.json({ batches: data });
+  }));
+  app.get('/v1/imports/:id/rows', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'admin') { response.status(403).json({ message: 'Only Admin may inspect historical imports.' }); return; }
+    const batchId = parse(id, request.params.id); const query = importPageQuery.parse(request.query);
+    const { data: batch, error: batchError } = await request.supabase!.from('lead_import_batches').select('id').eq('id', batchId).eq('workspace_id', request.profile!.workspace_id).maybeSingle();
+    if (batchError) throw batchError;
+    if (!batch) { response.status(404).json({ message: 'Import batch not found.' }); return; }
+    let db = request.supabase!.from('lead_import_rows').select('record_id,group_id,disposition,source_sheet,source_row,payload', { count: 'exact' }).eq('batch_id', batchId).order('record_id').range(query.offset, query.offset + 49);
+    if (query.disposition) db = db.eq('disposition', query.disposition);
+    const { data, count, error } = await db;
+    if (error) throw error;
+    response.json({ rows: data, count, offset: query.offset });
+  }));
+  app.post('/v1/imports/stage', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'admin') { response.status(403).json({ message: 'Only Admin may stage historical imports.' }); return; }
+    const value = stageImportRequest.parse(request.body);
+    const { data, error } = await request.supabase!.rpc('stage_historical_import', { p_manifest: value.manifest, p_rows: value.rows });
+    if (error) throw error;
+    response.json({ batchId: data });
+  }));
+  app.post('/v1/imports/validate', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'admin') { response.status(403).json({ message: 'Only Admin may validate historical imports.' }); return; }
+    const value = sealImportRequest.parse(request.body);
+    const { data, error } = await request.supabase!.rpc('seal_historical_import', { p_batch_id: value.batchId });
+    if (error) throw error;
+    response.json(data);
+  }));
+  app.post('/v1/imports/commit', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'admin') { response.status(403).json({ message: 'Only Admin may activate historical imports.' }); return; }
+    response.status(409).json({ message: 'Historical activation is not implemented yet. Staging preserves records but does not activate or replace leads.' });
+  }));
   app.get('/v1/coaching/:userId', ...protectedRoute(async (request, response) => {
     const targetId = parse(id, request.params.userId); const viewer = request.profile!;
     const { data: subject, error: subjectError } = await request.supabase!.from('profiles').select('id, workspace_id, role, manager_id, department').eq('id', targetId).maybeSingle();

@@ -16,6 +16,7 @@ import { LeadWorkspace } from './LeadWorkspace';
 import { LeadResearchQueue } from './LeadResearchQueue';
 import { LeadAlertController } from './LeadAlertController';
 import { AdminUserManagement } from './AdminUserManagement';
+import { HistoricalImports } from './HistoricalImports';
 import { ConnectionAnalyticsPanel } from './ConnectionAnalyticsPanel';
 import type { Session } from '@supabase/supabase-js';
 
@@ -315,7 +316,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
       }} />}
       {page === 'Follow-ups' && <FollowUpList leads={visible} viewer={viewer} onSelect={select} onComplete={completeFollowUp} />}
       {page === 'Assignments' && <AssignmentList leads={visible} users={workspaceDirectory} onSelect={select} />}
-      {page === 'Review queue' && <ReviewQueue leads={leads.filter((lead) => lead.incorrectReview?.state === 'pending')} onSelect={select} />}
+      {page === 'Review queue' && <><ReviewQueue leads={leads.filter((lead) => lead.incorrectReview?.state === 'pending')} onSelect={select} />{session && viewer.role === 'admin' && <HistoricalImports session={session} />}</>}
       {page === 'Reports' && <Reports dashboard={dashboard} viewer={viewer} duplicates={duplicateCount} />}
       {page === 'Benchmark Board' && canViewManagementBoards(viewer) && <BenchmarkBoard leads={dashboardLeads} />}
       {page === 'Leaderboard' && <Leaderboard leads={dashboardLeads} privateBenchmarkLeads={leads} viewer={viewer} scope={dashboardScope} />}

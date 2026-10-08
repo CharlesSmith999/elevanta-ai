@@ -117,7 +117,7 @@ async function refreshAccessSession() {
   return refreshPromise;
 }
 
-async function request<T>(session: Session, path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(session: Session, path: string, init?: RequestInit): Promise<T> {
   let response = await send(session, path, init);
   if (response.status === 401 && supabase) {
     const refreshed = await refreshAccessSession();
