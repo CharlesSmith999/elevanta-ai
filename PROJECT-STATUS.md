@@ -8,7 +8,7 @@ Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.
 
 The approved single-screen Sales workflow is implemented under [v1.18](CRM-DECISIONS-v1.18.md). Agents can view contacts, open external communication apps, update progress, record activity/notes and follow-ups, and Save and Next from their assigned-lead screen. Existing full details, assignment scope, fresh-start history and contact restrictions remain intact. No schema migration or live lead mutation is part of this release.
 
-The isolated candidate passed 136 application tests, API/web typechecks and synthetic browser acceptance including save/refresh failure recovery. Production release verification is pending. See [Sales Workbench](docs/SALES-WORKBENCH.md) for evidence and limits. Earlier dated sections below are historical snapshots, not a fresh production reconciliation.
+PR #68 is merged and deployed. Its live check caught a timeout when loading contact inventory across all historical leads. The follow-up limits inventory reads to the visible workbench page under existing row policies. The corrected candidate passes 137 application tests, API/web typechecks, production build and browser acceptance. Production re-verification is pending. See [Sales Workbench](docs/SALES-WORKBENCH.md) for evidence and limits. Earlier dated sections below are historical snapshots, not a fresh production reconciliation.
 
 ## Historical import: October 7, 2026
 
