@@ -194,6 +194,16 @@ export async function loadRemoteLead(session: Session, id: string): Promise<Lead
   return mapOpportunity(result.opportunity);
 }
 
+export async function loadWorkbenchContacts(session: Session, ids: string[]): Promise<Record<string, NonNullable<Lead['contactMethods']>>> {
+  const result = await request<{ contactMethods: (RemoteContactMethod & { opportunity_id: string })[] }>(session, `/v1/workbench-contact-methods?ids=${encodeURIComponent(ids.join(','))}`);
+  const mapped: Record<string, NonNullable<Lead['contactMethods']>> = Object.fromEntries(ids.map(id => [id, []]));
+  for (const item of result.contactMethods) {
+    const m = item.contact_methods;
+    if (m && mapped[item.opportunity_id]) mapped[item.opportunity_id].push({ id: m.id, type: m.method_type, value: m.value, label: m.label ?? undefined, health: item.health, focus: item.focus, restricted: Boolean(m.globally_restricted) });
+  }
+  return mapped;
+}
+
 export async function loadWorkspaceMembers(session: Session): Promise<WorkspaceMember[]> {
   const result = await request<{ users: WorkspaceMember[] }>(session, '/v1/workspace-members');
   return result.users;

@@ -334,13 +334,21 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     const status = typeof request.query.status === 'string' ? request.query.status : undefined;
     const data: Array<Record<string, unknown>> = [];
     for (let offset = 0; ; offset += 1000) {
-      let query = request.supabase!.from('opportunities').select('*, contacts(*), assignments(*), activities(*), follow_ups(*), incorrect_reports(*), incorrect_reviews(*), opportunity_contact_methods(id, health, focus, contact_methods(id, method_type, value, label, globally_restricted))').order('updated_at', { ascending: false }).order('id').range(offset, offset + 999);
+      let query = request.supabase!.from('opportunities').select('*, contacts(*), assignments(*), activities(*), follow_ups(*), incorrect_reports(*), incorrect_reviews(*)').order('updated_at', { ascending: false }).order('id').range(offset, offset + 999);
       if (status) query = query.eq('status', status);
       const page = await query; if (page.error) throw page.error;
       data.push(...(page.data ?? []));
       if ((page.data ?? []).length < 1000) break;
     }
     response.json({ opportunities: data });
+  }));
+  app.get('/v1/workbench-contact-methods', ...protectedRoute(async (request, response) => {
+    const ids = parse(z.array(id).min(1).max(41), typeof request.query.ids === 'string' ? request.query.ids.split(',') : []);
+    const { data, error } = await request.supabase!.from('opportunity_contact_methods')
+      .select('opportunity_id, id, health, focus, contact_methods(id, method_type, value, label, globally_restricted)')
+      .in('opportunity_id', ids).order('created_at', { ascending: true });
+    if (error) throw error;
+    response.json({ contactMethods: data ?? [] });
   }));
   app.post('/v1/opportunities', ...protectedRoute(async (request, response) => {
     const value = parse(newLead, request.body);

@@ -18,7 +18,7 @@ Open Leads as a Sales Agent. Assigned leads appear beside the current working pa
 
 No database migration, permission expansion or outbound integration is included. Existing authenticated API requests and database row policies remain the authority. Both the parent screen and workbench enforce assignment scope. Fresh-start history excludes previous assignment activity. Admin preview of a Sales account is read-only for saving work.
 
-Opportunity reads now include per-opportunity contact health/focus and global restriction flags. Missing health inventory on a real CRM record fails closed. The workbench uses the existing activity, note and status endpoints, and refreshes only the saved opportunity.
+The global lead list does not join contact inventory. Workbench contact health/focus and global restriction flags load in a bounded authenticated request for at most 41 opportunity IDs (40 visible rows plus the pinned lead), under existing row policies. Missing health inventory on a real CRM record fails closed. Single-lead refresh includes contact inventory. The workbench uses the existing activity, note and status endpoints.
 
 As with other network writes, a lost response can be ambiguous. The UI warns the agent to inspect history before retrying. This release does not claim new server-side idempotency for activity writes.
 
@@ -35,4 +35,4 @@ The isolated release excludes unrelated local dashboard/import changes.
 
 Run browser acceptance against a local Vite server with `WORKBENCH_TEST_URL` and optional `PLAYWRIGHT_MODULE`. The script rejects non-local targets and uses only synthetic contacts. It never signs into production or sends outreach.
 
-Release evidence will be added after CI and deployment verification. No production leads were changed by these tests.
+PR #68 passed CI run 369 and was deployed as commit `58ef539af3a2cba99a928b32f9a06fbad92f2a22`. Live verification caught a database timeout from loading contact inventory across the entire historical dataset. The follow-up removes that global join and loads only visible workbench contacts. Production re-verification is pending. No production leads were changed by these tests.

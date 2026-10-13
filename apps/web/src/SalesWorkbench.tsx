@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { IconCopy, IconPhone, IconMail, IconBrandWhatsapp, IconArrowRight } from '@tabler/icons-react';
-import { addRemoteNote, loadRemoteLead, logRemoteSalesActivity, updateRemoteStatus } from './api';
+import { addRemoteNote, loadRemoteLead, loadWorkbenchContacts, logRemoteSalesActivity, updateRemoteStatus } from './api';
 import { currentAssignment, leadCategoryLabels, lostReasonOptions, makeId, statusLabels, validStatusTransition, validWonFinancials, type Lead, type User } from './domain';
-import { healthLabel, type LeadContactMethod } from './leadWorkflow';
+import { healthLabel, isRemoteCrmId, type LeadContactMethod } from './leadWorkflow';
 import { contactLinks, nextWorkbenchId, outreachAllowed, workbenchHistory, workbenchMethods, workbenchOutcomes } from './workbenchModel';
 import './salesWorkbench.css';
 
@@ -50,7 +50,7 @@ export function SalesWorkbench(props: Props) {
   const [fallbackId, setFallbackId] = useState(() => leads[0]?.id);
   useEffect(() => { if (!fallbackId && leads[0]) setFallbackId(leads[0].id); }, [leads, fallbackId]);
   const filtered = useMemo(() => leads.filter(lead => {
-    const text = [lead.name, lead.source, ...workbenchMethods(lead).map(m => m.value)].join(' ').toLowerCase();
+    const text = [lead.name, lead.source, lead.phone, lead.email, ...workbenchMethods(lead).map(m => m.value)].join(' ').toLowerCase();
     return text.includes(query.trim().toLowerCase()) && (status === 'all' || lead.status === status)
       && (source === 'all' || lead.source === source)
       && (queue === 'all' || (queue === 'open' && !terminal.includes(lead.status)) || (queue === 'overdue' && due(lead) < Date.now()));
@@ -59,15 +59,35 @@ export function SalesWorkbench(props: Props) {
   const nextId = lead ? nextWorkbenchId(filtered.map(item => item.id), lead.id) : undefined;
   const maxPage = Math.max(0, Math.ceil(filtered.length / 40) - 1);
   const currentPage = Math.min(page, maxPage);
+  const [inventory, setInventory] = useState<{ key: string; data: Record<string, LeadContactMethod[]> }>({ key: '', data: {} });
+  const [contactError, setContactError] = useState('');
+  const [contactRetry, setContactRetry] = useState(0);
+  const pageLeads = filtered.slice(currentPage * 40, (currentPage + 1) * 40);
+  const contactIds = [...new Set([...pageLeads.map(item => item.id), ...(lead ? [lead.id] : [])])].filter(isRemoteCrmId);
+  const contactKey = viewer.id + ':' + contactIds.join(',');
+  useEffect(() => {
+    if (!props.session || !props.connected || !contactIds.length) return;
+    let cancelled = false;
+    setContactError('');
+    loadWorkbenchContacts(props.session, contactIds).then(data => {
+      if (!cancelled) setInventory({ key: contactKey, data });
+    }).catch(error => {
+      if (!cancelled) { setInventory({ key: contactKey, data: {} }); setContactError(error instanceof Error ? error.message : 'Contact details could not load.'); }
+    });
+    return () => { cancelled = true; };
+  }, [contactKey, props.session, props.connected, props.leads, contactRetry]);
+  const withContacts = (item: Lead): Lead => item.contactMethods ? item : { ...item, contactMethods: inventory.key === contactKey ? inventory.data[item.id] : undefined };
   useEffect(() => setPage(0), [query, status, source, queue]);
   useEffect(() => { if (!lead) props.onGuard(false, false); }, [lead, props.onGuard]);
   return <section className="sales-workbench" aria-label="Sales workbench">
     <header className="workbench-heading"><div><span className="eyebrow">SALES WORKBENCH</span><h2>Contact. Record. Continue.</h2><p>Work your assigned leads from one screen. Contact buttons open your apps; they do not log an activity.</p></div><span>{leads.length} assigned leads</span></header>
     {notice && <p className="workbench-notice" role="status">{notice}</p>}
+    {contactError && <p className="workbench-notice" role="alert">Contact details could not load. {contactError} <button type="button" className="quiet" onClick={() => setContactRetry(value => value + 1)}>Retry contacts</button></p>}
     <div className="workbench-layout">
       <section className="workbench-queue" aria-label="Assigned lead list">
         <div className="workbench-filters"><label>Search<input aria-label="Search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Name, phone, email, source" /></label><div className="workbench-two"><label>Queue<select aria-label="Queue" value={queue} onChange={e => setQueue(e.target.value)}><option value="all">All assigned</option><option value="open">Open leads</option><option value="overdue">Overdue</option></select></label><label>Status<select aria-label="Status" value={status} onChange={e => setStatus(e.target.value)}><option value="all">All statuses</option>{Object.entries(statusLabels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label></div><label>Source<select aria-label="Source" value={source} onChange={e => setSource(e.target.value)}><option value="all">All sources</option>{[...new Set(leads.map(l => l.source))].sort().map(s => <option key={s}>{s}</option>)}</select></label><small>{filtered.length} results</small></div>
-        <div className="workbench-rows">{filtered.slice(currentPage * 40, (currentPage + 1) * 40).map(item => {
+        <div className="workbench-rows">{pageLeads.map(rawItem => {
+          const item = withContacts(rawItem);
           const methods = workbenchMethods(item);
           const primary = methods.find(m => m.type === 'phone' && outreachAllowed(item, m)) ?? methods.find(m => m.type === 'phone') ?? methods[0];
           return <article key={item.id} className={`workbench-row ${lead?.id === item.id ? 'selected' : ''}`}>
@@ -78,7 +98,7 @@ export function SalesWorkbench(props: Props) {
         })}{!filtered.length && <p className="empty">No leads match these filters.</p>}</div>
         <div className="workbench-pagination"><button className="quiet" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Previous page</button><small>{currentPage + 1} / {maxPage + 1}</small><button className="quiet" disabled={currentPage === maxPage} onClick={() => setPage(currentPage + 1)}>Next page</button></div>
       </section>
-      {lead ? <WorkPanel key={`${viewer.id}:${lead.id}`} {...props} lead={lead} nextId={nextId} hiddenByFilter={!filtered.some(item => item.id === lead.id)} /> : <section className="workbench-panel"><h3>Select an assigned lead</h3><p>Contact details and updates will appear here. A lead reassigned to someone else will no longer be available.</p></section>}
+      {lead ? <WorkPanel key={`${viewer.id}:${lead.id}`} {...props} lead={withContacts(lead)} nextId={nextId} hiddenByFilter={!filtered.some(item => item.id === lead.id)} /> : <section className="workbench-panel"><h3>Select an assigned lead</h3><p>Contact details and updates will appear here. A lead reassigned to someone else will no longer be available.</p></section>}
     </div>
   </section>;
 }

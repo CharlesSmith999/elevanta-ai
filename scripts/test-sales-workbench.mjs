@@ -67,7 +67,13 @@ try {
   // Mount the real component with a fake session. Intercept every API call locally.
   const remoteId = 'a99c0011-2222-4333-8444-555566667777';
   let failWrite = true, failRead = false, writes = 0;
-  const remoteLead = { ...leads[0], id: remoteId, assignments: [{ ...leads[0].assignments[0], ownerId: 'agent' }], contactMethods: [method('b99c0011-2222-4333-8444-555566667777', '+12025550100')] };
+  const remoteLead = { ...leads[0], id: remoteId, assignments: [{ ...leads[0].assignments[0], ownerId: 'agent' }], contactMethods: undefined };
+  let inventoryReads = 0;
+  await page.route('**/api/v1/workbench-contact-methods?*', route => {
+    inventoryReads++;
+    assert.equal(new URL(route.request().url()).searchParams.get('ids'), remoteId);
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ contactMethods: [{ opportunity_id: remoteId, id: 'relation', health: 'verified', focus: 'active', contact_methods: { id: 'b99c0011-2222-4333-8444-555566667777', method_type: 'phone', value: '+12025550100', globally_restricted: false } }] }) });
+  });
   await page.route('**/api/v1/opportunities/**', async route => {
     if (route.request().method() === 'POST') {
       writes++;
@@ -84,6 +90,8 @@ try {
     const viewer = { id: 'agent', name: 'Synthetic Sales', role: 'sales_agent', department: 'sales' };
     (ReactDOM.default ?? ReactDOM).createRoot(host).render((React.default ?? React).createElement(SalesWorkbench, { leads: [remoteLead], viewer, session: { access_token: 'synthetic', user: { id: 'agent' } }, connected: true, onSelect() {}, onAdvance() {}, onDetails() {}, onGuard() {}, onSaved() {} }));
   }, { remoteLead });
+  await panel().getByRole('link', { name: 'Call +12025550100', exact: true }).waitFor();
+  assert.equal(inventoryReads, 1);
   await panel().getByLabel('Outcome', { exact: true }).selectOption('no_answer');
   await panel().getByLabel('Notes', { exact: true }).fill('Draft survives server failure');
   await panel().getByRole('button', { name: 'Save activity', exact: true }).click();

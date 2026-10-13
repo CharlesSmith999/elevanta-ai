@@ -20,7 +20,7 @@ const profile = { id: '00000000-0000-4000-8000-000000000001', workspace_id: '000
 
 function fakeClient(mode: 'active' | 'invalid' | 'inactive' | 'error' = 'active', selections: string[] = [], role = 'sales_agent') {
   const query = {
-    select(columns: string) { selections.push(columns); return query; }, eq() { return query; }, order() { return query; },
+    select(columns: string) { selections.push(columns); return query; }, eq() { return query; }, order() { return query; }, in() { return query; }, range() { return query; },
     maybeSingle: async () => ({ data: { ...profile, role, active: mode !== 'inactive' }, error: null }),
     then(resolve: (value: unknown) => unknown) { return Promise.resolve({ data: [profile], error: null }).then(resolve); },
   };
@@ -44,6 +44,27 @@ test('contact methods endpoint uses only the existing contact-method relationshi
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+test('workbench contact reads are bounded and global lead loading avoids the heavy contact join', async () => {
+  const selections: string[] = [];
+  const server = createApp(() => fakeClient('active', selections)).listen(0, '127.0.0.1');
+  try {
+    await new Promise<void>(resolve => server.once('listening', resolve));
+    const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const headers = { Authorization: 'Bearer synthetic-test-token' };
+    assert.equal((await fetch(`${base}/v1/workbench-contact-methods?ids=${profile.id}`, { headers })).status, 200);
+    assert.ok(selections.some(s => s.includes('opportunity_id, id, health, focus')));
+    assert.equal((await fetch(`${base}/v1/workbench-contact-methods?ids=invalid`, { headers })).status, 400);
+    assert.equal((await fetch(`${base}/v1/workbench-contact-methods?ids=${Array(42).fill(profile.id).join(',')}`, { headers })).status, 400);
+    selections.length = 0;
+    assert.equal((await fetch(`${base}/v1/opportunities`, { headers })).status, 200);
+    assert.ok(selections.every(s => !s.includes('opportunity_contact_methods(')));
+    assert.equal((await fetch(`${base}/v1/workbench-contact-methods?ids=${profile.id}`)).status, 401);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }
 });
 
