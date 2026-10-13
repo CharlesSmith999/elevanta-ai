@@ -12,6 +12,8 @@ Gmail reliability execution reference: [GMAIL-RELIABILITY-REPAIR.md](docs/GMAIL-
 
 Status: Planning baseline, approved from stakeholder answers
 
+Sales single-screen workbench refinement follows [CRM-DECISIONS-v1.18.md](./CRM-DECISIONS-v1.18.md) and [implementation and acceptance](./docs/SALES-WORKBENCH.md). Existing permissions and Phase 2 outbound boundaries remain unchanged.
+
 Historical Excel migration is governed by [CRM-DECISIONS-v1.16.md](./CRM-DECISIONS-v1.16.md). Staging preserves raw history and missing values. Staging, activation, and retirement of verified test data are separate verified steps.
 
 Current lead/research UX delivery: [CRM-DECISIONS-v1.15.md](./CRM-DECISIONS-v1.15.md) and [screen contract](./docs/LEAD-UX-REFINEMENT-PROPOSAL.md). Creation uses a two-step contact/review flow; research editing and Sales handoff are separate. Multiple-contact creation is transactional. Existing role permissions and immediate assignment remain unchanged. Verification and release evidence: [UX acceptance](./docs/LEAD-UX-ACCEPTANCE.md).
