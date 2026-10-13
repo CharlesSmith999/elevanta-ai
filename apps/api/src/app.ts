@@ -334,7 +334,7 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     const status = typeof request.query.status === 'string' ? request.query.status : undefined;
     const data: Array<Record<string, unknown>> = [];
     for (let offset = 0; ; offset += 1000) {
-      let query = request.supabase!.from('opportunities').select('*, contacts(*), assignments(*), activities(*), follow_ups(*), incorrect_reports(*), incorrect_reviews(*)').order('updated_at', { ascending: false }).order('id').range(offset, offset + 999);
+      let query = request.supabase!.from('opportunities').select('*, contacts(*), assignments(*), activities(*), follow_ups(*), incorrect_reports(*), incorrect_reviews(*), opportunity_contact_methods(id, health, focus, contact_methods(id, method_type, value, label, globally_restricted))').order('updated_at', { ascending: false }).order('id').range(offset, offset + 999);
       if (status) query = query.eq('status', status);
       const page = await query; if (page.error) throw page.error;
       data.push(...(page.data ?? []));
@@ -349,7 +349,7 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
   }));
   app.get('/v1/opportunities/:id', ...protectedRoute(async (request, response) => {
     const opportunityId = parse(id, request.params.id);
-    const { data, error } = await request.supabase!.from('opportunities').select('*, contacts(*), assignments(*), activities(*), follow_ups(*), incorrect_reports(*), incorrect_reviews(*)').eq('id', opportunityId).maybeSingle();
+    const { data, error } = await request.supabase!.from('opportunities').select('*, contacts(*), assignments(*), activities(*), follow_ups(*), incorrect_reports(*), incorrect_reviews(*), opportunity_contact_methods(id, health, focus, contact_methods(id, method_type, value, label, globally_restricted))').eq('id', opportunityId).maybeSingle();
     if (error) throw error; if (!data) { response.status(404).json({ message: 'Lead not found.' }); return; } response.json({ opportunity: data });
   }));
   app.get('/v1/opportunities/:id/contact-methods', ...protectedRoute(async (request, response) => {

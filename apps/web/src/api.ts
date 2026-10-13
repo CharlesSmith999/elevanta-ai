@@ -21,6 +21,11 @@ const apiBase = import.meta.env.DEV && configuredApiBase ? configuredApiBase.rep
 
 type OpportunityRecord = {
   id: string;
+  opportunity_contact_methods?: RemoteContactMethod[];
+  routing_paused_at?: string | null;
+  lost_reason?: Lead['lostReason'];
+  total_project_cost?: number | null;
+  upfront_payment_amount?: number | null;
   status: OpportunityStatus;
   qualification: Qualification;
   source?: string;
@@ -148,6 +153,7 @@ function mapOpportunity(record: OpportunityRecord): Lead {
   const currentOwner = assignments.find((item) => !item.endedAt)?.ownerId;
   return {
     id: record.id,
+    contactMethods: record.opportunity_contact_methods?.flatMap((item) => item.contact_methods ? [{ id: item.contact_methods.id, type: item.contact_methods.method_type, value: item.contact_methods.value, label: item.contact_methods.label ?? undefined, health: item.health, focus: item.focus, restricted: Boolean(item.contact_methods.globally_restricted) }] : []),
     name: record.contacts?.name ?? 'Unnamed contact',
     phone: record.contacts?.normalized_phone ?? undefined,
     email: record.contacts?.normalized_email ?? undefined,
@@ -169,8 +175,10 @@ function mapOpportunity(record: OpportunityRecord): Lead {
     followUps,
     incorrectReports,
     incorrectReview: review?.decision ? { state: review.decision, reviewerId: review.reviewer_id ?? undefined, reason: review.decision_reason ?? undefined, decidedAt: review.decided_at ?? undefined } : incorrectReports.length >= 3 ? { state: 'pending' } : undefined,
-    routingPaused: !review?.decision && incorrectReports.length >= 3,
-    lostReason: undefined,
+    routingPaused: Boolean(record.routing_paused_at),
+    lostReason: record.lost_reason ?? undefined,
+    totalProjectCost: record.total_project_cost ?? undefined,
+    upfrontPaymentAmount: record.upfront_payment_amount ?? undefined,
     duplicateOf: undefined,
     ...(currentOwner ? {} : {}),
   };
@@ -179,6 +187,11 @@ function mapOpportunity(record: OpportunityRecord): Lead {
 export async function loadRemoteLeads(session: Session): Promise<Lead[]> {
   const result = await request<{ opportunities: OpportunityRecord[] }>(session, '/v1/opportunities');
   return result.opportunities.map(mapOpportunity);
+}
+
+export async function loadRemoteLead(session: Session, id: string): Promise<Lead> {
+  const result = await request<{ opportunity: OpportunityRecord }>(session, `/v1/opportunities/${id}`);
+  return mapOpportunity(result.opportunity);
 }
 
 export async function loadWorkspaceMembers(session: Session): Promise<WorkspaceMember[]> {
