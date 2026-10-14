@@ -4,7 +4,11 @@ Status owner: Codex with Shariq
 Last updated: 2026-10-14
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [AGENT-DASHBOARD-ARRANGEMENT.md](./docs/AGENT-DASHBOARD-ARRANGEMENT.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.14.md](./CRM-DECISIONS-v1.14.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
 
-## Sales Workbench: October 13, 2026
+## Lead detail shortcuts: October 14, 2026
+
+Owner rejected the split-screen Sales Workbench and explicitly requested restoration of the previous Leads list/detail with only Copy, Dial and Email shortcuts. This supersedes the workbench UI under [v1.19](CRM-DECISIONS-v1.19.md). The previous page/navigation and API loading are restored in the release candidate. 133 automated tests, API/web typechecks, production build and synthetic browser acceptance passed, including clipboard copying, exact dial/email links, unchanged activity history and return-to-list navigation. Release/deployment status is tracked in the linked GitHub pull request. No lead data is modified.
+
+## Sales Workbench: October 13, 2026 (superseded by v1.19)
 
 The approved single-screen Sales workflow is implemented under [v1.18](CRM-DECISIONS-v1.18.md). Agents can view contacts, open external communication apps, update progress, record activity/notes and follow-ups, and Save and Next from their assigned-lead screen. Existing full details, assignment scope, fresh-start history and contact restrictions remain intact. No schema migration or live lead mutation is part of this release.
 

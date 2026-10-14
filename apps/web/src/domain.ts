@@ -58,7 +58,6 @@ export type IncorrectReport = { reporterId: string; reporterRole?: Role; reason:
 export type IncorrectReview = { state: 'pending' | 'confirmed_incorrect' | 'rejected' | 'merge_duplicate'; reason?: string; reviewerId?: string; decidedAt?: string };
 export type Lead = {
   id: string;
-  contactMethods?: import('./leadWorkflow').LeadContactMethod[];
   discoveredContactMethods?: Array<{ type: 'phone' | 'email'; value: string; label?: string }>;
   name: string;
   phone?: string;

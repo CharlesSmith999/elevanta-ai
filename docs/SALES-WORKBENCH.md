@@ -1,5 +1,7 @@
 # Sales Workbench
 
+Superseded on October 14, 2026 by [v1.19](../CRM-DECISIONS-v1.19.md). The owner requested the previous Leads list/detail with only Copy, Dial and Email shortcuts. This document is historical release evidence, not the current UI specification.
+
 Approved scope: [CRM-DECISIONS-v1.18.md](../CRM-DECISIONS-v1.18.md). This extends the Phase 1 CRM core and screen-refinement work in [CRM-PLAN.md](../CRM-PLAN.md).
 
 ## Agent workflow
