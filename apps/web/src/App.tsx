@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { IconActivityHeartbeat, IconAlertTriangle, IconArrowRight, IconArrowUpRight, IconBriefcase, IconBulb, IconCalendar, IconChartBar, IconChartPieFilled, IconChecklist, IconChevronDown, IconCircleCheck, IconClock, IconCurrencyDollar, IconFilter, IconFlag, IconHistory, IconHome, IconMail, IconMenu2, IconMoonStars, IconPhone, IconReportAnalytics, IconRobot, IconRocket, IconSearch, IconSparkles, IconSun, IconTarget, IconTargetArrow, IconTrophy, IconTrendingUp, IconUserCircle, IconUsers, IconX } from '@tabler/icons-react';
 import { Area, AreaChart, Bar as RechartsBar, BarChart as RechartsBarChart, CartesianGrid, Cell, Funnel, FunnelChart, LabelList, Line, LineChart, RadialBar, RadialBarChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from 'recharts';
 import {
@@ -13,7 +13,6 @@ import { XaviarWorkspace } from './XaviarWorkspace';
 import { navigationFor } from './navigation';
 import { CreateLeadForm } from './CreateLeadForm';
 import { LeadWorkspace } from './LeadWorkspace';
-import { SalesWorkbench } from './SalesWorkbench';
 import { LeadResearchQueue } from './LeadResearchQueue';
 import { LeadAlertController } from './LeadAlertController';
 import { AdminUserManagement } from './AdminUserManagement';
@@ -59,10 +58,6 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   const [viewerId, setViewerId] = useState(session?.user.id ?? 'shariq');
   const [page, setPage] = useState('Dashboard');
   const [selectedId, setSelectedId] = useState<string | undefined>();
-  const [salesFullView, setSalesFullView] = useState(false);
-  const workbenchGuard = useRef({ dirty: false, saving: false });
-  const setWorkbenchGuard = useCallback((dirty: boolean, saving: boolean) => { workbenchGuard.current = { dirty, saving }; }, []);
-  const receiveWorkbenchLead = useCallback((updated: Lead) => setLeads(existing => existing.map(lead => lead.id === updated.id ? updated : lead)), []);
   const [showCreate, setShowCreate] = useState(false);
   const [createError, setCreateError] = useState('');
   const [creatingLead, setCreatingLead] = useState(false);
@@ -84,7 +79,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   const dashboard = useMemo(() => viewer.role === 'manager' && viewer.department === 'marketing'
     ? dashboardFor({ ...viewer, role: 'admin' }, leads.filter((lead) => workspaceDirectory.find((user) => user.id === lead.marketingOwnerId)?.managerId === viewer.id), new Date(), workspaceDirectory)
     : dashboardFor(viewer, leads, new Date(), workspaceDirectory), [viewer, leads, workspaceDirectory]);
-  const selected = dashboard.visible.find((lead) => lead.id === selectedId);
+  const selected = leads.find((lead) => lead.id === selectedId);
   const visible = dashboard.visible;
   const selectedRange = useMemo(() => dashboardDateRange(dashboardPeriod, new Date(), { start: customStart || undefined, end: customEnd || undefined }), [dashboardPeriod, customStart, customEnd]);
   const scopedDashboardLeads = useMemo(() => {
@@ -132,14 +127,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
 
   const mutateLead = (leadId: string, mutate: (lead: Lead) => Lead) => setLeads((existing) => existing.map((lead) => lead.id === leadId ? mutate(lead) : lead));
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [page, selectedId]);
-  function canLeaveWorkbench() {
-    if (workbenchGuard.current.saving) { setNotice('Please wait for the current save to finish.'); return false; }
-    if (workbenchGuard.current.dirty && !window.confirm('You have unsaved lead changes. Discard them and continue?')) return false;
-    workbenchGuard.current = { dirty: false, saving: false };
-    return true;
-  }
-  const select = (leadId: string) => { if (!canLeaveWorkbench()) return; setSelectedId(leadId); setSalesFullView(false); setPage('Lead inbox'); };
-  const safeSignOut = onSignOut ? () => { if (canLeaveWorkbench()) onSignOut(); } : undefined;
+  const select = (leadId: string) => { setSelectedId(leadId); setPage('Lead inbox'); };
 
   function updateStatus(lead: Lead, next: OpportunityStatus, options?: { persist?: boolean }) {
     if (next === 'won') return setNotice('Use the Won financial details form to record total project cost and upfront payment.');
@@ -274,10 +262,8 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
     setLeads((current) => [...current, lead]); setShowCreate(false); event.currentTarget.reset(); setNotice(duplicate ? 'Test lead created and flagged as a duplicate candidate.' : 'Test lead created in this browser.');
   }
 
-  function resetDemo() { if (!canLeaveWorkbench()) return; setLeads(structuredClone(seedLeads)); setSelectedId(undefined); setNotice('Test workspace reset to the protected sample data.'); }
+  function resetDemo() { setLeads(structuredClone(seedLeads)); setSelectedId(undefined); setNotice('Test workspace reset to the protected sample data.'); }
   function switchViewer(nextViewerId: string) {
-    if (!canLeaveWorkbench()) return;
-    setSalesFullView(false);
     setViewerId(nextViewerId);
     setPage('Dashboard');
     setDashboardScope('company');
@@ -286,8 +272,6 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
     setMobileNavOpen(false);
   }
   function navigate(next: string) {
-    if (!canLeaveWorkbench()) return;
-    setSalesFullView(false);
     if (next === 'Dashboard') setDashboardScope('company');
     setPage(next);
     setSelectedId(undefined);
@@ -306,8 +290,8 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
     <button className="mobile-nav-toggle" type="button" aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen((open) => !open)}>{mobileNavOpen ? <IconX size={22} /> : <IconMenu2 size={22} />}<span>Menu</span></button>
     {mobileNavOpen && <button className="mobile-nav-backdrop" type="button" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} />}
     <aside className={`sidebar ${mobileNavOpen ? 'mobile-open' : ''}`}>{viewer.role === 'admin'
-      ? <AdminReferenceSidebar viewer={viewer} activePage={page} onNavigate={navigate} onReset={resetDemo} onSignOut={safeSignOut} />
-      : roleReferenceKind && <RoleReferenceSidebar kind={roleReferenceKind} viewer={viewer} activePage={page} onNavigate={navigate} onReset={resetDemo} onSignOut={safeSignOut} />}
+      ? <AdminReferenceSidebar viewer={viewer} activePage={page} onNavigate={navigate} onReset={resetDemo} onSignOut={onSignOut} />
+      : roleReferenceKind && <RoleReferenceSidebar kind={roleReferenceKind} viewer={viewer} activePage={page} onNavigate={navigate} onReset={resetDemo} onSignOut={onSignOut} />}
     </aside>
     <section className={`content ${referenceDashboard ? 'reference-dashboard-content' : 'unified-content'}`}>
       {!referenceDashboard && <><UnifiedPageHeader page={page} viewer={viewer} viewers={switchableUsers} theme={theme} onViewer={switchViewer} onTheme={setTheme} />
@@ -319,7 +303,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
       </div>}
       {notice && <div className="toast" role="status">{notice}</div>}
       {adminReference ? <AdminCommandCenter viewer={viewer} viewers={switchableUsers} leads={dashboardLeads} dashboard={filteredDashboard} period={dashboardPeriod} source={dashboardSource} theme={theme} onViewer={switchViewer} onPeriod={setDashboardPeriod} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} /> : roleReferenceDashboard && roleReferenceKind ? <RoleReferenceDashboard kind={roleReferenceKind} viewer={viewer} viewers={switchableUsers} leads={dashboardLeads} period={dashboardPeriod} source={dashboardSource} theme={theme} session={session} start={selectedRange.start} end={selectedRange.end} onViewer={switchViewer} onPeriod={setDashboardPeriod} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} onCreate={() => setShowCreate(true)} onOpenLead={select} /> : <>
-      {page === 'Lead inbox' && (viewer.role === 'sales_agent' && !salesFullView ? <SalesWorkbench leads={visible} viewer={viewer} session={session} connected={remoteLoaded} selectedId={selectedId} onSelect={select} onAdvance={setSelectedId} onDetails={id => { if (canLeaveWorkbench()) { setSelectedId(id); setSalesFullView(true); } }} onSaved={receiveWorkbenchLead} onGuard={setWorkbenchGuard} /> : selected ? <LeadWorkspace lead={selected} viewer={viewer} workspaceUsers={workspaceDirectory} session={session} onBack={() => { setSalesFullView(false); if (viewer.role !== 'sales_agent') setSelectedId(undefined); }} onStatus={updateStatus} onQualification={updateQualification} onReassign={reassign} onEditDetails={editLeadDetails} onReportIncorrect={reportIncorrect} onDecision={decideReview} /> : <section className="inbox-layout"><LeadTable viewer={viewer} canCreate={viewer.role === 'admin' || viewer.role === 'marketer'} leads={visible} users={workspaceDirectory} onSelect={select} onCreate={() => setShowCreate(true)} /></section>)}
+      {page === 'Lead inbox' && (selected ? <LeadWorkspace lead={selected} viewer={viewer} workspaceUsers={workspaceDirectory} session={session} onBack={() => setSelectedId(undefined)} onStatus={updateStatus} onQualification={updateQualification} onReassign={reassign} onEditDetails={editLeadDetails} onReportIncorrect={reportIncorrect} onDecision={decideReview} /> : <section className="inbox-layout"><LeadTable viewer={viewer} canCreate={viewer.role === 'admin' || viewer.role === 'marketer'} leads={visible} users={workspaceDirectory} onSelect={select} onCreate={() => setShowCreate(true)} /></section>)}
       {page === 'Lead research' && <LeadResearchQueue viewer={viewer} users={workspaceDirectory} session={session} onNotice={setNotice} onPublished={async (research, salesOwnerId) => {
         if (session) setLeads(await loadRemoteLeads(session));
         else {

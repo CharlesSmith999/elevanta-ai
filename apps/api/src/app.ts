@@ -342,14 +342,6 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     }
     response.json({ opportunities: data });
   }));
-  app.get('/v1/workbench-contact-methods', ...protectedRoute(async (request, response) => {
-    const ids = parse(z.array(id).min(1).max(41), typeof request.query.ids === 'string' ? request.query.ids.split(',') : []);
-    const { data, error } = await request.supabase!.from('opportunity_contact_methods')
-      .select('opportunity_id, id, health, focus, contact_methods(id, method_type, value, label, globally_restricted)')
-      .in('opportunity_id', ids).order('created_at', { ascending: true });
-    if (error) throw error;
-    response.json({ contactMethods: data ?? [] });
-  }));
   app.post('/v1/opportunities', ...protectedRoute(async (request, response) => {
     const value = parse(newLead, request.body);
     const { data, error } = value.contactMethods ? await request.supabase!.rpc('create_opportunity_v21', { p_name: value.name, p_methods: value.contactMethods, p_source: value.source, p_marketing_owner_id: value.marketingOwnerId ?? null, p_sales_owner_id: value.salesOwnerId ?? null, p_description: value.description ?? null, p_lead_category: value.category }) : await request.supabase!.rpc('create_opportunity_v17', { p_name: value.name, p_phone: value.phone ?? null, p_email: value.email ?? null, p_source: value.source ?? null, p_marketing_owner_id: value.marketingOwnerId ?? null, p_sales_owner_id: value.salesOwnerId ?? null, p_description: value.description ?? null, p_lead_category: value.category });
@@ -357,7 +349,7 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
   }));
   app.get('/v1/opportunities/:id', ...protectedRoute(async (request, response) => {
     const opportunityId = parse(id, request.params.id);
-    const { data, error } = await request.supabase!.from('opportunities').select('*, contacts(*), assignments(*), activities(*), follow_ups(*), incorrect_reports(*), incorrect_reviews(*), opportunity_contact_methods(id, health, focus, contact_methods(id, method_type, value, label, globally_restricted))').eq('id', opportunityId).maybeSingle();
+    const { data, error } = await request.supabase!.from('opportunities').select('*, contacts(*), assignments(*), activities(*), follow_ups(*), incorrect_reports(*), incorrect_reviews(*)').eq('id', opportunityId).maybeSingle();
     if (error) throw error; if (!data) { response.status(404).json({ message: 'Lead not found.' }); return; } response.json({ opportunity: data });
   }));
   app.get('/v1/opportunities/:id/contact-methods', ...protectedRoute(async (request, response) => {

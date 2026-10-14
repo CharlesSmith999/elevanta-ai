@@ -4,6 +4,7 @@ import { canEditLeadDetails, canFlagIncorrectLead, leadCategoryLabels, leadCateg
 import { canRestore, focusForHealth, healthLabel, isRemoteCrmId, validateContactMethod, type ContactHealth, type LeadContactMethod } from './leadWorkflow';
 import type { Session } from '@supabase/supabase-js';
 import { addRemoteContactMethod, assessRemoteContactMethod, loadRemoteActivityHistory, loadRemoteContactMethods, logRemoteSalesActivity, restoreRemoteContactMethod } from './api';
+import { ContactShortcuts } from './ContactShortcuts';
 
 const healthOptions: ContactHealth[] = ['verified', 'incorrect', 'wrong_person', 'reception_gatekeeper', 'do_not_contact'];
 const firstMethods = (lead: Lead): LeadContactMethod[] => lead.discoveredContactMethods ? lead.discoveredContactMethods.map((method, index) => ({ ...method, id: `${lead.id}-method-${index}`, health: 'unverified', focus: 'active' })) : [
@@ -27,6 +28,8 @@ const localHistory = (lead: Lead): HistoryItem[] => [...lead.activities].sort((a
 
 export function LeadWorkspace({ lead, viewer, workspaceUsers, session, onBack, onStatus, onQualification, onReassign, onEditDetails, onReportIncorrect, onDecision }: { lead: Lead; viewer: User; workspaceUsers: User[]; session?: Session; onBack: () => void; onStatus: (lead: Lead, status: Lead['status'], options?: { persist?: boolean }) => void; onQualification: (lead: Lead, qualification: Lead['qualification']) => void; onReassign: (lead: Lead, event: FormEvent<HTMLFormElement>) => void; onEditDetails: (lead: Lead, event: FormEvent<HTMLFormElement>) => void; onReportIncorrect: (lead: Lead, event: FormEvent<HTMLFormElement>) => void; onDecision: (lead: Lead, decision: 'confirmed_incorrect' | 'rejected' | 'merge_duplicate') => void; }) {
   const [methods, setMethods] = useState<LeadContactMethod[]>(() => firstMethods(lead));
+  const [loadedContactLead, setLoadedContactLead] = useState<string>();
+  const shortcutsAllowed = (!session || !isRemoteCrmId(lead.id) || loadedContactLead === lead.id) && !lead.routingPaused && !['incorrect', 'duplicate', 'do_not_contact'].includes(lead.status);
   const [followUps, setFollowUps] = useState(lead.followUps);
   const [tab, setTab] = useState<'overview' | 'history'>('overview');
   const [activityOpen, setActivityOpen] = useState(false);
@@ -50,7 +53,7 @@ export function LeadWorkspace({ lead, viewer, workspaceUsers, session, onBack, o
   const latestActivity = history[0];
   const primaryMethod = active.find((method) => method.health === 'verified') ?? active[0] ?? secondary[0];
 
-  useEffect(() => { setMethods(firstMethods(lead)); setFollowUps(lead.followUps); setHistory(localHistory(lead)); setTab('overview'); window.scrollTo({ top: 0, behavior: 'instant' }); }, [lead.id]);
+  useEffect(() => { setLoadedContactLead(undefined); setMethods(firstMethods(lead)); setFollowUps(lead.followUps); setHistory(localHistory(lead)); setTab('overview'); window.scrollTo({ top: 0, behavior: 'instant' }); }, [lead.id]);
   useEffect(() => {
     if (!session || !isRemoteCrmId(lead.id)) return;
     let alive = true;
@@ -60,7 +63,8 @@ export function LeadWorkspace({ lead, viewer, workspaceUsers, session, onBack, o
         const method = item.contact_methods;
         return method ? [{ id: method.id, type: method.method_type, value: method.value, label: method.label ?? undefined, health: item.health, focus: item.focus, reason: item.assessment_reason ?? undefined, restricted: Boolean(method.globally_restricted), lastAttemptAt: item.last_assessed_at ?? undefined }] : [];
       });
-      if (remoteMethods.length) setMethods(remoteMethods);
+      setMethods(remoteMethods);
+      setLoadedContactLead(lead.id);
       setHistory(historyResult.activities.map((item) => ({ id: item.id, at: item.occurred_at ?? item.created_at, type: item.type, outcome: item.outcome ?? 'recorded', method: item.contact_methods?.value, note: item.body ?? undefined, actorId: item.actor_id ?? undefined })));
     }).catch((error: unknown) => { if (alive) setNotice(error instanceof Error ? `CRM data could not load: ${error.message}` : 'CRM data could not load.'); });
     return () => { alive = false; };
@@ -125,8 +129,8 @@ export function LeadWorkspace({ lead, viewer, workspaceUsers, session, onBack, o
       </section>
       <div className="lead-workspace-grid action-first-grid">
         <section className="workflow-card contact-summary"><div className="workflow-heading"><div><span className="eyebrow">ACTIVE CONTACTS</span><h2>Who can I contact?</h2><p>Keep useful methods in focus. Mark contact quality without changing the whole lead.</p></div>{canManage && <button className="quiet icon-label" onClick={() => setContactOpen(true)}><IconPlus size={17} /> Add contact</button>}</div>
-          <MethodGroup title="Best available methods" methods={active} sales={sales} canManage={canManage} onAssess={assess} onLog={openActivity} />
-          {secondary.length > 0 && <MethodGroup title="Secondary methods" methods={secondary} sales={sales} canManage={canManage} onAssess={assess} onLog={openActivity} />}
+          <MethodGroup title="Best available methods" methods={active} sales={sales} canManage={canManage} shortcutsAllowed={shortcutsAllowed} onAssess={assess} onLog={openActivity} />
+          {secondary.length > 0 && <MethodGroup title="Secondary methods" methods={secondary} sales={sales} canManage={canManage} shortcutsAllowed={shortcutsAllowed} onAssess={assess} onLog={openActivity} />}
           <details className="removed-methods"><summary>Removed from active focus ({removed.length}) <small>Incorrect, wrong person, and do-not-contact methods remain visible for audit.</small></summary>{removed.map((method) => <div className="removed-method" key={method.id}><span>{method.type === 'phone' ? <IconPhone size={16} /> : <IconMail size={16} />}</span><div><b>{contactValue(method)}</b><small>{healthLabel[method.health]}{method.restricted ? ' · Globally restricted' : ''}</small></div>{canRestore(method, viewer.role) && <button className="quiet" onClick={() => restore(method)}><IconRefresh size={15} /> Restore</button>}</div>)}</details>
         </section>
         <aside className="lead-workspace-side">
@@ -148,7 +152,7 @@ export function LeadWorkspace({ lead, viewer, workspaceUsers, session, onBack, o
   </section>;
 }
 
-function MethodGroup({ title, methods, sales, canManage, onAssess, onLog }: { title: string; methods: LeadContactMethod[]; sales: boolean; canManage: boolean; onAssess: (method: LeadContactMethod, health: ContactHealth) => void; onLog: (method: LeadContactMethod) => void }) { return <div className="method-group"><h3>{title}</h3>{methods.length ? methods.map((method) => <article className="method-row" key={method.id}><span className={`method-icon ${method.type}`}>{method.type === 'phone' ? <IconPhone size={19} /> : <IconAt size={19} />}</span><div className="method-main"><b>{contactValue(method)}</b><small>{method.label || `${method.type === 'phone' ? 'Phone' : 'Email'} contact`}{method.lastOutcome ? ` · Last: ${outcomeLabels[method.lastOutcome] ?? method.lastOutcome.replaceAll('_',' ')}` : ''}</small></div><span className={`health-chip ${method.health}`}>{healthLabel[method.health]}</span>{sales && <button className="quiet method-log" onClick={() => onLog(method)}>{actionIcon(method.type === 'phone' ? 'call' : 'email')} Log {method.type === 'phone' ? 'call' : 'email'}</button>}{canManage && <label className="method-assess"><span className="sr-only">Update method health</span><select value={method.health} onChange={(event) => onAssess(method, event.target.value as ContactHealth)}><option value="unverified">Update quality</option>{healthOptions.map((health) => <option key={health} value={health}>{healthLabel[health]}</option>)}</select><IconChevronDown size={14} /></label>}</article>) : <p className="empty">No usable contact methods are available.</p>}</div>; }
+function MethodGroup({ title, methods, sales, canManage, shortcutsAllowed, onAssess, onLog }: { title: string; methods: LeadContactMethod[]; sales: boolean; canManage: boolean; shortcutsAllowed: boolean; onAssess: (method: LeadContactMethod, health: ContactHealth) => void; onLog: (method: LeadContactMethod) => void }) { return <div className="method-group"><h3>{title}</h3>{methods.length ? methods.map((method) => <article className="method-row" key={method.id}><span className={`method-icon ${method.type}`}>{method.type === 'phone' ? <IconPhone size={19} /> : <IconAt size={19} />}</span><div className="method-main"><b>{contactValue(method)}</b><ContactShortcuts method={method} allowed={shortcutsAllowed} /><small>{method.label || `${method.type === 'phone' ? 'Phone' : 'Email'} contact`}{method.lastOutcome ? ` · Last: ${outcomeLabels[method.lastOutcome] ?? method.lastOutcome.replaceAll('_',' ')}` : ''}</small></div><span className={`health-chip ${method.health}`}>{healthLabel[method.health]}</span>{sales && <button className="quiet method-log" onClick={() => onLog(method)}>{actionIcon(method.type === 'phone' ? 'call' : 'email')} Log {method.type === 'phone' ? 'call' : 'email'}</button>}{canManage && <label className="method-assess"><span className="sr-only">Update method health</span><select value={method.health} onChange={(event) => onAssess(method, event.target.value as ContactHealth)}><option value="unverified">Update quality</option>{healthOptions.map((health) => <option key={health} value={health}>{healthLabel[health]}</option>)}</select><IconChevronDown size={14} /></label>}</article>) : <p className="empty">No usable contact methods are available.</p>}</div>; }
 function ActivityDrawer({ methods, initialMethodId, onClose, onSubmit }: { methods: LeadContactMethod[]; initialMethodId?: string; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
   const initialMethod = methods.find((method) => method.id === initialMethodId) ?? methods[0];
   const [methodId, setMethodId] = useState(initialMethod?.id ?? '');
