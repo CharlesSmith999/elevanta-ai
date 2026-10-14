@@ -1,14 +1,16 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-10-13
+Last updated: 2026-10-14
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [AGENT-DASHBOARD-ARRANGEMENT.md](./docs/AGENT-DASHBOARD-ARRANGEMENT.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.14.md](./CRM-DECISIONS-v1.14.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
 
 ## Sales Workbench: October 13, 2026
 
 The approved single-screen Sales workflow is implemented under [v1.18](CRM-DECISIONS-v1.18.md). Agents can view contacts, open external communication apps, update progress, record activity/notes and follow-ups, and Save and Next from their assigned-lead screen. Existing full details, assignment scope, fresh-start history and contact restrictions remain intact. No schema migration or live lead mutation is part of this release.
 
-PR #68 is merged and deployed. Its live check caught a timeout when loading contact inventory across all historical leads. The follow-up limits inventory reads to the visible workbench page under existing row policies. The corrected candidate passes 137 application tests, API/web typechecks, production build and browser acceptance. Production re-verification is pending. See [Sales Workbench](docs/SALES-WORKBENCH.md) for evidence and limits. Earlier dated sections below are historical snapshots, not a fresh production reconciliation.
+Released through PRs [#68](https://github.com/CharlesSmith999/elevanta-ai/pull/68) and [#69](https://github.com/CharlesSmith999/elevanta-ai/pull/69). Production commit `08cce47df7ddc774db61e34133af4ed9335d1581` passed Vercel deployment. The corrected release passes 137 application tests, API/web typechecks, production build and browser acceptance. Live Admin preview of Asad's Leads confirmed 692 assigned leads, contact values and call/copy actions, disabled outreach on Incorrect leads, and read-only saving during role preview. No real leads were edited or contacted in testing.
+
+The first release's global contact join caused a timeout; #69 replaces it with bounded visible-page reads. One subsequent workspace load still required Retry connection before succeeding, so intermittent initial-load latency remains a follow-up rather than a claimed performance guarantee. Live agent writes were tested synthetically, not against production records. See [Sales Workbench](docs/SALES-WORKBENCH.md) for evidence and limits. Earlier dated sections below are historical snapshots, not a fresh production reconciliation.
 
 ## Historical import: October 7, 2026
 

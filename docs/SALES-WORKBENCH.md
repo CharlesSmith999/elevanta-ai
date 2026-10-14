@@ -26,13 +26,17 @@ As with other network writes, a lost response can be ambiguous. The UI warns the
 
 The isolated release excludes unrelated local dashboard/import changes.
 
-- 136 application tests passed, including five focused workbench tests.
+- 137 application tests passed after the loading correction, including five focused workbench tests and the bounded-query regression.
 - Web and API TypeScript checks passed.
 - Web production build passed with the existing large-bundle warning.
 - Synthetic browser acceptance passed: assignment list/panel, blocked contact links, fresh-start history, unsaved navigation/filter protection, activity with follow-up, Save and Next, Won amount validation, last-record behavior, and mobile width.
 - Intercepted API browser checks passed: failed saves retain drafts; successful saves with failed refresh cannot be duplicated by Refresh; no uncaught browser errors.
-- Desktop and mobile screenshot inspection is part of release verification.
+- Desktop and mobile screenshots were inspected.
 
 Run browser acceptance against a local Vite server with `WORKBENCH_TEST_URL` and optional `PLAYWRIGHT_MODULE`. The script rejects non-local targets and uses only synthetic contacts. It never signs into production or sends outreach.
 
-PR #68 passed CI run 369 and was deployed as commit `58ef539af3a2cba99a928b32f9a06fbad92f2a22`. Live verification caught a database timeout from loading contact inventory across the entire historical dataset. The follow-up removes that global join and loads only visible workbench contacts. Production re-verification is pending. No production leads were changed by these tests.
+PR #68 passed CI run 369 and was deployed as commit `58ef539af3a2cba99a928b32f9a06fbad92f2a22`. Live verification caught a database timeout from loading contact inventory across the entire historical dataset.
+
+PR #69 passed CI run 371 and removed the global join. Production commit `08cce47df7ddc774db61e34133af4ed9335d1581` deployed successfully in Vercel deployment `C7mondwHehBepdGjaCyPkiSAcGsD`. Live read-only acceptance confirmed Asad's 692 assigned leads, visible contact values, 26 call links and 41 copy buttons on the inspected page/pinned record, blocked outreach on an Incorrect record, and disabled saves during Admin role preview. These counts are a point-in-time acceptance observation, not a fixed business total.
+
+The API health check returned OK. One initial workspace load still required Retry connection before succeeding; further startup performance investigation remains a follow-up. Successful writes and failure recovery were tested with synthetic data and intercepted API responses, not by changing production leads. No production leads were edited, deleted or contacted during verification.
