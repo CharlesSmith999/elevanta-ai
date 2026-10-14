@@ -10,7 +10,9 @@ Released in [PR #70](https://github.com/CharlesSmith999/elevanta-ai/pull/70), pr
 
 ## Assignment page simplification: October 14, 2026
 
-Approved under [v1.20](CRM-DECISIONS-v1.20.md). The release candidate replaces crowded assignment rows with a compact current-ownership table, searchable owner/source/reason fields, an owner filter, a full-history toggle and 50-row pagination. This does not change assignment data or permissions. Verification and deployment are pending.
+Approved under [v1.20](CRM-DECISIONS-v1.20.md). The release replaces crowded assignment rows with a compact current-ownership table, searchable owner/source/reason fields, an owner filter, a full-history toggle and 50-row pagination. Desktop uses a compact table and mobile uses readable cards. This does not change assignment data or permissions.
+
+Released through [PR #71](https://github.com/CharlesSmith999/elevanta-ai/pull/71), production commit `36e0519acb82c0b97e011c42598b32e52237b3da`. CI run 377 and Vercel production deployment `CdvEcyYz9x5TBNvTGVRCSgNDFV7N` passed. API/web typechecks, the production build, all 133 automated tests and desktop/mobile browser acceptance passed. The final read-only production check reached the deployed application but the CRM remained on “Connecting to your CRM workspace,” so live data rendering could not be reconfirmed in that session. No production records were modified.
 
 Owner rejected the split-screen Sales Workbench and explicitly requested restoration of the previous Leads list/detail with only Copy, Dial and Email shortcuts. This supersedes the workbench UI under [v1.19](CRM-DECISIONS-v1.19.md). The previous page/navigation and API loading are restored in the release candidate. 133 automated tests, API/web typechecks, production build and synthetic browser acceptance passed, including clipboard copying, exact dial/email links, unchanged activity history and return-to-list navigation. Release/deployment status is tracked in the linked GitHub pull request. No lead data is modified.
 
