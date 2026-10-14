@@ -740,6 +740,44 @@ function LeadDetail({ lead, viewer, onStatus, onMarkWon, onQualification, onLost
 }
 
 function FollowUpList({ leads, viewer, onSelect, onComplete }: { leads: Lead[]; viewer: User; onSelect: (id: string) => void; onComplete: (lead: Lead, id: string) => void }) { const rows = leads.flatMap((lead) => lead.followUps.filter((followUp) => followUp.status === 'open').map((followUp) => ({ lead, followUp }))).sort((a, b) => a.followUp.dueAt.localeCompare(b.followUp.dueAt)); return <article className="panel"><h2>Follow-up task list</h2><p>Overdue work is shown first. Completing a task is recorded in history.</p>{rows.length ? rows.map(({ lead, followUp }) => <div className="task-row" key={followUp.id}><button className="text-button dark" onClick={() => onSelect(lead.id)}>{lead.name}</button><span>{followUp.action}</span><span className={relativeDue(followUp) === 'Overdue' ? 'overdue' : ''}>{relativeDue(followUp)}</span>{canUpdateLead(viewer, lead) && !lead.routingPaused && <button className="quiet" onClick={() => onComplete(lead, followUp.id)}>Complete</button>}</div>) : <p className="empty">No open follow-ups.</p>}</article>; }
-function AssignmentList({ leads, users: directory, onSelect }: { leads: Lead[]; users: User[]; onSelect: (id: string) => void }) { return <article className="panel"><h2>Assignment history</h2><p>Every owner remains visible. Fresh-start assignments protect the new agent’s working view without deleting history.</p>{leads.flatMap((lead) => lead.assignments.map((assignment) => ({ lead, assignment }))).sort((a, b) => b.assignment.at.localeCompare(a.assignment.at)).map(({ lead, assignment }) => <div className="task-row" key={assignment.id}><button className="text-button dark" onClick={() => onSelect(lead.id)}>{lead.name}</button><span>{directory.find((user) => user.id === assignment.ownerId)?.name ?? 'Unknown user'}</span><span>{assignment.visibility === 'full_context' ? 'Full context' : 'Fresh view'}</span><span>{assignment.reason}</span></div>)}</article>; }
+function AssignmentList({ leads, users: directory, onSelect }: { leads: Lead[]; users: User[]; onSelect: (id: string) => void }) {
+  const [query, setQuery] = useState('');
+  const [owner, setOwner] = useState('all');
+  const [view, setView] = useState<'current' | 'history'>('current');
+  const [page, setPage] = useState(0);
+  const pageSize = 50;
+  const userName = (id?: string) => directory.find((user) => user.id === id)?.name ?? 'Unknown user';
+  const rows = leads.flatMap((lead) => lead.assignments.map((assignment) => ({ lead, assignment, current: !assignment.endedAt })));
+  const currentCount = rows.filter((row) => row.current).length;
+  const freshCount = rows.filter((row) => row.current && row.assignment.visibility === 'fresh_start').length;
+  const ownerOptions = [...new Set(rows.map((row) => row.assignment.ownerId))].sort((a, b) => userName(a).localeCompare(userName(b)));
+  const filtered = rows.filter(({ lead, assignment, current }) => {
+    const text = [lead.name, lead.source, assignment.reason, userName(assignment.ownerId), userName(assignment.assignedBy)].join(' ').toLowerCase();
+    return (view === 'history' || current) && (owner === 'all' || assignment.ownerId === owner) && text.includes(query.trim().toLowerCase());
+  }).sort((a, b) => Date.parse(b.assignment.at) - Date.parse(a.assignment.at));
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, pages - 1);
+  const visible = filtered.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  const resetPage = () => setPage(0);
+
+  return <section className="assignment-page">
+    <header className="assignment-heading"><div><span className="eyebrow">ASSIGNMENTS</span><h2>Lead ownership</h2><p>See who owns each lead and how it was handed over.</p></div><div className="assignment-summary"><span><b>{currentCount}</b> Current</span><span><b>{freshCount}</b> Fresh view</span><span><b>{rows.length}</b> Total history</span></div></header>
+    <div className="assignment-toolbar">
+      <label className="assignment-search"><span>Search</span><input value={query} onChange={(event) => { setQuery(event.target.value); resetPage(); }} placeholder="Lead, owner, source, or reason" /></label>
+      <label><span>Owner</span><select value={owner} onChange={(event) => { setOwner(event.target.value); resetPage(); }}><option value="all">All owners</option>{ownerOptions.map((id) => <option value={id} key={id}>{userName(id)}</option>)}</select></label>
+      <div className="assignment-view" role="group" aria-label="Assignment view"><button type="button" className={view === 'current' ? 'active' : ''} aria-pressed={view === 'current'} onClick={() => { setView('current'); resetPage(); }}>Current</button><button type="button" className={view === 'history' ? 'active' : ''} aria-pressed={view === 'history'} onClick={() => { setView('history'); resetPage(); }}>Full history</button></div>
+    </div>
+    <div className="assignment-table-wrap"><table className="assignment-table responsive-data-table"><thead><tr><th>Lead</th><th>Owner</th><th>Assigned by</th><th>Assigned</th><th>Access</th><th>Reason</th><th></th></tr></thead><tbody>{visible.map(({ lead, assignment, current }) => <tr key={assignment.id}>
+      <td data-label="Lead"><button className="assignment-lead" onClick={() => onSelect(lead.id)}><b>{lead.name}</b><small>{lead.source}</small></button></td>
+      <td data-label="Owner"><span className="assignment-person"><i>{initialsFor(userName(assignment.ownerId))}</i><span><b>{userName(assignment.ownerId)}</b><small>{current ? 'Current owner' : 'Previous owner'}</small></span></span></td>
+      <td data-label="Assigned by">{userName(assignment.assignedBy)}</td>
+      <td data-label="Assigned"><time dateTime={assignment.at}>{formatDate(assignment.at)}</time></td>
+      <td data-label="Access"><span className={`assignment-access ${assignment.visibility}`}>{assignment.visibility === 'full_context' ? 'Full context' : 'Fresh view'}</span></td>
+      <td data-label="Reason" className="assignment-reason">{assignment.reason || 'Not available'}</td>
+      <td data-label="Action"><button className="quiet" onClick={() => onSelect(lead.id)}>Open lead</button></td>
+    </tr>)}{!visible.length && <tr><td colSpan={7}><div className="assignment-empty"><IconUsers size={26} /><b>No assignments found</b><span>Try another owner, search, or view.</span></div></td></tr>}</tbody></table></div>
+    <footer className="assignment-pagination"><span>{filtered.length ? `${currentPage * pageSize + 1}–${Math.min((currentPage + 1) * pageSize, filtered.length)} of ${filtered.length}` : '0 assignments'}</span><div><button className="quiet" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Previous</button><span>Page {currentPage + 1} of {pages}</span><button className="quiet" disabled={currentPage >= pages - 1} onClick={() => setPage(currentPage + 1)}>Next</button></div></footer>
+  </section>;
+}
 function ReviewQueue({ leads, onSelect }: { leads: Lead[]; onSelect: (id: string) => void }) { return <article className="panel"><h2>Incorrect Review queue</h2><p>Three different agents must report a lead before it reaches this queue. Leads stay paused until Admin decides.</p>{leads.length ? leads.map((lead) => <div className="task-row" key={lead.id}><button className="text-button dark" onClick={() => onSelect(lead.id)}>{lead.name}</button><span>{lead.incorrectReports.length} reports</span><span>Routing paused</span><span>{lead.incorrectReports.map((report) => nameFor(report.reporterId)).join(', ')}</span></div>) : <p className="empty">No lead is waiting for review.</p>}</article>; }
 function Reports({ dashboard, viewer, duplicates }: { dashboard: ReturnType<typeof dashboardFor>; viewer: User; duplicates: number }) { return <section className="report-grid"><article className="panel"><h2>{viewer.role === 'marketer' ? 'Marketing quality report' : 'Sales performance report'}</h2><div className="report-row"><span>Visible leads</span><b>{dashboard.visible.length}</b></div><div className="report-row"><span>MQL / SQL</span><b>{dashboard.mql} / {dashboard.sql}</b></div><div className="report-row"><span>Won</span><b>{dashboard.won}</b></div><div className="report-row"><span>Conversion</span><b>{dashboard.conversionRate}%</b></div><div className="report-row"><span>Overdue follow-ups</span><b>{dashboard.overdue}</b></div><div className="report-row"><span>Duplicate candidates</span><b>{duplicates}</b></div></article><article className="panel"><span className="spark dark">XAVIAR EVIDENCE MODEL</span><h2>What this report will use</h2><p>Response speed, follow-up consistency, qualification outcome, note quality, source quality, duplicate rate, and conversion. The production version will cite the exact CRM events behind each recommendation.</p></article></section>; }
