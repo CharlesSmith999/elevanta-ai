@@ -8,6 +8,10 @@ Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.
 
 Released in [PR #70](https://github.com/CharlesSmith999/elevanta-ai/pull/70), production commit `a80a5a4f9cd864d91eaf7e8f243e4003d0824de7`. CI run 374 passed, Vercel deployment `xDwh8DGoLHZxupMdLnggun56pjwE` succeeded, and the production API health check returned OK. No production records were modified.
 
+## Assignment page simplification: October 14, 2026
+
+Approved under [v1.20](CRM-DECISIONS-v1.20.md). The release candidate replaces crowded assignment rows with a compact current-ownership table, searchable owner/source/reason fields, an owner filter, a full-history toggle and 50-row pagination. This does not change assignment data or permissions. Verification and deployment are pending.
+
 Owner rejected the split-screen Sales Workbench and explicitly requested restoration of the previous Leads list/detail with only Copy, Dial and Email shortcuts. This supersedes the workbench UI under [v1.19](CRM-DECISIONS-v1.19.md). The previous page/navigation and API loading are restored in the release candidate. 133 automated tests, API/web typechecks, production build and synthetic browser acceptance passed, including clipboard copying, exact dial/email links, unchanged activity history and return-to-list navigation. Release/deployment status is tracked in the linked GitHub pull request. No lead data is modified.
 
 ## Sales Workbench: October 13, 2026 (superseded by v1.19)

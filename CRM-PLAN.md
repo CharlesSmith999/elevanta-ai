@@ -14,6 +14,8 @@ Status: Planning baseline, approved from stakeholder answers
 
 The owner replaced the Sales Workbench direction with [CRM-DECISIONS-v1.19.md](./CRM-DECISIONS-v1.19.md): restore the previous Leads list/detail and add only Copy, Dial and Email shortcuts on the existing detail page. Existing permissions and Phase 2 outbound boundaries remain unchanged.
 
+The Assignments page follows [CRM-DECISIONS-v1.20.md](./CRM-DECISIONS-v1.20.md): a compact current-ownership table with search, owner filtering, full-history toggle, and pagination. Assignment rules and permissions remain unchanged.
+
 Historical Excel migration is governed by [CRM-DECISIONS-v1.16.md](./CRM-DECISIONS-v1.16.md). Staging preserves raw history and missing values. Staging, activation, and retirement of verified test data are separate verified steps.
 
 Current lead/research UX delivery: [CRM-DECISIONS-v1.15.md](./CRM-DECISIONS-v1.15.md) and [screen contract](./docs/LEAD-UX-REFINEMENT-PROPOSAL.md). Creation uses a two-step contact/review flow; research editing and Sales handoff are separate. Multiple-contact creation is transactional. Existing role permissions and immediate assignment remain unchanged. Verification and release evidence: [UX acceptance](./docs/LEAD-UX-ACCEPTANCE.md).
