@@ -10,7 +10,9 @@ Approved under [v1.22](CRM-DECISIONS-v1.22.md). The remaining production startup
 
 The release candidate replaces that query with bounded table reads and joins the permitted rows by opportunity ID inside the API. It keeps row-level security, full lead history, role visibility, dashboards, reminders, incorrect-review evidence, and assignment behavior unchanged. It also restores persisted loss reasons to the web lead model. No schema or production-data mutation is required.
 
-Local validation passed: 133 application tests, API and web TypeScript checks, web production build, and repository whitespace validation. Production release and signed-in verification are pending.
+Released through [PR #73](https://github.com/CharlesSmith999/elevanta-ai/pull/73), production commit `5fccc911345c97e2f19e6293830fd6aadb0feab0`. GitHub Actions run 383 and Vercel production deployment `7HTLxNjWnxzzYmws4Hg5ANgqEb1d` passed. Local validation passed: 133 application tests, API and web TypeScript checks, web production build, and repository whitespace validation.
+
+Signed-in production verification passed. The Admin Command Center loaded 4,158 leads and its dashboard evidence. The Lead inbox then loaded the same 4,158-result workspace with statuses, sources, contact shortcuts, assignment-derived work states, and no browser console errors. The earlier database statement-timeout message did not recur. No production record was added, edited, deleted, or reassigned during verification.
 
 ## Sales loss reason and assignment-first inbox: October 15, 2026
 
