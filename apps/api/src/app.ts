@@ -7,6 +7,7 @@ import { z, ZodError } from 'zod';
 import { stageImportRequest, sealImportRequest, importPageQuery, historicalActivationRequest } from './historicalImport.js';
 import { readConnectionReport } from './connectionReporting.js';
 import { buildApiXaviarReport, canRequestXaviar, opportunityBelongsToSubject, type XaviarOpportunity, type XaviarProfile } from './xaviar.js';
+import { readOpportunities } from './opportunityReader.js';
 
 type Profile = { id: string; workspace_id: string; role: 'admin' | 'manager' | 'sales_agent' | 'marketer'; full_name: string; manager_id: string | null; department?: 'marketing' | 'sales' | null; active: boolean };
 type AuthenticatedRequest = Request & { profile?: Profile; supabase?: SupabaseClient };
@@ -332,14 +333,7 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
   }));
   app.get('/v1/opportunities', ...protectedRoute(async (request, response) => {
     const status = typeof request.query.status === 'string' ? request.query.status : undefined;
-    const data: Array<Record<string, unknown>> = [];
-    for (let offset = 0; ; offset += 1000) {
-      let query = request.supabase!.from('opportunities').select('*, contacts(*), assignments(*), activities(*), follow_ups(*), incorrect_reports(*), incorrect_reviews(*)').order('updated_at', { ascending: false }).order('id').range(offset, offset + 999);
-      if (status) query = query.eq('status', status);
-      const page = await query; if (page.error) throw page.error;
-      data.push(...(page.data ?? []));
-      if ((page.data ?? []).length < 1000) break;
-    }
+    const data = await readOpportunities(request.supabase!, status);
     response.json({ opportunities: data });
   }));
   app.post('/v1/opportunities', ...protectedRoute(async (request, response) => {

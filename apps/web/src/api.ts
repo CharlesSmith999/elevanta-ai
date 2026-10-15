@@ -32,6 +32,7 @@ type OpportunityRecord = {
   research_summary?: string | null;
   source_received_at?: string | null;
   historical_source_date?: string | null;
+  lost_reason?: Lead['lostReason'] | null;
   created_at: string;
   updated_at: string;
   contacts?: { name: string; normalized_phone?: string | null; normalized_email?: string | null } | null;
@@ -170,7 +171,7 @@ function mapOpportunity(record: OpportunityRecord): Lead {
     incorrectReports,
     incorrectReview: review?.decision ? { state: review.decision, reviewerId: review.reviewer_id ?? undefined, reason: review.decision_reason ?? undefined, decidedAt: review.decided_at ?? undefined } : incorrectReports.length >= 3 ? { state: 'pending' } : undefined,
     routingPaused: !review?.decision && incorrectReports.length >= 3,
-    lostReason: undefined,
+    lostReason: record.lost_reason ?? undefined,
     duplicateOf: undefined,
     ...(currentOwner ? {} : {}),
   };

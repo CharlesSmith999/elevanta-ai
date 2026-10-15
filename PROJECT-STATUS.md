@@ -1,8 +1,16 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-10-14
+Last updated: 2026-10-15
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [AGENT-DASHBOARD-ARRANGEMENT.md](./docs/AGENT-DASHBOARD-ARRANGEMENT.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.14.md](./CRM-DECISIONS-v1.14.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
+
+## CRM startup database reliability: October 15, 2026
+
+Approved under [v1.22](CRM-DECISIONS-v1.22.md). The remaining production startup timeout was traced to one PostgREST query embedding five one-to-many relationships at the same time. That join multiplied assignment, activity, follow-up, incorrect-report, and review rows before returning the lead records.
+
+The release candidate replaces that query with bounded table reads and joins the permitted rows by opportunity ID inside the API. It keeps row-level security, full lead history, role visibility, dashboards, reminders, incorrect-review evidence, and assignment behavior unchanged. It also restores persisted loss reasons to the web lead model. No schema or production-data mutation is required.
+
+Local validation passed: 133 application tests, API and web TypeScript checks, web production build, and repository whitespace validation. Production release and signed-in verification are pending.
 
 ## Sales loss reason and assignment-first inbox: October 15, 2026
 
