@@ -6,7 +6,9 @@ Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.
 
 ## Sales loss reason and assignment-first inbox: October 15, 2026
 
-Approved under [v1.21](CRM-DECISIONS-v1.21.md). Selecting Lost now reveals a required loss-reason control and saves the reason with the status. The Sales Agent lead list now defaults to newest current assignment first while preserving the separate lead creation date. API/web typechecks, the production build, 131 application tests, and a focused browser test passed. Release and production verification are pending. No production lead was modified during testing.
+Approved under [v1.21](CRM-DECISIONS-v1.21.md). Selecting Lost now reveals a required loss-reason control and saves the reason with the status. The Sales Agent lead list now defaults to newest current assignment first while preserving the separate lead creation date.
+
+Released through [PR #72](https://github.com/CharlesSmith999/elevanta-ai/pull/72), production commit `58dc64de7266751b682b4ee806dd541082656783`. GitHub Actions run 380, Vercel preview, and Vercel production deployment `EG9FhvA8FjkRCuUhZ52Wch6ycivt` passed. API/web typechecks, the production build, 131 application tests, and the focused browser test passed. The live browser loaded the new production bundle, but its existing CRM query timed out before lead-page data rendered; therefore the exact production-data ordering was not changed or exercised. No production lead was modified during testing.
 
 ## Lead detail shortcuts: October 14, 2026
 
