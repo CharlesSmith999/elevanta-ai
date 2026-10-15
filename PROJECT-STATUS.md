@@ -4,6 +4,10 @@ Status owner: Codex with Shariq
 Last updated: 2026-10-14
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [AGENT-DASHBOARD-ARRANGEMENT.md](./docs/AGENT-DASHBOARD-ARRANGEMENT.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.14.md](./CRM-DECISIONS-v1.14.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
 
+## Sales loss reason and assignment-first inbox: October 15, 2026
+
+Approved under [v1.21](CRM-DECISIONS-v1.21.md). Selecting Lost now reveals a required loss-reason control and saves the reason with the status. The Sales Agent lead list now defaults to newest current assignment first while preserving the separate lead creation date. API/web typechecks, the production build, 131 application tests, and a focused browser test passed. Release and production verification are pending. No production lead was modified during testing.
+
 ## Lead detail shortcuts: October 14, 2026
 
 Released in [PR #70](https://github.com/CharlesSmith999/elevanta-ai/pull/70), production commit `a80a5a4f9cd864d91eaf7e8f243e4003d0824de7`. CI run 374 passed, Vercel deployment `xDwh8DGoLHZxupMdLnggun56pjwE` succeeded, and the production API health check returned OK. No production records were modified.
