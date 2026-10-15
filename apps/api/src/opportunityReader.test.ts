@@ -56,7 +56,7 @@ test('opportunity reader avoids the relationship cross product and preserves rel
 
 test('opportunity reader pages large relations and keeps the status filter', async () => {
   const calls: Array<{ table: string; columns: string; from: number; to: number; status?: string }> = [];
-  const assignments = Array.from({ length: 501 }, (_, index) => ({ id: `assignment-${String(index).padStart(3, '0')}`, opportunity_id: 'lead-1' }));
+  const assignments = Array.from({ length: 1001 }, (_, index) => ({ id: `assignment-${String(index).padStart(4, '0')}`, opportunity_id: 'lead-1' }));
   const fixtures: Record<string, Row[]> = {
     opportunities: [{ id: 'lead-1', status: 'won' }, { id: 'lead-2', status: 'lost' }],
     assignments,
@@ -66,7 +66,7 @@ test('opportunity reader pages large relations and keeps the status filter', asy
   const data = await readOpportunities(fakeClient(fixtures, calls), 'won');
 
   assert.deepEqual(data.map((row) => row.id), ['lead-1']);
-  assert.equal((data[0].assignments as Row[]).length, 501);
+  assert.equal((data[0].assignments as Row[]).length, 1001);
   assert.equal(calls.filter((call) => call.table === 'assignments').length, 2);
   assert.equal(calls.find((call) => call.table === 'opportunities')?.status, 'won');
 });

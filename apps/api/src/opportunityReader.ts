@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 type Row = Record<string, unknown>;
 type RelatedTable = 'assignments' | 'activities' | 'follow_ups' | 'incorrect_reports' | 'incorrect_reviews';
 
-const PAGE_SIZE = 500;
+const PAGE_SIZE = 1000;
 
 const relatedColumns: Record<RelatedTable, string> = {
   assignments: 'id,opportunity_id,assigned_to,assigned_by,visibility_mode,reason,started_at,ended_at',
