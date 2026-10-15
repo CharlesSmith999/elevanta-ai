@@ -14,6 +14,8 @@ Released through [PR #73](https://github.com/CharlesSmith999/elevanta-ai/pull/73
 
 Signed-in production verification passed. The Admin Command Center loaded 4,158 leads and its dashboard evidence. The Lead inbox then loaded the same 4,158-result workspace with statuses, sources, contact shortcuts, assignment-derived work states, and no browser console errors. The earlier database statement-timeout message did not recur. No production record was added, edited, deleted, or reassigned during verification.
 
+Follow-up [PR #74](https://github.com/CharlesSmith999/elevanta-ai/pull/74), production commit `b3d55f85f8b9cb0d88715b97891a4f3f63b81d18`, increased each bounded page to 1,000 rows to reduce database round trips. GitHub Actions run 386 and Vercel production deployment `CHYhHcsDjizAjNhf7CBt969mzfTX` passed. A fresh signed-in production reload completed, the Lead inbox again showed the connected 4,158-result workspace, the statement-timeout error did not recur, and the browser console remained clear.
+
 ## Sales loss reason and assignment-first inbox: October 15, 2026
 
 Approved under [v1.21](CRM-DECISIONS-v1.21.md). Selecting Lost now reveals a required loss-reason control and saves the reason with the status. The Sales Agent lead list now defaults to newest current assignment first while preserving the separate lead creation date.
