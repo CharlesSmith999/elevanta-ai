@@ -83,6 +83,8 @@ Terminal or exception statuses: `Not Interested`, `Incorrect`, `Duplicate`, `Do 
 
 Status changes require actor, timestamp, previous status, new status, and optional reason. Agents can update working statuses for assigned leads. Managers/admins can correct status and reassign. A status change never deletes prior status history.
 
+`Lost` is a controlled exception: Sales must choose an approved loss reason before confirming the transition, and the status plus reason are saved together.
+
 ## 5. Routing and history rules
 
 1. Marketing creates/imports a lead and may assign it to an initial agent. The assignment is active immediately; Sales does not accept or reject it.
@@ -94,6 +96,7 @@ Status changes require actor, timestamp, previous status, new status, and option
 5. The system must show the reassignment chain and the reason for each handoff.
 6. Reassignment also shows every contact method removed by a prior Sales Agent. The assigner chooses whether each eligible method remains removed or is restored for the new owner; keep-removed is the default.
 7. Fresh-start visibility never reactivates an incorrect, wrong-person, or DNC method.
+8. The Sales Agent inbox defaults to newest current assignment first. Lead creation date remains independent, so a newly reassigned older lead appears at the top without changing its original creation date.
 
 Manual `Sales Acceptance` is retired. The CRM records `First Worked At` from the first eligible sales activity and derives `Sales Engaged At` from the earliest successful `Connected` outcome or SQL transition. A failed attempt counts as first work but not Sales Engagement.
 
