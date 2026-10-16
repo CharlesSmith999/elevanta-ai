@@ -1,4 +1,4 @@
-export type Person = { id: string; workspace_id: string; role: string; department: string | null; manager_id: string | null; full_name: string };
+export type Person = { id: string; workspace_id: string; role: string; department: string | null; manager_id: string | null; full_name: string; active?: boolean };
 export type Assignment = { id: string; opportunity_id: string; assigned_to: string; started_at: string; ended_at: string | null };
 export type Event = { id: string; opportunity_id: string; actor_id: string | null; assignment_id: string | null; type: string; outcome: string | null; occurred_at: string | null; created_at: string; to_status?: string | null; metadata?: Record<string, unknown> | null };
 export type Opportunity = { id: string; workspace_id: string; marketing_owner_id: string | null; source: string; lead_category: string; status: string; lost_reason: string | null };
@@ -20,7 +20,7 @@ export function connectionAnalytics(viewer: Person, input: AnalyticsInput, filte
   if (!Number.isFinite(end) || Number.isNaN(start) || start > end) throw new Error('Invalid reporting date range.');
   dayKey(end, filter.timezone); // Validate the timezone before processing records.
   const within = (time: number) => Number.isFinite(time) && time >= start && time <= end;
-  const people = input.people.filter((person) => person.workspace_id === viewer.workspace_id);
+  const people = input.people.filter((person) => person.workspace_id === viewer.workspace_id && person.active !== false);
   const names = new Map(people.map((person) => [person.id, person.full_name]));
   const permitted = (id: string | null) => !!id && (viewer.role === 'admin' || id === viewer.id || (viewer.role === 'manager' && people.some((person) => person.id === id && person.manager_id === viewer.id && person.department === viewer.department)));
   const marketing = viewer.role === 'admin' || viewer.role === 'marketer' || (viewer.role === 'manager' && viewer.department === 'marketing');

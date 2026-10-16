@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { canRestore, focusForHealth, isCallable, isRemoteCrmId, validateContactMethod, type LeadContactMethod } from './leadWorkflow';
+import { canRestore, focusForHealth, isCallable, isRemoteCrmId, needsSalesAction, validateContactMethod, type LeadContactMethod } from './leadWorkflow';
 
 const phone = (overrides: Partial<LeadContactMethod> = {}): LeadContactMethod => ({ id: 'phone-1', type: 'phone', value: '+1 555 100 2000', health: 'unverified', focus: 'active', ...overrides });
 
@@ -39,4 +39,14 @@ test('remote CRM requests are limited to database UUID records', () => {
   assert.equal(isRemoteCrmId('e77a0ac8-8cdd-4f91-9526-7dc469e65db4'), true);
   assert.equal(isRemoteCrmId('lead-ronald-fowler'), false);
   assert.equal(isRemoteCrmId('ronald@example.test'), false);
+});
+
+test('every active lead without a future follow-up stays in the Sales action queue', () => {
+  const now = new Date('2026-10-16T12:00:00.000Z');
+  for (const status of ['no_answer', 'not_available', 'qualified', 'contacted']) {
+    assert.equal(needsSalesAction({ status, followUps: [] }, now), true);
+  }
+  assert.equal(needsSalesAction({ status: 'qualified', followUps: [{ status: 'open', dueAt: '2026-10-17T12:00:00.000Z' }] }, now), false);
+  assert.equal(needsSalesAction({ status: 'qualified', followUps: [{ status: 'open', dueAt: '2026-10-16T11:00:00.000Z' }] }, now), true);
+  assert.equal(needsSalesAction({ status: 'won', followUps: [] }, now), false);
 });

@@ -37,3 +37,17 @@ export function validateContactMethod(type: ContactMethodType, value: string): s
   const digits = trimmed.replace(/\D/g, '');
   return digits.length >= 7 && digits.length <= 15 ? undefined : 'Enter a valid phone number with 7 to 15 digits.';
 }
+
+type ActionableLead = {
+  status: string;
+  followUps: Array<{ status: string; dueAt: string }>;
+};
+
+const closedStatuses = new Set(['won', 'lost', 'not_interested', 'incorrect', 'duplicate', 'do_not_contact']);
+
+export function needsSalesAction(lead: ActionableLead, now = new Date()): boolean {
+  if (closedStatuses.has(lead.status)) return false;
+  const openFollowUps = lead.followUps.filter((followUp) => followUp.status === 'open');
+  if (!openFollowUps.length) return true;
+  return openFollowUps.some((followUp) => Date.parse(followUp.dueAt) <= now.getTime());
+}

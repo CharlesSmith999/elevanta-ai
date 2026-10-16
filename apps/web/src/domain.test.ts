@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { benchmarkBySource, canEditLeadDetails, canFlagIncorrectLead, canReassign, canUpdateLead, canViewDataQualityBoard, canViewLead, canViewManagementBoards, canViewNamedLeaderboard, dashboardDateRange, dashboardFor, dashboardReconciliation, dataQualityIssues, duplicateMatches, dueToday, filterDashboardLeads, financialMetrics, incorrectReviewState, isLeadIdentity, leadCategoryLabels, leadCategoryOptions, leaderboardForMarketing, leaderboardForSales, lossReasonBreakdown, overdue, responseHours, routingHours, salesIncorrectReportCount, seedLeads, sourceOptions, stageOwnershipSegments, transitionStage, users, validStatusTransition, validWonFinancials } from './domain.js';
+import { benchmarkBySource, canEditLeadDetails, canFlagIncorrectLead, canReassign, canUpdateLead, canViewDataQualityBoard, canViewLead, canViewManagementBoards, canViewNamedLeaderboard, dashboardDateRange, dashboardFor, dashboardReconciliation, dataQualityIssues, duplicateMatches, dueToday, filterDashboardLeads, financialMetrics, incorrectReviewState, isLeadIdentity, leadCategoryLabels, leadCategoryOptions, leaderboardForMarketing, leaderboardForSales, lossReasonBreakdown, overdue, responseHours, routingHours, salesIncorrectReportCount, seedLeads, sourceOptions, stageOwnershipSegments, transitionStage, userNameFor, users, validStatusTransition, validWonFinancials } from './domain.js';
 
 const user = (id: string) => users.find((candidate) => candidate.id === id)!;
 
@@ -107,6 +107,14 @@ test('dashboard filters use the selected date range, source, and status without 
   ];
   assert.deepEqual(filterDashboardLeads(leads, range, 'Bark Paid').map((lead) => lead.id), ['july-bark']);
   assert.deepEqual(filterDashboardLeads(leads, range, 'all', 'follow_up_required').map((lead) => lead.id), ['july-seo']);
+});
+
+test('custom dashboard date inputs include the full selected end date', () => {
+  const range = dashboardDateRange('custom', new Date('2026-07-29T12:00:00.000Z'), { start: '2026-07-01', end: '2026-07-31' });
+  assert.equal(range.start, '2026-07-01T00:00:00.000Z');
+  assert.equal(range.end, '2026-07-31T23:59:59.999Z');
+  const lead = { ...structuredClone(seedLeads[0]), sourceDate: '2026-07-31T20:30:00.000Z' };
+  assert.equal(filterDashboardLeads([lead], range).length, 1);
 });
 
 test('benchmark metrics keep sources separate and exclude confirmed incorrect records from conversion', () => {
@@ -266,4 +274,20 @@ test('invalid assignment and stage date order are reported as data-quality issue
 test('empty qualified sample does not invent a conversion rate', () => {
   const leads = structuredClone(seedLeads).map((lead) => ({ ...lead, qualification: 'not_available' as const, status: 'assigned' as const }));
   assert.equal(dashboardFor(user('shariq'), leads).conversionRate, 0);
+});
+
+test('MQL and SQL conversion counts only qualified wins and cannot exceed 100 percent', () => {
+  const base = structuredClone(seedLeads[0]);
+  const leads = [
+    { ...base, id: 'qualified-won', status: 'won' as const, qualification: 'sql' as const },
+    { ...base, id: 'qualified-open', status: 'connected' as const, qualification: 'mql' as const },
+    { ...base, id: 'unqualified-won', status: 'won' as const, qualification: 'not_available' as const },
+  ];
+  assert.equal(dashboardFor(user('shariq'), leads).conversionRate, 50);
+});
+
+test('workspace directory resolves live UUID names', () => {
+  const directory = [{ id: 'f74d68ca-cddf-48ed-bf95-72a2205c15d0', name: 'Live Agent', role: 'sales_agent' as const, department: 'sales' as const }];
+  assert.equal(userNameFor(directory[0].id, directory), 'Live Agent');
+  assert.equal(userNameFor('missing', directory), 'Unassigned');
 });

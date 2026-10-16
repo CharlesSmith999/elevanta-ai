@@ -90,3 +90,9 @@ test('New comparisons honor source, workspace, timezone and empty cohorts',()=>{
  const empty=connectionAnalytics(marketer,data,{...range,source:'SEO'});assert.equal(empty.researchFunnel?.received,0);assert.equal(empty.conversion.rate,null);
  const foreign=connectionAnalytics({...admin,workspace_id:'foreign'},data,range);assert.equal(foreign.researchFunnel?.received,0);assert.equal(foreign.conversion.connected,0);
 });
+test('Inactive users are excluded from operational analytics',()=>{
+ const data=fixture();data.people.push({...person('inactive-sales','sales_agent','sales'),active:false},{...person('inactive-marketing','marketer','marketing'),active:false});
+ const report=connectionAnalytics(admin,data,range);
+ assert.equal(report.salesAgents.some(row=>row.id==='inactive-sales'),false);
+ assert.equal(report.marketingAgents.some(row=>row.id==='inactive-marketing'),false);
+});

@@ -213,7 +213,11 @@ export function stageOwnershipSegments(stage: StageHistory, assignments: Assignm
 
 export function dashboardDateRange(period: DashboardPeriod, now = new Date(), custom?: { start?: string; end?: string }): DashboardDateRange {
   if (period === 'lifetime') return { period };
-  if (period === 'custom') return { period, start: custom?.start, end: custom?.end };
+  if (period === 'custom') {
+    const start = custom?.start && /^\d{4}-\d{2}-\d{2}$/.test(custom.start) ? `${custom.start}T00:00:00.000Z` : custom?.start;
+    const end = custom?.end && /^\d{4}-\d{2}-\d{2}$/.test(custom.end) ? `${custom.end}T23:59:59.999Z` : custom?.end;
+    return { period, start, end };
+  }
   const start = new Date(now); start.setHours(0, 0, 0, 0);
   if (period === 'weekly') start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
   if (period === 'monthly') start.setDate(1);
@@ -393,12 +397,17 @@ export function dashboardReconciliation(leads: Lead[], range: DashboardDateRange
 
 export const isLeadIdentity = (name: string, phone?: string, email?: string) => Boolean(name.trim() && (phone?.trim() || email?.trim()));
 
+export function userNameFor(id: string | undefined, directory: User[] = users) {
+  return directory.find((user) => user.id === id)?.name ?? 'Unassigned';
+}
+
 export function dashboardFor(user: User, leads: Lead[], now = new Date(), allUsers = users) {
   const visible = leads.filter((lead) => canViewLead(user, lead, allUsers));
   const open = visible.filter((lead) => !['won', 'lost', 'not_interested', 'incorrect', 'duplicate', 'do_not_contact'].includes(lead.status));
   const followUps = visible.flatMap((lead) => lead.followUps);
   const won = visible.filter((lead) => lead.status === 'won').length;
   const qualified = visible.filter((lead) => lead.qualification === 'mql' || lead.qualification === 'sql').length;
+  const qualifiedWon = visible.filter((lead) => lead.status === 'won' && (lead.qualification === 'mql' || lead.qualification === 'sql')).length;
   return {
     visible, open: open.length,
     dueToday: followUps.filter((followUp) => dueToday(followUp, now)).length,
@@ -407,7 +416,7 @@ export function dashboardFor(user: User, leads: Lead[], now = new Date(), allUse
     mql: visible.filter((lead) => lead.qualification === 'mql').length,
     sql: visible.filter((lead) => lead.qualification === 'sql').length,
     won,
-    conversionRate: qualified ? Math.round((won / qualified) * 100) : 0,
+    conversionRate: qualified ? Math.round((qualifiedWon / qualified) * 100) : 0,
   };
 }
 

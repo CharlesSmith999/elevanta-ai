@@ -15,7 +15,7 @@ export async function readConnectionReport(client: SupabaseClient, viewer: Perso
     return all;
   }
   const [people, opportunities, assignments, events, research] = await Promise.all([
-    rows('profiles','id,workspace_id,full_name,role,department,manager_id'),
+    rows('profiles','id,workspace_id,full_name,role,department,manager_id,active'),
     rows('opportunities','id,workspace_id,marketing_owner_id,source,lead_category,status,lost_reason'),
     rows('assignments','id,opportunity_id,assigned_to,started_at,ended_at'),
     rows('activities','id,opportunity_id,actor_id,assignment_id,type,outcome,occurred_at,created_at,to_status,metadata'),
