@@ -13,6 +13,8 @@ import { XaviarWorkspace } from './XaviarWorkspace';
 import { navigationFor } from './navigation';
 import { CreateLeadForm } from './CreateLeadForm';
 import { LeadWorkspace } from './LeadWorkspace';
+import { CallingView } from './CallingView';
+import type { CallResult } from './callingModel';
 import { LeadResearchQueue } from './LeadResearchQueue';
 import { LeadAlertController } from './LeadAlertController';
 import { AdminUserManagement } from './AdminUserManagement';
@@ -59,6 +61,8 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   const [viewerId, setViewerId] = useState(session?.user.id ?? 'shariq');
   const [page, setPage] = useState('Dashboard');
   const [selectedId, setSelectedId] = useState<string | undefined>();
+  const [callingMode, setCallingMode] = useState(false);
+  const [callingDirty, setCallingDirty] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [createError, setCreateError] = useState('');
   const [creatingLead, setCreatingLead] = useState(false);
@@ -129,6 +133,16 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   const mutateLead = (leadId: string, mutate: (lead: Lead) => Lead) => setLeads((existing) => existing.map((lead) => lead.id === leadId ? mutate(lead) : lead));
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [page, selectedId]);
   const select = (leadId: string) => { setSelectedId(leadId); setPage('Lead inbox'); };
+  function callingSaved(leadId:string,result:CallResult,note:string,due:string) {
+    setCallingDirty(true);
+    if (!session) mutateLead(leadId, lead => ({...lead,activities:[...lead.activities,leadActivity(viewer.id,'note',`Call result: ${result.replaceAll('_',' ')}. ${note}`)],followUps:due ? [...lead.followUps,{id:makeId('follow-up'),ownerId:viewer.id,dueAt:new Date(due).toISOString(),action:'Call',status:'open'}] : lead.followUps}));
+  }
+  useEffect(() => { setCallingMode(false); }, [viewerId]);
+  useEffect(() => {
+    if (!callingDirty || (page === 'Lead inbox' && callingMode && !selectedId)) return;
+    setCallingDirty(false);
+    if (session) void loadRemoteLeads(session).then(setLeads).catch(() => setNotice('Call saved. Refresh the workspace to update lead summaries.'));
+  }, [callingDirty, callingMode, page, selectedId, session]);
 
   function updateStatus(lead: Lead, next: OpportunityStatus, options?: { persist?: boolean; lostReason?: Lead['lostReason'] }) {
     if (next === 'won') return setNotice('Use the Won financial details form to record total project cost and upfront payment.');
@@ -305,7 +319,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
       </div>}
       {notice && <div className="toast" role="status">{notice}</div>}
       {adminReference ? <AdminCommandCenter viewer={viewer} viewers={switchableUsers} directory={workspaceDirectory} leads={dashboardLeads} dashboard={filteredDashboard} period={dashboardPeriod} customStart={customStart} customEnd={customEnd} source={dashboardSource} theme={theme} onViewer={switchViewer} onPeriod={setDashboardPeriod} onCustomStart={setCustomStart} onCustomEnd={setCustomEnd} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} /> : roleReferenceDashboard && roleReferenceKind ? <RoleReferenceDashboard kind={roleReferenceKind} viewer={viewer} viewers={switchableUsers} leads={dashboardLeads} period={dashboardPeriod} customStart={customStart} customEnd={customEnd} source={dashboardSource} theme={theme} session={session} start={selectedRange.start} end={selectedRange.end} onViewer={switchViewer} onPeriod={setDashboardPeriod} onCustomStart={setCustomStart} onCustomEnd={setCustomEnd} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} onCreate={() => setShowCreate(true)} onOpenLead={select} /> : <>
-      {page === 'Lead inbox' && (selected ? <LeadWorkspace lead={selected} viewer={viewer} workspaceUsers={workspaceDirectory} session={session} onBack={() => setSelectedId(undefined)} onStatus={updateStatus} onQualification={updateQualification} onReassign={reassign} onEditDetails={editLeadDetails} onReportIncorrect={reportIncorrect} onDecision={decideReview} /> : <section className="inbox-layout"><LeadTable viewer={viewer} canCreate={viewer.role === 'admin' || viewer.role === 'marketer'} leads={visible} users={workspaceDirectory} onSelect={select} onCreate={() => setShowCreate(true)} /></section>)}
+{page === 'Lead inbox' && (selected ? <LeadWorkspace lead={selected} viewer={viewer} workspaceUsers={workspaceDirectory} session={session} onBack={() => setSelectedId(undefined)} onStatus={updateStatus} onQualification={updateQualification} onReassign={reassign} onEditDetails={editLeadDetails} onReportIncorrect={reportIncorrect} onDecision={decideReview} /> : <><div className="calling-view-switch">{(viewer.role === 'admin' || viewer.role === 'sales_agent' || (viewer.role === 'manager' && viewer.department === 'sales')) && <><button className={!callingMode ? 'primary' : 'quiet'} aria-pressed={!callingMode} onClick={() => setCallingMode(false)}>Lead view</button><button className={callingMode ? 'primary' : 'quiet'} aria-pressed={callingMode} onClick={() => setCallingMode(true)}>Calling view</button></>}</div>{callingMode ? <CallingView key={viewer.id} leads={visible} viewer={viewer} session={session} ready={!session || remoteLoaded} onDetails={select} onSaved={callingSaved} /> : <section className="inbox-layout"><LeadTable viewer={viewer} canCreate={viewer.role === 'admin' || viewer.role === 'marketer'} leads={visible} users={workspaceDirectory} onSelect={select} onCreate={() => setShowCreate(true)} /></section>}</>)}
       {page === 'Lead research' && <LeadResearchQueue viewer={viewer} users={workspaceDirectory} session={session} onNotice={setNotice} onPublished={async (research, salesOwnerId) => {
         if (session) setLeads(await loadRemoteLeads(session));
         else {

@@ -1,9 +1,22 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-10-15
+Last updated: 2026-10-17
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [AGENT-DASHBOARD-ARRANGEMENT.md](./docs/AGENT-DASHBOARD-ARRANGEMENT.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.14.md](./CRM-DECISIONS-v1.14.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
 
+## Simple calling view: October 17, 2026
+
+Approved scope: [CRM-DECISIONS-v1.23.md](CRM-DECISIONS-v1.23.md). Optional calling view preserves the existing lead pages and uses the main activity log, ownership permissions, contact restrictions, and follow-up rules. No production lead data was edited during release validation.
+
+Validated: 150 automated tests, API/web type checks, production web build, eight isolated database scenarios, desktop/mobile calling flow, failed-save retry/idempotency, existing contact shortcuts, Lost reason and assignment ordering. Production SQL function `log_calling_result` was installed and its presence verified on October 17. Application release is pending push, CI and production verification. Actual external calls were not placed; daily metrics count saved manual logs, not dial clicks.
+
+## Product-readiness correction: October 16, 2026
+
+A read-only production audit confirmed five operational defects and three role/UI defects. The local release candidate repairs the Sales action queue, qualified-to-Won conversion calculation, inactive-user analytics, signed-in test controls and loading message, non-Admin role-switcher visibility, live workspace name resolution, and the dashboard custom-date controls. No production record or database schema was changed.
+
+The release candidate matches the existing plan and workflow documents. It does not require a new decision-document version. Validation passed: 138 automated tests, both TypeScript checks, the production web build, and browser acceptance for custom dates, the Sales queue, assignment ordering/history, Lost reason, and Copy/Dial/Email shortcuts. Full evidence: [Product readiness audit](audit/product-readiness-2026-10-16/AUDIT.md).
+
+Code changes are present on origin/main through PRs #75 and #76. Production verification is recorded separately from local test results.
 ## CRM startup database reliability: October 15, 2026
 
 Approved under [v1.22](CRM-DECISIONS-v1.22.md). The remaining production startup timeout was traced to one PostgREST query embedding five one-to-many relationships at the same time. That join multiplied assignment, activity, follow-up, incorrect-report, and review rows before returning the lead records.

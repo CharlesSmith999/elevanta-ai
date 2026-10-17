@@ -1,5 +1,7 @@
 # Lead CRM — Phase 1 Product and Technical Plan
 
+The optional simple Calling view follows owner-approved [CRM-DECISIONS-v1.23.md](./CRM-DECISIONS-v1.23.md): compact phone-method rows, inline results, daily tabs and manual call effort metrics, alongside the existing lead pages.
+
 October 5 requested agent graph additions follow [AGENT-GRAPH-ADDITIONS.md](docs/AGENT-GRAPH-ADDITIONS.md). Add graphs first, review removals/layout next, then finalize Milestone 5 data import.
 
 Research and Sales connection graphs follow [CONNECTION-DASHBOARDS.md](docs/CONNECTION-DASHBOARDS.md), approved October 3, 2026: first-success connection attribution, research discovery evidence, role-scoped charts and loss reasons.
