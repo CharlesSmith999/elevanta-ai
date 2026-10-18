@@ -7,7 +7,7 @@ import {
   leadCategoryLabels, leadCategoryOptions, ownerId, qualificationLabels, responseHours, routingHours, seedLeads, sourceOptions, stageAgeLabel, statusLabels, transitionStage, userNameFor, users, validStatusTransition, validWonFinancials,
 } from './domain';
 import { authEnabled, supabase, type AuthState } from './auth';
-import { addRemoteFollowUp, addRemoteNote, completeRemoteFollowUp, createAdminUser, createRemoteLead, decideRemoteReview, loadAdminUsers, loadRemoteLeads, loadWorkspaceMembers, reassignRemoteLead, reportRemoteIncorrect, updateAdminUser, updateRemoteLeadDetails, updateRemoteStatus, type ManagedUser } from './api';
+import { addRemoteFollowUp, addRemoteNote, completeRemoteFollowUp, createAdminUser, createRemoteLead, decideRemoteReview, loadAdminUsers, loadRemoteLeadPage, loadRemoteLeads, loadWorkspaceMembers, reassignRemoteLead, reportRemoteIncorrect, updateAdminUser, updateRemoteLeadDetails, updateRemoteStatus, type ManagedUser } from './api';
 import { RoleReferenceDashboard, RoleReferenceKind, RoleReferenceSidebar, RoleSwitcher } from './RoleReferenceDashboards';
 import { XaviarWorkspace } from './XaviarWorkspace';
 import { navigationFor } from './navigation';
@@ -112,14 +112,15 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
     if (!session) return;
     let active = true;
     setConnectionError('');
-    Promise.all([loadRemoteLeads(session), loadWorkspaceMembers(session)]).then(([remoteLeads, members]) => {
+    Promise.all([loadRemoteLeadPage(session), loadWorkspaceMembers(session)]).then(([firstPage, members]) => {
       if (!active) return;
       const directory: User[] = members.map((member) => ({ id: member.id, name: member.full_name, role: member.role, managerId: member.manager_id ?? undefined, department: member.department ?? 'marketing' }));
-      setLeads(remoteLeads);
+      setLeads(firstPage.leads);
       if (directory.length) setWorkspaceDirectory(directory);
       setViewerId(directory.some((member) => member.id === session.user.id) ? session.user.id : directory[0]?.id ?? 'shariq');
       setRemoteLoaded(true);
       setNotice('Connected to the CRM workspace.');
+      void loadRemoteLeads(session).then((remoteLeads) => { if (active) setLeads(remoteLeads); }).catch(() => { if (active) setNotice('The first lead page is ready. Full dashboard totals will refresh when the CRM reconnects.'); });
     }).catch((error: unknown) => { if (active) { setRemoteLoaded(false); setConnectionError(error instanceof Error ? error.message : 'The CRM could not load your workspace.'); } });
     return () => { active = false; };
   }, [session, connectionAttempt]);
@@ -491,7 +492,22 @@ function intelligenceCopy(viewer: User, dashboard: ReturnType<typeof dashboardFo
   return { title: 'Pipeline intelligence', subtitle: 'Live visibility into pipeline health, performance, and what to focus on.', risk: dashboard.overdue ? `${dashboard.overdue} follow-up${dashboard.overdue === 1 ? '' : 's'} need attention before the risk grows.` : 'Follow-up timing is healthy across this test workspace.', strength: `${dashboard.open} active opportunities are visible across the company.` };
 }
 
+function useChartsReady() {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    const schedule = () => { if (!cancelled) setReady(true); };
+    const idle = (window as Window & { requestIdleCallback?: (callback: () => void) => number }).requestIdleCallback;
+    if (idle) { const handle = idle(schedule); return () => { cancelled = true; (window as Window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback?.(handle); }; }
+    const handle = window.setTimeout(schedule, 120);
+    return () => { cancelled = true; window.clearTimeout(handle); };
+  }, []);
+  return ready;
+}
+
 function PipelineIntelligence({ viewer, leads, dashboard, onSelect, period, scope }: { viewer: User; leads: Lead[]; dashboard: ReturnType<typeof dashboardFor>; onSelect: (leadId: string) => void; period: DashboardPeriod; scope: DashboardScope }) {
+  const chartsReady = useChartsReady();
+  if (!chartsReady) return <section className="intelligence chart-loading" aria-label="Pipeline intelligence dashboard"><span>Preparing pipeline insights…</span></section>;
   const stages = intelligenceStages(leads, dashboard); const history = intelligenceHistory(leads); const matrix = intelligenceMatrix(leads); const copy = intelligenceCopy(viewer, dashboard, scope);
   const duplicates = duplicateMatches(leads).length;
   const healthScore = Math.max(0, Math.min(100, 100 - dashboard.overdue * 22 - dashboard.incorrectReview * 14 - duplicates * 8 + Math.min(10, dashboard.mql * 2 + dashboard.sql * 3)));
@@ -606,6 +622,8 @@ function RoleScorecards({ viewer, leads, scope }: { viewer: User; leads: Lead[];
 }
 
 function RoleCharts({ viewer, leads, dashboard, scope }: { viewer: User; leads: Lead[]; dashboard: ReturnType<typeof dashboardFor>; scope: DashboardScope }) {
+  const chartsReady = useChartsReady();
+  if (!chartsReady) return <section className="insight-section chart-loading" aria-label="Role-specific performance graphs"><span>Preparing performance graphs…</span></section>;
   const qualityRate = leads.length ? Math.round(((dashboard.mql + dashboard.sql) / leads.length) * 100) : 0;
   const conversionBase = dashboard.won + chartCount(leads, (lead) => lead.status === 'lost');
   const closeRate = conversionBase ? Math.round((dashboard.won / conversionBase) * 100) : 0;
@@ -664,6 +682,8 @@ function AdminReferenceSidebar({ viewer, activePage, onNavigate, onReset, onSign
 function IconSparkleMark() { return <IconSparkles className="admin-reference-spark" size={28} stroke={2.1} />; }
 
 function AdminCommandCenter({ viewer, viewers, directory, leads, dashboard, period, customStart, customEnd, source, theme, onViewer, onPeriod, onCustomStart, onCustomEnd, onSource, onTheme, onNavigate }: { viewer: User; viewers: User[]; directory: User[]; leads: Lead[]; dashboard: ReturnType<typeof dashboardFor>; period: DashboardPeriod; customStart: string; customEnd: string; source: string; theme: 'light' | 'dark'; onViewer: (viewerId: string) => void; onPeriod: (value: DashboardPeriod) => void; onCustomStart: (value: string) => void; onCustomEnd: (value: string) => void; onSource: (value: string) => void; onTheme: (value: 'light' | 'dark') => void; onNavigate: (page: string) => void }) {
+  const chartsReady = useChartsReady();
+  if (!chartsReady) return <section className="admin-command-center chart-loading" aria-label="Admin dashboard"><span>Preparing company dashboard…</span></section>;
   const financial = financialMetrics(leads);
   const stages = [
     { name: 'Leads', value: leads.length, fill: '#8b5cf6' }, { name: 'MQL', value: dashboard.mql, fill: '#6659f4' }, { name: 'SQL', value: dashboard.sql, fill: '#2579df' }, { name: 'Won', value: dashboard.won, fill: '#53ca94' },
