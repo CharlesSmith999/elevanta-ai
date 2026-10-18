@@ -457,3 +457,10 @@ Milestones 1–3, lead workflow v1.6, and lead details/reporting v1.7 are releas
 - The main application bundle is approximately 648 KB before compression, down from approximately 1.12 MB.
 - Web TypeScript check and production build passed.
 - The release authority is [`CRM-DECISIONS-v1.27.md`](./CRM-DECISIONS-v1.27.md).
+
+## 2026-10-18 Calling view performance milestone
+
+- Calling list derivation, filters, tabs, and metrics are memoized and search is deferred while typing.
+- Calling activity and open follow-up lookups have targeted indexes in `supabase/migrations/202610180003_calling_view_indexes.sql`.
+- The call, copy, log, auto-disappear, and pagination behavior is unchanged.
+- The release authority is [`CRM-DECISIONS-v1.28.md`](./CRM-DECISIONS-v1.28.md).

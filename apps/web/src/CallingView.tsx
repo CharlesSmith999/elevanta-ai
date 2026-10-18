@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { IconPhone, IconCopy } from '@tabler/icons-react';
 import { request } from './api';
@@ -24,7 +24,7 @@ export function CallingView({ leads, viewer, session, ready, onDetails, onSaved 
   const [clock, setClock] = useState(new Date());
   const [reportDay, setReportDay] = useState(localDay(new Date()));
   const [revision, setRevision] = useState(0);
-  const scope = leads.map(lead => lead.id).sort().join(',');
+  const scope = useMemo(() => leads.map(lead => lead.id).sort().join(','), [leads]);
   const identity = `${session?.user.id ?? 'sample'}:${viewer.id}:${scope}`;
   const identityRef = useRef(identity); identityRef.current = identity;
   const filterKey = `elevanta-calling-status-filters:${viewer.id}`;
@@ -52,10 +52,11 @@ export function CallingView({ leads, viewer, session, ready, onDetails, onSaved 
   }, [identity, revision, ready]);
   useEffect(() => { if (!session && !loading) localStorage.setItem(`elevanta-sample-calls:${viewer.id}`,JSON.stringify(records)); }, [session,loading,records,viewer.id]);
   const today = localDay(clock);
-  const rows = callingRows(records, today);
-  const matching = rows.filter(row => (!outcomes.length || outcomes.includes(row.latest?.outcome ?? 'never')) && (service === 'all' || row.record.category === service) && row.record.name.toLowerCase().includes(query.trim().toLowerCase()));
-  const filtered = matching.filter(row => callTab(row, tab, clock));
-  const metrics = callMetrics(records, reportDay, viewer.role === 'sales_agent' ? viewer.id : undefined);
+  const deferredQuery = useDeferredValue(query);
+  const rows = useMemo(() => callingRows(records, today), [records, today]);
+  const matching = useMemo(() => rows.filter(row => (!outcomes.length || outcomes.includes(row.latest?.outcome ?? 'never')) && (service === 'all' || row.record.category === service) && row.record.name.toLowerCase().includes(deferredQuery.trim().toLowerCase())), [rows, outcomes, service, deferredQuery]);
+  const filtered = useMemo(() => matching.filter(row => callTab(row, tab, clock)), [matching, tab, clock]);
+  const metrics = useMemo(() => callMetrics(records, reportDay, viewer.role === 'sales_agent' ? viewer.id : undefined), [records, reportDay, viewer.role]);
   const pageIndex = Math.min(page, Math.max(0, Math.ceil(filtered.length/30)-1));
   useEffect(() => { setPage(0); }, [tab,outcomes,service,query]);
   async function save(row: CallRow, result: CallResult, note: string, due: string, reason: string, requestId: string) {
