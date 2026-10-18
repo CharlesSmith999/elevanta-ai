@@ -434,3 +434,11 @@ Milestones 1–3, lead workflow v1.6, and lead details/reporting v1.7 are releas
 - A follow-up main-branch release at `f81c46bfdd0135f404c5fdb7aac9fee663f3665a` strengthens every modal and drawer overlay with an opaque theme-aware surface, blur, contrast, and stacking isolation so popup content cannot appear transparent. The connected Vercel project will deploy this commit automatically.
 - A session-recovery follow-up at `2901cd387d6ee021670c85206423b6da9e9e7dea` now coordinates token refresh across simultaneous CRM requests and signs out a stale session after a confirmed second 401, preventing the UI from remaining in a misleading disconnected state. Web TypeScript and production build checks passed.
 - Lead creation now includes a visible Reconnect action when a stale session blocks CRM access, taking the user directly back through sign-in instead of leaving a disabled form without recovery guidance.
+## 2026-10-18 performance and lead-list release candidate
+
+- Download controls are removed from all CRM views as previously approved.
+- The main lead inbox now renders 50 rows per page with Previous/Next controls. Filtering and assignment-date sorting happen before paging, so no leads are dropped.
+- The opportunities API now exposes a bounded page contract (`limit`, `offset`, and `hasMore`) for incremental migration to server-side list loading. Existing callers remain compatible.
+- Additive indexes are prepared for opportunity ordering, source filters, active assignment ordering, and open follow-up queues in `supabase/migrations/202610180002_performance_indexes.sql`.
+- The decision authority for this release is [`CRM-DECISIONS-v1.25.md`](./CRM-DECISIONS-v1.25.md).
+- Remaining performance work is explicitly tracked: dashboard summary endpoints, lazy chart/history loading, and replacing the initial full lead fetch with server-side filters.
