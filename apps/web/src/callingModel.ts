@@ -2,6 +2,7 @@ import type { CallingRecord, CallingMethod } from '../../api/src/callingList';
 import { usableCallingMethod } from '../../api/src/callingList';
 export type { CallingRecord, CallingMethod };
 export const callResults = { connected: 'Connected', no_answer: 'No Answer', voicemail: 'Voicemail', busy: 'Busy', callback_requested: 'Callback', meeting_booked: 'Meeting booked', not_interested: 'Not Interested', wrong_number: 'Wrong Number', other: 'Other' };
+export const callResultTones: Record<CallResult | 'never', string> = { connected: 'green', meeting_booked: 'green-strong', callback_requested: 'blue', voicemail: 'purple', no_answer: 'amber', busy: 'orange', not_interested: 'red', wrong_number: 'red-strong', other: 'gray', never: 'gray' };
 export type CallResult = keyof typeof callResults;
 export type CallRow = { key: string; record: CallingRecord; method: CallingMethod; latest?: CallingRecord['events'][number]; calledToday: boolean; usable: boolean; due?: string };
 export function localDay(date: Date) { return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`; }
