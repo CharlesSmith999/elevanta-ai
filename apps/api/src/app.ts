@@ -646,6 +646,28 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     await admin.from('audit_events').insert({ workspace_id: request.profile!.workspace_id, actor_id: request.profile!.id, entity_type: 'xaviar_release_review', entity_id: data.id, action: 'xaviar_release_review_recorded', before_json: null, after_json: data });
     response.status(201).json({ review: data });
   }));
+  app.get('/v1/dashboards/:role/summary', ...protectedRoute(async (request, response) => {
+    const role = parse(dashboardRoles, request.params.role); const profile = request.profile!;
+    const permitted = profile.role === 'admin' || (role === 'agent' && profile.role === 'sales_agent') || profile.role === role || (role === 'manager' && profile.role === 'manager');
+    if (!permitted) { response.status(403).json({ message: 'This dashboard is outside your permitted role scope.' }); return; }
+    const filters = parse(dashboardQuery, request.query);
+    const count = async (field: 'status' | 'qualification' | 'source', value: string) => {
+      let query = request.supabase!.from('opportunities').select('id', { count: 'exact', head: true }).eq(field, value);
+      if (filters.source) query = query.eq('source', filters.source);
+      if (filters.start) query = query.gte('created_at', `${filters.start}T00:00:00.000Z`);
+      if (filters.end) query = query.lt('created_at', `${filters.end}T23:59:59.999Z`);
+      const result = await query; if (result.error) throw result.error; return result.count ?? 0;
+    };
+    const statuses = ['new', 'assigned', 'contacted', 'connected', 'follow_up_required', 'qualified', 'proposal_sent', 'won', 'lost', 'not_interested', 'incorrect', 'duplicate', 'do_not_contact', 'not_available', 'no_answer'];
+    const qualifications = ['mql', 'sql', 'not_available'];
+    const [statusCounts, qualificationCounts] = await Promise.all([
+      Promise.all(statuses.map(async (value) => [value, await count('status', value)] as const)),
+      Promise.all(qualifications.map(async (value) => [value, await count('qualification', value)] as const)),
+    ]);
+    const byStatus = Object.fromEntries(statusCounts); const byQualification = Object.fromEntries(qualificationCounts);
+    const sampleSize = Object.values(byStatus).reduce((sum, value) => sum + value, 0);
+    response.json({ role, period: filters.period, source: filters.source ?? 'all', sampleSize, byStatus, byQualification });
+  }));
   app.get('/v1/dashboards/:role', ...protectedRoute(async (request, response) => {
     const role = parse(dashboardRoles, request.params.role); const profile = request.profile!;
     const permitted = profile.role === 'admin' || (role === 'agent' && profile.role === 'sales_agent') || profile.role === role || (role === 'manager' && profile.role === 'manager');
