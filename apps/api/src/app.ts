@@ -219,7 +219,7 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     response.json({ records: await readCallingList(request.supabase!, value.ids) });
   }));
   app.post('/v1/calling-list/result', ...protectedRoute(async (request, response) => {
-    if (request.profile!.role !== 'sales_agent') { response.status(403).json({ message: 'Only the assigned Sales Agent can record a call.' }); return; }
+    if (request.profile!.role !== 'sales_agent' && request.profile!.role !== 'admin') { response.status(403).json({ message: 'Only Sales Agents or Admins can record a call.' }); return; }
     const value = parse(z.object({ opportunityId: id, contactMethodId: id, requestId: id, outcome: z.enum(['connected','no_answer','voicemail','busy','callback_requested','meeting_booked','not_interested','wrong_number','other']), body: z.string().trim().max(5000).optional(), followUpAt: z.string().datetime({ offset: true }).optional(), lostReason: z.enum(lostReasonOptions).optional() }), request.body);
     const { data, error } = await request.supabase!.rpc('log_calling_result', { p_opportunity_id: value.opportunityId, p_contact_method_id: value.contactMethodId, p_request_id: value.requestId, p_outcome: value.outcome, p_body: value.body ?? null, p_follow_up_at: value.followUpAt ?? null, p_lost_reason: value.lostReason ?? null });
     if (error) throw error;

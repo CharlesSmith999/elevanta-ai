@@ -379,3 +379,5 @@ Multi-tenancy hardening, billing, self-service administration, onboarding, usage
 3. Approve final Lead Generator and reassignment visual references before lead-workflow v1.6 development begins.
 
 Approved dashboard and operating decisions are recorded in [CRM-DECISIONS-v1.5.md](./CRM-DECISIONS-v1.5.md), [CRM-DECISIONS-v1.6.md](./CRM-DECISIONS-v1.6.md), and [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md).
+# Latest approved decision: [CRM-DECISIONS-v1.24.md](CRM-DECISIONS-v1.24.md)
+

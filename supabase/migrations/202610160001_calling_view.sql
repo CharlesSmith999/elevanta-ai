@@ -8,9 +8,9 @@ declare v_lead public.opportunities; v_activity uuid; v_method public.opportunit
 begin
   select * into v_lead from public.opportunities where id = p_opportunity_id for update;
   if v_lead.id is null or not public.can_access_opportunity(p_opportunity_id)
-    or public.current_role() <> 'sales_agent'
+    or public.current_role() not in ('sales_agent','admin')
     or not exists(select 1 from public.profiles where id = auth.uid() and active)
-    or not exists(select 1 from public.assignments where opportunity_id = p_opportunity_id and assigned_to = auth.uid() and ended_at is null)
+    or (public.current_role() = 'sales_agent' and not exists(select 1 from public.assignments where opportunity_id = p_opportunity_id and assigned_to = auth.uid() and ended_at is null))
     then raise exception 'Only the current Sales owner can log a call'; end if;
   select id into v_activity from public.activities where opportunity_id = p_opportunity_id
     and actor_id = auth.uid() and metadata->>'calling_request_id' = p_request_id::text;
