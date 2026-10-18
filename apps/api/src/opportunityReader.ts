@@ -66,3 +66,27 @@ export async function readOpportunities(client: SupabaseClient, status?: string)
     };
   });
 }
+
+export async function readOpportunityPage(client: SupabaseClient, options: { status?: string; offset: number; limit: number }): Promise<{ opportunities: Row[]; hasMore: boolean }> {
+  let query = client.from('opportunities').select('*,contacts(*)').order('updated_at', { ascending: false }).order('id').range(options.offset, options.offset + options.limit - 1);
+  if (options.status) query = query.eq('status', options.status);
+  const page = await query;
+  if (page.error) throw page.error;
+  const opportunities = (page.data ?? []) as unknown as Row[];
+  if (!opportunities.length) return { opportunities: [], hasMore: false };
+  const ids = opportunities.map((item) => String(item.id));
+  const tables: RelatedTable[] = ['assignments', 'activities', 'follow_ups', 'incorrect_reports', 'incorrect_reviews'];
+  const related = await Promise.all(tables.map(async (table) => {
+    const result = await client.from(table).select(relatedColumns[table]).in('opportunity_id', ids).order('id');
+    if (result.error) throw result.error;
+    return result.data ?? [];
+  }));
+  const grouped = new Map(tables.map((table, index) => [table, groupByOpportunity(related[index] as unknown as Row[])])) as Map<RelatedTable, Map<string, Row[]>>;
+  return {
+    opportunities: opportunities.map((opportunity): Row => {
+      const opportunityId = String(opportunity.id);
+      return { ...opportunity, assignments: grouped.get('assignments')?.get(opportunityId) ?? [], activities: grouped.get('activities')?.get(opportunityId) ?? [], follow_ups: grouped.get('follow_ups')?.get(opportunityId) ?? [], incorrect_reports: grouped.get('incorrect_reports')?.get(opportunityId) ?? [], incorrect_reviews: grouped.get('incorrect_reviews')?.get(opportunityId) ?? [] };
+    }),
+    hasMore: opportunities.length === options.limit,
+  };
+}
