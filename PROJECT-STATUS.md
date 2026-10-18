@@ -442,3 +442,11 @@ Milestones 1–3, lead workflow v1.6, and lead details/reporting v1.7 are releas
 - Additive indexes are prepared for opportunity ordering, source filters, active assignment ordering, and open follow-up queues in `supabase/migrations/202610180002_performance_indexes.sql`.
 - The decision authority for this release is [`CRM-DECISIONS-v1.25.md`](./CRM-DECISIONS-v1.25.md).
 - Remaining performance work is explicitly tracked: dashboard summary endpoints, lazy chart/history loading, and replacing the initial full lead fetch with server-side filters.
+
+## 2026-10-18 progressive loading performance milestone
+
+- The first 50 leads now load before the complete lead history, then the existing full dataset refreshes in the background so totals and permissions remain unchanged.
+- A lightweight dashboard summary API is available at `/v1/dashboards/:role/summary` with status and qualification counts.
+- Pipeline, role, and Admin charts defer their expensive calculations until the browser is idle.
+- API and web typechecks, production build, and all 72 API tests passed.
+- The release authority is [`CRM-DECISIONS-v1.26.md`](./CRM-DECISIONS-v1.26.md).
