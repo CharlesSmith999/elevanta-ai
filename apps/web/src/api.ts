@@ -182,6 +182,18 @@ export async function loadRemoteLeads(session: Session): Promise<Lead[]> {
   return result.opportunities.map(mapOpportunity);
 }
 
+export async function loadRemoteLeadPage(session: Session, offset = 0, limit = 50): Promise<{ leads: Lead[]; hasMore: boolean; nextOffset: number | null }> {
+  const params = new URLSearchParams({ offset: String(offset), limit: String(limit) });
+  const result = await request<{ opportunities: OpportunityRecord[]; hasMore: boolean; nextOffset: number | null }>(session, `/v1/opportunities?${params}`);
+  return { leads: result.opportunities.map(mapOpportunity), hasMore: result.hasMore, nextOffset: result.nextOffset };
+}
+
+export type DashboardSummary = { role: string; period: string; source: string; sampleSize: number; byStatus: Record<string, number>; byQualification: Record<string, number> };
+export const loadDashboardSummary = (session: Session, role: string, filters: { period?: string; source?: string; start?: string; end?: string } = {}) => {
+  const params = new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => Boolean(entry[1])));
+  return request<DashboardSummary>(session, `/v1/dashboards/${role}/summary?${params}`);
+};
+
 export async function loadWorkspaceMembers(session: Session): Promise<WorkspaceMember[]> {
   const result = await request<{ users: WorkspaceMember[] }>(session, '/v1/workspace-members');
   return result.users;
