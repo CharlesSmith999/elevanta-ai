@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { IconPhone, IconCopy } from '@tabler/icons-react';
 import { request } from './api';
 import { currentAssignment, leadCategoryLabels, lostReasonOptions, ownerId, type Lead, type User, type LeadCategory } from './domain';
-import { callingRows, callTab, callMetrics, localDay, callResults, callResultTones, callingCsv, type CallingRecord, type CallRow, type CallResult } from './callingModel';
+import { callingRows, callTab, callMetrics, localDay, callResults, callResultTones, type CallingRecord, type CallRow, type CallResult } from './callingModel';
 import './callingView.css';
 
 function samples(leads: Lead[]): CallingRecord[] {
@@ -24,7 +24,6 @@ export function CallingView({ leads, viewer, session, ready, onDetails, onSaved 
   const [clock, setClock] = useState(new Date());
   const [reportDay, setReportDay] = useState(localDay(new Date()));
   const [revision, setRevision] = useState(0);
-  const [exporting, setExporting] = useState(false);
   const scope = leads.map(lead => lead.id).sort().join(',');
   const identity = `${session?.user.id ?? 'sample'}:${viewer.id}:${scope}`;
   const identityRef = useRef(identity); identityRef.current = identity;
@@ -59,18 +58,6 @@ export function CallingView({ leads, viewer, session, ready, onDetails, onSaved 
   const metrics = callMetrics(records, reportDay, viewer.role === 'sales_agent' ? viewer.id : undefined);
   const pageIndex = Math.min(page, Math.max(0, Math.ceil(filtered.length/30)-1));
   useEffect(() => { setPage(0); }, [tab,outcomes,service,query]);
-  async function exportRows() {
-    setExporting(true); setError('');
-    try {
-      const ids = [...new Set(filtered.map(row => row.record.id))];
-      const result = session ? await request<{records:CallingRecord[]}>(session, '/v1/calling-list/export', {method:'POST', body:JSON.stringify({ids, filters:JSON.stringify({tab,outcomes,service,query})})}) : {records};
-      const keys = new Set(filtered.map(row => row.key));
-      const selected = result.records.map(record => ({...record, methods:record.methods.filter(method => keys.has(`${record.id}:${method.id}`))}));
-      const url = URL.createObjectURL(new Blob([callingCsv(selected)], {type:'text/csv;charset=utf-8;'}));
-      const link = document.createElement('a'); link.href = url; link.download = `calling-list-${today}.csv`; link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setNotice('Filtered calling list downloaded.');
-    } catch(err) { setError(err instanceof Error ? err.message : 'Download failed.'); } finally { setExporting(false); }
-  }
   async function save(row: CallRow, result: CallResult, note: string, due: string, reason: string, requestId: string) {
     const captured = identity;
     if (session) {
@@ -84,7 +71,7 @@ export function CallingView({ leads, viewer, session, ready, onDetails, onSaved 
   const canAct = (viewer.role === 'sales_agent' || viewer.role === 'admin') && (!session || session.user.id === viewer.id);
   const canCallRow = (row: CallRow) => row.usable && canAct && (viewer.role === 'admin' || row.record.ownerId === viewer.id);
   return <section className="panel calling-view" aria-label="Calling view">
-    <div className="panel-heading"><div><h2>Calling view</h2><p>Call, record the result, and continue with the next row.</p>{viewer.role === 'admin' && <small className="admin-call-note">Admin test actions are recorded under your Admin account.</small>}</div><button className="quiet" disabled={loading || exporting || !filtered.length} onClick={() => void exportRows()}>{exporting ? 'Preparing download…' : 'Download filtered leads'}</button></div>
+    <div className="panel-heading"><div><h2>Calling view</h2><p>Call, record the result, and continue with the next row.</p>{viewer.role === 'admin' && <small className="admin-call-note">Admin test actions are recorded under your Admin account.</small>}</div></div>
     <div className="calling-metrics"><label>Report date<input type="date" value={reportDay} max={today} onChange={event => setReportDay(event.target.value || today)} /></label><span><b>{metrics.attempts}</b> Logged calls</span><span><b>{metrics.unique}</b> Unique numbers</span><span><b>{metrics.connected}</b> Reached contacts</span><span><b>{metrics.rate}%</b> Connection rate</span></div>
     <small>Based on manually logged calls in your local timezone. A Dial click is not counted.</small>
     <nav className="calling-tabs" aria-label="Calling lists">{[['todo','To Call'],['called','Called Today'],['followup','Follow-up Needed']].map(([key,label]) => <button className={tab === key ? 'primary' : 'quiet'} aria-pressed={tab === key} key={key} onClick={() => {setTab(key);setExpanded(undefined);}}>{label} <b>{matching.filter(row => callTab(row,key,clock)).length}</b></button>)}</nav>
