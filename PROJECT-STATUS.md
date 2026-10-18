@@ -450,3 +450,10 @@ Milestones 1–3, lead workflow v1.6, and lead details/reporting v1.7 are releas
 - Pipeline, role, and Admin charts defer their expensive calculations until the browser is idle.
 - API and web typechecks, production build, and all 72 API tests passed.
 - The release authority is [`CRM-DECISIONS-v1.26.md`](./CRM-DECISIONS-v1.26.md).
+
+## 2026-10-18 browser bundle optimization milestone
+
+- Vite now splits the chart library, icon library, and application code into cacheable chunks.
+- The main application bundle is approximately 648 KB before compression, down from approximately 1.12 MB.
+- Web TypeScript check and production build passed.
+- The release authority is [`CRM-DECISIONS-v1.27.md`](./CRM-DECISIONS-v1.27.md).
