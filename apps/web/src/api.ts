@@ -217,6 +217,7 @@ export const addRemoteContactMethod = (session: Session, id: string, body: unkno
 export const assessRemoteContactMethod = (session: Session, id: string, contactMethodId: string, body: unknown) => request<void>(session, `/v1/opportunities/${id}/contact-methods/${contactMethodId}`, { method: 'PATCH', body: JSON.stringify(body) });
 export const restoreRemoteContactMethod = (session: Session, id: string, contactMethodId: string, body: unknown) => request<void>(session, `/v1/opportunities/${id}/contact-methods/${contactMethodId}/restore`, { method: 'POST', body: JSON.stringify(body) });
 export const logRemoteSalesActivity = (session: Session, id: string, body: unknown) => request<{ activityId: string }>(session, `/v1/opportunities/${id}/activities`, { method: 'POST', body: JSON.stringify(body) });
+export const sendRemoteLeadEmail = (session: Session, id: string, body: { toEmail: string; subject: string; body: string; replyToMessageId?: string }) => request<{ status: 'sent'; messageId: string }>(session, `/v1/opportunities/${id}/email`, { method: 'POST', body: JSON.stringify(body) });
 export async function loadResearchLeads(session: Session) { const result = await request<{ researchLeads: RemoteResearchLead[] }>(session, '/v1/inbound/research-leads'); return result.researchLeads.map(mapResearchLead); }
 export type GmailHealth = { mailbox:string; settingsRevision?:string; setupReady:boolean; connected:boolean; enabled:boolean; activatedAt?:string; lastSyncAt?:string; lastError?:string; activationApproved:boolean; failures?:{provider_message_id:string;failure_code:string;received_at:string}[] };
 export const replaceGmailMailbox = (session:Session,mailbox:string,expectedRevision:string) => request(session,'/v1/admin/gmail/replace-mailbox',{method:'POST',body:JSON.stringify({mailbox,expectedRevision,confirmed:true})});
@@ -225,6 +226,24 @@ export const getGmailHealth = (session:Session) => request<GmailHealth>(session,
 export const connectGmail = (session:Session) => request<{url:string}>(session,'/v1/admin/gmail/connect',{method:'POST'});
 export const enableGmail = (session:Session,enabled:boolean) => request(session,'/v1/admin/gmail/enabled',{method:'POST',body:JSON.stringify({enabled})});
 export const syncGmailNow = (session:Session) => request<{state:string}>(session,'/v1/admin/gmail/sync',{method:'POST'});
+export type AgentGmailHealth = { mailbox:string; status:'not_connected'|'pending_consent'|'connected'|'paused'|'error'|'revoked'; enabled:boolean; connectedAt?:string; lastSyncAt?:string; lastError?:string; grantedScopes:string[]; setupReady:boolean };
+export const getAgentGmailHealth = (session:Session) => request<AgentGmailHealth>(session,'/v1/profile/agent-gmail');
+export const saveAgentGmailMailbox = (session:Session,mailbox:string) => request(session,'/v1/profile/agent-gmail/mailbox',{method:'PUT',body:JSON.stringify({mailbox})});
+export const connectAgentGmail = (session:Session) => request<{url:string}>(session,'/v1/profile/agent-gmail/connect',{method:'POST'});
+export const disconnectAgentGmail = (session:Session) => request<{disconnected:boolean}>(session,'/v1/profile/agent-gmail/disconnect',{method:'POST'});
+export const syncAgentGmailNow = (session:Session) => request<{state:string;processed:number;linked:number}>(session,'/v1/profile/agent-gmail/sync',{method:'POST'});
+export type AgentGmailMatchReview = { id:string; message_id:string; reason:string; candidate_emails:string[]; status:string; created_at:string; message?:{subject?:string;sender?:string;occurred_at?:string}|null };
+export const getAgentGmailReviews = (session:Session) => request<{reviews:AgentGmailMatchReview[]}>(session,'/v1/profile/agent-gmail/reviews');
+export const resolveAgentGmailReview = (session:Session, reviewId:string, body:{decision:'linked'|'ignored'; opportunityId?:string}) => request<void>(session, `/v1/profile/agent-gmail/reviews/${reviewId}/resolve`, {method:'POST', body:JSON.stringify(body)});
+export type AgentGmailContextSuggestion = { id:string; message_id:string; generator:string; model_version:string; summary:string; intent:string; objections:string[]; suggested_next_action:string; suggested_status?:string|null; suggested_qualification?:string|null; suggested_follow_up_at?:string|null; state:string; created_at:string };
+export type AgentGmailContextMessage = { id:string; subject?:string|null; sender?:string|null; recipients:string[]; direction:'inbound'|'outbound'; occurred_at:string; body:string; links:Array<{opportunity_id:string;confidence:number;match_reason:string}>; suggestion?:AgentGmailContextSuggestion|null };
+export const getAgentGmailContext = (session:Session) => request<{messages:AgentGmailContextMessage[]}>(session,'/v1/profile/agent-gmail/context');
+export const generateAgentGmailSuggestion = (session:Session, messageId:string) => request<{suggestion:AgentGmailContextSuggestion}>(session, `/v1/profile/agent-gmail/context/${messageId}/suggest`, {method:'POST'});
+export const reviewAgentGmailSuggestion = (session:Session, suggestionId:string, state:'accepted'|'dismissed') => request<void>(session, `/v1/profile/agent-gmail/context/${suggestionId}/feedback`, {method:'POST',body:JSON.stringify({state})});
+export type AgentGmailSuggestionStats = { generated:number; pending:number; accepted:number; dismissed:number };
+export const getAgentGmailSuggestionStats = (session:Session) => request<AgentGmailSuggestionStats>(session, '/v1/profile/agent-gmail/context-stats');
+export type AgentGmailReviewOpportunity = { id:string; name?:string|null; email?:string|null; phone?:string|null };
+export const searchAgentGmailReviewOpportunities = (session:Session, search:string) => request<{opportunities:AgentGmailReviewOpportunity[]}>(session, `/v1/profile/agent-gmail/review-opportunities?search=${encodeURIComponent(search)}`);
 export const createResearchLead = (session: Session, body: unknown) => request<{ researchLeadId: string }>(session, '/v1/inbound/research-leads', { method: 'POST', body: JSON.stringify(body) });
 export const updateResearchLead = (session: Session, id: string, body: unknown) => request<void>(session, `/v1/inbound/research-leads/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
 export const publishResearchLead = (session: Session, id: string, body: unknown) => request<{ opportunityId: string }>(session, `/v1/inbound/research-leads/${id}/publish`, { method: 'POST', body: JSON.stringify(body) });

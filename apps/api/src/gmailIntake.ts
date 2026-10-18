@@ -5,7 +5,7 @@ export type GmailMessage = { id: string; threadId?: string; internalDate: string
 export type BarkLead = { name: string; category: 'app' | 'web' | 'smm'; receivedAt: string; maskedPhone?: string; maskedEmail?: string; address?: string; credits?: number; description?: string; details?: string };
 export type ParseResult = { state: 'parsed'; lead: BarkLead } | { state: 'ignored' | 'needs_review'; code: string };
 
-function header(message: GmailMessage, name: string) {
+export function header(message: GmailMessage, name: string) {
   return message.payload?.headers?.find(h => h.name.toLowerCase() === name)?.value ?? '';
 }
 
@@ -30,6 +30,12 @@ function mimeText(part: GmailPart, mime: 'text/plain' | 'text/html', depth = 0):
   }
   if ((part.parts?.length ?? 0) > 100) throw new Error('mime_parts');
   return (part.parts ?? []).map(p => mimeText(p, mime, depth + 1)).filter(Boolean).join('\n');
+}
+
+export function messageText(message: GmailMessage): string {
+  let body = mimeText(message.payload ?? {}, 'text/plain');
+  if (!body.trim()) body = htmlEmailText(mimeText(message.payload ?? {}, 'text/html'));
+  return body.replace(/[\u200B\u200C\u200D\uFEFF\u00AD]/g, '').replace(/\u00A0/g, ' ').replace(/\r\n?/g, '\n').trim();
 }
 
 export function parseBarkMessage(message: GmailMessage, activatedAt: string): ParseResult {
@@ -88,11 +94,11 @@ export function createGmailReader(accessToken: string, request: typeof fetch = f
       const value = await get('profile');
       if (typeof value.emailAddress !== 'string' || value.emailAddress.toLowerCase() !== expectedEmail.trim().toLowerCase()) throw new GmailReadError('authorization');
     },
-    async list(activatedAt: string, pageToken?: string): Promise<{ messages: { id: string }[]; nextPageToken?: string }> {
+    async list(activatedAt: string, pageToken?: string, queryPrefix = 'from:bark.com'): Promise<{ messages: { id: string }[]; nextPageToken?: string }> {
       const cutoff = Date.parse(activatedAt);
       if (!Number.isFinite(cutoff)) throw new Error('Invalid activation time');
       // One-second overlap is filtered using internalDate by the parser.
-      const query = new URLSearchParams({ q: `from:bark.com (in:inbox OR in:spam) after:${Math.floor(cutoff / 1000) - 1}`, includeSpamTrash: 'true', maxResults: '100' });
+      const query = new URLSearchParams({ q: `${queryPrefix ? `${queryPrefix} ` : ''}(in:inbox OR in:sent OR in:spam) after:${Math.floor(cutoff / 1000) - 1}`, includeSpamTrash: 'true', maxResults: '100' });
       if (pageToken) query.set('pageToken', pageToken);
       const value = await get(`messages?${query}`);
       if ((value.messages !== undefined && (!Array.isArray(value.messages) || value.messages.some((m: { id?: unknown }) => !m || typeof m.id !== 'string'))) || (value.nextPageToken !== undefined && typeof value.nextPageToken !== 'string')) throw new GmailReadError('invalid_response');

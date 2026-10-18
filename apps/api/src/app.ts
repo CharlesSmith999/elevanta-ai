@@ -4,6 +4,7 @@ import express, { NextFunction, Request, Response } from 'express';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { ConfigurationError, supabaseConfig } from './config.js';
 import { startGmailConnection, finishGmailConnection, gmailHealth, saveGmailMailbox, replaceGmailMailbox, setGmailEnabled, syncGmail, validSchedulerSecret } from './gmailConnector.js';
+import { agentGmailHealth, saveAgentGmailMailbox, startAgentGmailConnection, finishAgentGmailConnection, disconnectAgentGmail, syncAgentGmail, agentGmailMatchReviews, resolveAgentGmailMatchReview, agentGmailContext, generateAgentGmailContextSuggestion, resolveAgentGmailContextSuggestion, agentGmailSuggestionStats, agentGmailReviewOpportunities, sendAgentGmailEmail } from './agentGmailConnector.js';
 import { z, ZodError } from 'zod';
 import { stageImportRequest, sealImportRequest, importPageQuery, historicalActivationRequest } from './historicalImport.js';
 import { readConnectionReport } from './connectionReporting.js';
@@ -81,6 +82,7 @@ const salesActivity = z.object({
   followUpAction: z.enum(['Call', 'Email', 'SMS', 'Task']).optional(),
   followUpPurpose: z.string().trim().max(1000).optional(),
 });
+const agentEmailSend = z.object({ toEmail: z.string().trim().email().max(254), subject: z.string().trim().min(1).max(200), body: z.string().trim().min(1).max(10000), replyToMessageId: id.optional() });
 const incorrectReport = z.object({ reasonCode: z.enum(['Invalid contact information', 'Wrong person or business', 'Spam or fake request', 'Duplicate contact']), evidence: z.string().trim().max(3000).optional() });
 const reviewDecision = z.object({ decision: z.enum(['confirmed_incorrect', 'rejected', 'merge_duplicate']), reason: z.string().trim().max(3000).optional() });
 const dashboardQuery = z.object({ period: dashboardPeriods.default('lifetime'), source: z.enum(sourceOptions).optional(), start: z.string().date().optional(), end: z.string().date().optional() });
@@ -293,11 +295,85 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     if (request.profile!.role !== 'admin') { response.status(403).json({message:'Only Admin can manage Gmail.'}); return; }
     response.json(await syncGmail(serviceClient(),request.profile!.workspace_id));
   }));
+  app.get('/v1/profile/agent-gmail', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'sales_agent') { response.status(403).json({ message: 'Only Sales Agents can manage an agent Gmail connection.' }); return; }
+    response.json(await agentGmailHealth(serviceClient(), request.profile!.workspace_id, request.profile!.id));
+  }));
+  app.put('/v1/profile/agent-gmail/mailbox', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'sales_agent') { response.status(403).json({ message: 'Only Sales Agents can manage an agent Gmail connection.' }); return; }
+    const value = z.object({ mailbox: z.string().trim().toLowerCase().email().max(254) }).strict().parse(request.body);
+    await saveAgentGmailMailbox(serviceClient(), request.profile!.workspace_id, request.profile!.id, value.mailbox);
+    response.json({ saved: true });
+  }));
+  app.post('/v1/profile/agent-gmail/connect', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'sales_agent') { response.status(403).json({ message: 'Only Sales Agents can manage an agent Gmail connection.' }); return; }
+    const result = await startAgentGmailConnection(serviceClient(), request.profile!.workspace_id, request.profile!.id);
+    response.cookie('agent_gmail_oauth', result.state, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 600000, path: '/api/v1/inbound/agent-gmail/callback' });
+    response.json({ url: result.url });
+  }));
+  app.post('/v1/profile/agent-gmail/disconnect', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'sales_agent') { response.status(403).json({ message: 'Only Sales Agents can manage an agent Gmail connection.' }); return; }
+    await disconnectAgentGmail(serviceClient(), request.profile!.workspace_id, request.profile!.id);
+    response.json({ disconnected: true });
+  }));
+  app.post('/v1/profile/agent-gmail/sync', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'sales_agent') { response.status(403).json({ message: 'Only Sales Agents can sync an agent Gmail connection.' }); return; }
+    response.json(await syncAgentGmail(serviceClient(), request.profile!.workspace_id, request.profile!.id));
+  }));
+  app.get('/v1/profile/agent-gmail/reviews', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'sales_agent') { response.status(403).json({ message: 'Only Sales Agents can view agent Gmail reviews.' }); return; }
+    response.json({ reviews: await agentGmailMatchReviews(serviceClient(), request.profile!.workspace_id, request.profile!.id) });
+  }));
+  app.post('/v1/profile/agent-gmail/reviews/:id/resolve', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'sales_agent') { response.status(403).json({ message: 'Only Sales Agents can resolve agent Gmail reviews.' }); return; }
+    const value = z.object({ decision: z.enum(['linked', 'ignored']), opportunityId: id.optional() }).strict().refine((item) => item.decision === 'ignored' || Boolean(item.opportunityId), { message: 'A CRM lead is required when linking an email.' }).parse(request.body);
+    await resolveAgentGmailMatchReview(serviceClient(), request.profile!.workspace_id, request.profile!.id, parse(id, request.params.id), value.decision, value.opportunityId);
+    response.status(204).end();
+  }));
+  app.get('/v1/profile/agent-gmail/context', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'sales_agent') { response.status(403).json({ message: 'Only Sales Agents can view agent Gmail context.' }); return; }
+    response.json({ messages: await agentGmailContext(serviceClient(), request.profile!.workspace_id, request.profile!.id) });
+  }));
+  app.post('/v1/profile/agent-gmail/context/:id/suggest', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'sales_agent') { response.status(403).json({ message: 'Only Sales Agents can generate email suggestions.' }); return; }
+    response.json({ suggestion: await generateAgentGmailContextSuggestion(serviceClient(), request.profile!.workspace_id, request.profile!.id, parse(id, request.params.id)) });
+  }));
+  app.post('/v1/profile/agent-gmail/context/:id/feedback', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'sales_agent') { response.status(403).json({ message: 'Only Sales Agents can review email suggestions.' }); return; }
+    const value = z.object({ state: z.enum(['accepted', 'dismissed']) }).strict().parse(request.body);
+    await resolveAgentGmailContextSuggestion(serviceClient(), request.profile!.workspace_id, request.profile!.id, parse(id, request.params.id), value.state);
+    response.status(204).end();
+  }));
+  app.get('/v1/profile/agent-gmail/context-stats', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'sales_agent') { response.status(403).json({ message: 'Only Sales Agents can view email suggestion stats.' }); return; }
+    response.json(await agentGmailSuggestionStats(serviceClient(), request.profile!.workspace_id, request.profile!.id));
+  }));
+  app.get('/v1/profile/agent-gmail/review-opportunities', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'sales_agent') { response.status(403).json({ message: 'Only Sales Agents can search review leads.' }); return; }
+    const search = typeof request.query.search === 'string' ? request.query.search : '';
+    response.json({ opportunities: await agentGmailReviewOpportunities(serviceClient(), request.profile!.workspace_id, search) });
+  }));
+  app.get('/v1/inbound/agent-gmail/callback', asyncRoute(async (request, response) => {
+    response.setHeader('Cache-Control', 'no-store'); response.setHeader('Referrer-Policy', 'no-referrer');
+    const cookie = request.headers.cookie?.split(';').map((value) => value.trim()).find((value) => value.startsWith('agent_gmail_oauth='))?.slice('agent_gmail_oauth='.length) ?? '';
+    response.clearCookie('agent_gmail_oauth', { httpOnly: true, secure: true, sameSite: 'lax', path: '/api/v1/inbound/agent-gmail/callback' });
+    try { await finishAgentGmailConnection(serviceClient(), String(request.query.state ?? ''), cookie, String(request.query.code ?? '')); response.type('text').send('Gmail connected. Return to your CRM profile.'); }
+    catch { response.status(400).type('text').send('Gmail was not connected. Return to the CRM and start authorization again.'); }
+  }));
   app.get('/v1/internal/gmail/sync',asyncRoute(async (request,response) => {
     if (!validSchedulerSecret(request.headers.authorization,process.env.CRON_SECRET)) { response.status(401).json({message:'Unauthorized'}); return; }
     const db = serviceClient(); const {data,error} = await db.from('gmail_connections').select('workspace_id').eq('enabled',true).limit(1);
     if(error) { response.status(503).json({message:'Gmail scheduler unavailable'}); return; }
     response.json(data?.[0] ? await syncGmail(db,data[0].workspace_id) : {state:'idle'});
+  }));
+  app.get('/v1/internal/agent-gmail/sync', asyncRoute(async (request, response) => {
+    if (!validSchedulerSecret(request.headers.authorization, process.env.CRON_SECRET)) { response.status(401).json({ message: 'Unauthorized' }); return; }
+    const db = serviceClient();
+    const { data, error } = await db.from('agent_gmail_connections').select('workspace_id,profile_id').eq('enabled', true).limit(100);
+    if (error) { response.status(503).json({ message: 'Agent Gmail scheduler unavailable' }); return; }
+    const results = [];
+    for (const connection of data ?? []) results.push({ workspaceId: connection.workspace_id, profileId: connection.profile_id, ...(await syncAgentGmail(db, connection.workspace_id, connection.profile_id)) });
+    response.json({ state: 'processed', results });
   }));
   app.get('/v1/workspace-members', ...protectedRoute(async (request, response) => {
     const { data, error } = await request.supabase!
@@ -413,6 +489,12 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     const value = parse(salesActivity, request.body); const opportunityId = parse(id, request.params.id);
     const { data, error } = await request.supabase!.rpc('log_sales_activity', { p_opportunity_id: opportunityId, p_contact_method_id: value.contactMethodId, p_type: value.type, p_outcome: value.outcome, p_body: value.body ?? null, p_follow_up_at: value.followUpAt ?? null, p_follow_up_action: value.followUpAction ?? null, p_follow_up_purpose: value.followUpPurpose ?? null });
     if (error) throw error; response.status(201).json({ activityId: data });
+  }));
+  app.post('/v1/opportunities/:id/email', ...protectedRoute(async (request, response) => {
+    if (request.profile!.role !== 'sales_agent') { response.status(403).json({ message: 'Only the assigned Sales Agent can send from their connected Gmail.' }); return; }
+    const value = parse(agentEmailSend, request.body); const opportunityId = parse(id, request.params.id);
+    const result = await sendAgentGmailEmail(serviceClient(), request.profile!.workspace_id, request.profile!.id, opportunityId, value);
+    response.status(201).json(result);
   }));
   app.post('/v1/opportunities/:id/contact-methods', ...protectedRoute(async (request, response) => {
     const value = parse(addContactMethod, request.body); const opportunityId = parse(id, request.params.id);
