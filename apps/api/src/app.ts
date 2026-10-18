@@ -8,7 +8,7 @@ import { z, ZodError } from 'zod';
 import { stageImportRequest, sealImportRequest, importPageQuery, historicalActivationRequest } from './historicalImport.js';
 import { readConnectionReport } from './connectionReporting.js';
 import { buildApiXaviarReport, canRequestXaviar, opportunityBelongsToSubject, type XaviarOpportunity, type XaviarProfile } from './xaviar.js';
-import { readOpportunities } from './opportunityReader.js';
+import { readOpportunities, readOpportunityPage } from './opportunityReader.js';
 
 type Profile = { id: string; workspace_id: string; role: 'admin' | 'manager' | 'sales_agent' | 'marketer'; full_name: string; manager_id: string | null; department?: 'marketing' | 'sales' | null; active: boolean };
 type AuthenticatedRequest = Request & { profile?: Profile; supabase?: SupabaseClient };
@@ -84,6 +84,7 @@ const salesActivity = z.object({
 const incorrectReport = z.object({ reasonCode: z.enum(['Invalid contact information', 'Wrong person or business', 'Spam or fake request', 'Duplicate contact']), evidence: z.string().trim().max(3000).optional() });
 const reviewDecision = z.object({ decision: z.enum(['confirmed_incorrect', 'rejected', 'merge_duplicate']), reason: z.string().trim().max(3000).optional() });
 const dashboardQuery = z.object({ period: dashboardPeriods.default('lifetime'), source: z.enum(sourceOptions).optional(), start: z.string().date().optional(), end: z.string().date().optional() });
+const opportunityListQuery = z.object({ status: z.string().trim().optional(), offset: z.coerce.number().int().min(0).default(0), limit: z.coerce.number().int().min(1).max(100).optional() });
 const userRole = z.enum(['admin', 'manager', 'sales_agent', 'marketer']);
 const department = z.enum(['marketing', 'sales']);
 const createUser = z.object({
@@ -353,8 +354,13 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     response.json({ provider: 'gmail', liveConnection: 'disabled_pending_approval', parserVersion: 'fixture-v1', states });
   }));
   app.get('/v1/opportunities', ...protectedRoute(async (request, response) => {
-    const status = typeof request.query.status === 'string' ? request.query.status : undefined;
-    const data = await readOpportunities(request.supabase!, status);
+    const query = parse(opportunityListQuery, request.query);
+    if (query.limit) {
+      const page = await readOpportunityPage(request.supabase!, { status: query.status, offset: query.offset, limit: query.limit });
+      response.json({ opportunities: page.opportunities, offset: query.offset, limit: query.limit, hasMore: page.hasMore, nextOffset: page.hasMore ? query.offset + query.limit : null });
+      return;
+    }
+    const data = await readOpportunities(request.supabase!, query.status);
     response.json({ opportunities: data });
   }));
   app.post('/v1/opportunities', ...protectedRoute(async (request, response) => {
