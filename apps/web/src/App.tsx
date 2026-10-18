@@ -16,6 +16,7 @@ import { LeadWorkspace } from './LeadWorkspace';
 import { CallingView } from './CallingView';
 import type { CallResult } from './callingModel';
 import { LeadResearchQueue } from './LeadResearchQueue';
+import { AgentGmailConnection } from './AgentGmailConnection';
 import { LeadAlertController } from './LeadAlertController';
 import { AdminUserManagement } from './AdminUserManagement';
 import { HistoricalImports } from './HistoricalImports';
@@ -339,6 +340,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
       {page === 'Leaderboard' && <Leaderboard leads={dashboardLeads} privateBenchmarkLeads={leads} viewer={viewer} directory={workspaceDirectory} scope={dashboardScope} />}
       {page === 'Data quality' && canViewDataQualityBoard(viewer) && <DataQualityBoard leads={dashboardLeads} range={selectedRange} source={dashboardSource} />}
       {page === 'Xaviar' && <XaviarWorkspace leads={leads} viewer={viewer} />}
+      {page === 'My profile' && viewer.role === 'sales_agent' && session && <section className="profile-page"><div className="board-heading"><div><span className="eyebrow">ACCOUNT SETTINGS</span><h2>{viewer.name}</h2><p>Manage your CRM profile and read-only Gmail connection.</p></div></div><AgentGmailConnection session={session} /></section>}
       {page === 'User management' && viewer.role === 'admin' && session && <AdminUserManagement session={session} onNotice={setNotice} onChanged={() => setConnectionAttempt((value) => value + 1)} />}
       </>}
       {page === 'Dashboard' && (viewer.role === 'admin' || viewer.role === 'manager') && <ConnectionAnalyticsPanel session={session} viewerId={viewer.id} start={selectedRange.start} end={selectedRange.end} source={dashboardSource} />}

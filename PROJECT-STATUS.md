@@ -1,8 +1,14 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-10-17
+Last updated: 2026-10-18
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [AGENT-DASHBOARD-ARRANGEMENT.md](./docs/AGENT-DASHBOARD-ARRANGEMENT.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.14.md](./CRM-DECISIONS-v1.14.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
+
+## Sales-agent email track: October 18, 2026
+
+Stage 1 manual email sending is implemented locally on `development/agent-email-phase2` under [CRM-DECISIONS-v1.42.md](CRM-DECISIONS-v1.42.md). A Sales Agent can compose and send one email from the connected Gmail account from the lead detail page. The recipient is locked to the CRM email, ownership and Do Not Contact/Incorrect/Duplicate checks run before sending, and the CRM records the result in both the email audit table and lead activity history. Sending is disabled unless `AGENT_GMAIL_SEND_ENABLED=true`, and agents must reauthorize Gmail for the send scope. No automated sequences, templates, AI, live deployment, production migration, or live CRM changes were made.
+
+Phase 1d is implemented locally under [CRM-DECISIONS-v1.33.md](CRM-DECISIONS-v1.33.md) and [AGENT-EMAIL-SYNC-PLAN.md](AGENT-EMAIL-SYNC-PLAN.md). Gmail is the first provider. The additive migration, agent-only OAuth/status routes, Sales Agent My profile form, manual read-only sync, and protected background worker endpoint are local only. No scheduler is enabled, and the migration/OAuth configuration have not been applied to production. No production data, mailbox permissions, or existing CRM behavior changed. Review UI and production scheduling remain separate phases.
 
 ## Simple calling view: October 17, 2026
 
@@ -464,3 +470,12 @@ Milestones 1–3, lead workflow v1.6, and lead details/reporting v1.7 are releas
 - Calling activity and open follow-up lookups have targeted indexes in `supabase/migrations/202610180003_calling_view_indexes.sql`.
 - The call, copy, log, auto-disappear, and pagination behavior is unchanged.
 - The release authority is [`CRM-DECISIONS-v1.28.md`](./CRM-DECISIONS-v1.28.md).
+
+## 2026-10-18 Stage 1 manual agent email sending
+
+- Sales Agents can compose and send one email from the connected Gmail account on the lead detail page.
+- The recipient must match the CRM email, the sender must be the current lead owner, and Incorrect, Duplicate, and Do Not Contact leads are blocked.
+- Send attempts are audited and sent messages appear in the lead activity history.
+- Sending is protected by `AGENT_GMAIL_SEND_ENABLED=true` and requires Gmail send-scope consent.
+- No AI, templates, bulk sending, scheduled sequences, or automatic follow-ups are enabled.
+- Release authority: [`CRM-DECISIONS-v1.42.md`](./CRM-DECISIONS-v1.42.md).

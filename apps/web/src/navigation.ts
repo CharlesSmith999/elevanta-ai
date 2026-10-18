@@ -49,6 +49,7 @@ const marketingAgent: NavigationItem[] = [
   { label: 'Reports', page: 'Reports' },
   { label: 'My standing', page: 'Leaderboard' },
   { label: 'Xaviar', page: 'Xaviar' },
+  { label: 'My profile', page: 'My profile' },
 ];
 
 const salesAgent: NavigationItem[] = [
@@ -59,6 +60,7 @@ const salesAgent: NavigationItem[] = [
   { label: 'Reports', page: 'Reports' },
   { label: 'My standing', page: 'Leaderboard' },
   { label: 'Xaviar', page: 'Xaviar' },
+  { label: 'My profile', page: 'My profile' },
 ];
 
 export function navigationFor(viewer: User): NavigationItem[] {
