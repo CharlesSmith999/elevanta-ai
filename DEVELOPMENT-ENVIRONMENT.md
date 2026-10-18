@@ -6,11 +6,10 @@ Date: 2026-10-18
 
 All Gmail and Phase 2 work is isolated on the local branch `development/agent-email-phase2`.
 
-- Production reference: `origin/main` at `55fb535` when this branch was created.
-- Development head: the local Stage 1 manual-email implementation commit (after validation).
-- No commits from this branch have been deployed to Vercel.
-- No migrations from this branch have been applied to the live Supabase project.
-- No production OAuth credentials, Gmail tokens, or scheduler configuration are stored in this branch.
+- Production reference when this branch was created: `origin/main` at `55fb535`.
+- Stage 1 was promoted through GitHub PRs #86 and #87. Production deployment commit: `df0699d`.
+- Migrations `202610180004`, `202610180006`, `202610180008`, `202610180009`, and `202610180010` were applied to the live Supabase project on 2026-10-18. The live table check returned both `agent_gmail_connections` and `agent_email_sends`.
+- The live Vercel feature flag `AGENT_GMAIL_SEND_ENABLED=true` is enabled. No production OAuth tokens or scheduler configuration were added.
 
 ## Change workflow
 
