@@ -47,16 +47,15 @@ function groupByOpportunity(rows: Row[]) {
   return grouped;
 }
 
-export async function readOpportunities(client: SupabaseClient, status?: string): Promise<Row[]> {
+export async function readOpportunities(client: SupabaseClient, status?: string, options?: { limit?: number; offset?: number }): Promise<Row[]> {
   const opportunities: Row[] = [];
-  for (let offset = 0; ; offset += PAGE_SIZE) {
-    let query = client.from('opportunities').select('*,contacts(*)').order('updated_at', { ascending: false }).order('id').range(offset, offset + PAGE_SIZE - 1);
-    if (status) query = query.eq('status', status);
-    const page = await query;
-    if (page.error) throw page.error;
-    opportunities.push(...((page.data ?? []) as unknown as Row[]));
-    if ((page.data ?? []).length < PAGE_SIZE) break;
-  }
+  const limit = Math.max(1, Math.min(options?.limit ?? 250, 500));
+  const offset = Math.max(0, options?.offset ?? 0);
+  let query = client.from('opportunities').select('*,contacts(*)').order('updated_at', { ascending: false }).order('id').range(offset, offset + limit - 1);
+  if (status) query = query.eq('status', status);
+  const page = await query;
+  if (page.error) throw page.error;
+  opportunities.push(...((page.data ?? []) as unknown as Row[]));
 
   if (!opportunities.length) return opportunities;
 
