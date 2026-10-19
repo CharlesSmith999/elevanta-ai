@@ -633,7 +633,8 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     const value = stageImportRequest.parse(request.body);
     const { data, error } = await request.supabase!.rpc('stage_historical_import', { p_manifest: value.manifest, p_rows: value.rows });
     if (error) throw error;
-    response.json({ batchId: data });
+    // Keep this response compatible with the production Express type resolution.
+    response.status(200).send({ batchId: data });
   }));
   app.post('/v1/imports/validate', ...protectedRoute(async (request, response) => {
     if (request.profile!.role !== 'admin') { response.status(403).json({ message: 'Only Admin may validate historical imports.' }); return; }
