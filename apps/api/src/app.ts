@@ -435,8 +435,14 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
   }));
   app.get('/v1/opportunities', ...protectedRoute(async (request, response) => {
     const status = typeof request.query.status === 'string' ? request.query.status : undefined;
-    const data = await readOpportunities(request.supabase!, status);
-    response.json({ opportunities: data });
+    const parseNumber = (value: unknown, fallback: number) => {
+      const parsed = typeof value === 'string' ? Number(value) : NaN;
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+    const limit = Math.max(1, Math.min(Math.floor(parseNumber(request.query.limit, 250)), 500));
+    const offset = Math.max(0, Math.floor(parseNumber(request.query.offset, 0)));
+    const data = await readOpportunities(request.supabase!, status, { limit, offset });
+    response.json({ opportunities: data, offset, limit, hasMore: data.length === limit });
   }));
   app.post('/v1/opportunities', ...protectedRoute(async (request, response) => {
     const value = parse(newLead, request.body);
@@ -632,7 +638,8 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     const value = stageImportRequest.parse(request.body);
     const { data, error } = await request.supabase!.rpc('stage_historical_import', { p_manifest: value.manifest, p_rows: value.rows });
     if (error) throw error;
-    // Keep this response compatible with the production Express type resolution.
+    // Use send here because the Vercel build's Express type resolution can
+    // select a response type without the json convenience method.
     response.status(200).send({ batchId: data });
   }));
   app.post('/v1/imports/validate', ...protectedRoute(async (request, response) => {
