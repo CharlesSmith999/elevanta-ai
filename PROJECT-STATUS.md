@@ -1,7 +1,7 @@
 # Elevanta AI — Project Status
 
 Status owner: Codex with Shariq  
-Last updated: 2026-10-18
+Last updated: 2026-10-19
 Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.md](./CRM-INTELLIGENCE-READINESS-PLAN.md), [DASHBOARD-DATA-DICTIONARY.md](./DASHBOARD-DATA-DICTIONARY.md), [DASHBOARD-COMPLETION-PLAN.md](./DASHBOARD-COMPLETION-PLAN.md), [DASHBOARD-REVAMP-DECISIONS-v1.0.md](./DASHBOARD-REVAMP-DECISIONS-v1.0.md), [DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md](./DASHBOARD-ROLE-SCREEN-SPEC-v1.0.md), [AGENT-DASHBOARD-ARRANGEMENT.md](./docs/AGENT-DASHBOARD-ARRANGEMENT.md), [ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ADMIN-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md](./ROLE-DASHBOARD-REFERENCE-IMPLEMENTATION.md), [UI-REFINEMENT-LOG.md](./docs/UI-REFINEMENT-LOG.md), [CRM-DECISIONS-v1.1.md](./CRM-DECISIONS-v1.1.md) through [CRM-DECISIONS-v1.14.md](./CRM-DECISIONS-v1.14.md), [LEAD-WORKFLOW-SPEC-v1.0.md](./LEAD-WORKFLOW-SPEC-v1.0.md), [XAVIAR-DATA-CONTRACT-v1.1.md](./XAVIAR-DATA-CONTRACT-v1.1.md), and [XAVIAR-EVALUATION-PLAN.md](./XAVIAR-EVALUATION-PLAN.md)
 
 ## Sales-agent email track: October 18, 2026
@@ -9,6 +9,13 @@ Source of truth: [CRM-PLAN.md](./CRM-PLAN.md), [CRM-INTELLIGENCE-READINESS-PLAN.
 Stage 1 manual email sending is deployed from production commit `df0699d` under [CRM-DECISIONS-v1.42.md](CRM-DECISIONS-v1.42.md). A Sales Agent can compose and send one email from the connected Gmail account from the lead detail page. The recipient is locked to the CRM email, ownership and Do Not Contact/Incorrect/Duplicate checks run before sending, and the CRM records the result in both the email audit table and lead activity history. The production feature flag is enabled and the additive Gmail tables are applied. Agents must reconnect Gmail for the send scope. No automated sequences, templates, AI, or bulk sending are enabled.
 
 The broader Phase 1d sync track remains documented under [CRM-DECISIONS-v1.33.md](CRM-DECISIONS-v1.33.md) and [AGENT-EMAIL-SYNC-PLAN.md](AGENT-EMAIL-SYNC-PLAN.md). Gmail is the first provider. The current production release is limited to the Stage 1 manual-send slice described above. Read-only sync, scheduler work, templates, automated sequences, AI, and bulk sending remain separate phases. No production lead records or mailbox permissions were changed by this release; each agent must explicitly reconnect Gmail before sending.
+
+
+## Historical workbook activation: October 19, 2026
+
+The approved staged workbook `PG-Leads-reconciled-review.xlsx` was activated through the Admin-only, chunked, retry-safe workflow. The batch contains 18,885 preserved source rows. Production reconciliation confirmed 4,102 historical opportunities and 4,102 active assignments were created. Existing CRM leads were not changed or deleted, source rows remain preserved, and no historical calls, notes, follow-ups, revenue, or stage timestamps were invented.
+
+Thirty-five records remain in the Admin review queue: 29 unsupported historical statuses, 5 phone collisions with existing CRM contacts or restrictions, and 1 MQL/SQL conflict. The 527 historical Incorrect rows were not fabricated into current three-agent reports; they remain governed by the source review rules. The next action is human review of the 35 records, followed by a final role-visibility and dashboard reconciliation check.
 
 ## Simple calling view: October 17, 2026
 
@@ -69,11 +76,11 @@ The owner approved keeping historical “Incorrect” rows in Admin review becau
 
 Owner approved historical import rules, recorded as CRM-DECISIONS-v1.16.md because v1.14 and v1.15 were already used on main. Existing decisions remain unchanged. Reuse of the existing Ali, Owais and Muzammil profiles is approved; duplicate person profiles must not be mapped twice.
 
-Historical activation code is implemented locally but is not released or applied in Supabase yet. It includes Admin-only chunked activation, explicit owner mapping, date/status provenance, collision checks, immutable row-to-opportunity links, idempotent retries, no synthetic activity/outcome dates, and full opportunity/dashboard pagination. The 527 Incorrect rows, unsupported historical statuses, unresolved within-workbook identities, and matches to existing CRM contacts are retained in Admin review. The original 15 live opportunities remain untouched. One opportunity was explicitly labeled as a test lead during read-only inspection; no deletion has occurred.
+Historical activation code is released and applied in Supabase. It includes Admin-only chunked activation, explicit owner mapping, date/status provenance, collision checks, immutable row-to-opportunity links, idempotent retries, no synthetic activity/outcome dates, and full opportunity/dashboard pagination. The 527 Incorrect rows, unsupported historical statuses, unresolved within-workbook identities, and matches to existing CRM contacts are retained in Admin review. The original 15 live opportunities remain untouched. One opportunity was explicitly labeled as a test lead during read-only inspection; no deletion has occurred.
 
 Local validation for the activation change: 131 application tests passed, API and web TypeScript checks passed, the web production build passed with the existing large-bundle warning, and all 30 database migrations plus synthetic activation/RLS cases replayed successfully in isolated PostgreSQL.
 
-Production release, migration application, activation totals, live role visibility, and test-lead cleanup remain pending. See [Historical import operations](docs/HISTORICAL-IMPORT-OPERATIONS.md) and [Staging acceptance](docs/HISTORICAL-STAGING-ACCEPTANCE.md). Milestone 5 is still in progress.
+Production release and migration application are complete for the staged batch. Activation totals are reconciled. The 35 held records, live role visibility, dashboard reconciliation, and any test-lead cleanup remain separate follow-up work. See [Historical import operations](docs/HISTORICAL-IMPORT-OPERATIONS.md) and [Staging acceptance](docs/HISTORICAL-STAGING-ACCEPTANCE.md). Milestone 5 is active with Admin review open.
 
 ## Connection and lead-quality graphs: October 3, 2026
 
