@@ -6,7 +6,13 @@ import { supabase } from './auth';
 import type { connectionAnalytics } from '../../api/src/connectionAnalytics';
 
 export function loadConnectionAnalytics(session: Session, filter: {viewerId: string; start?: string; end: string; source: string; timezone: string}) {
-  const params = new URLSearchParams(Object.entries(filter).filter((entry): entry is [string,string] => typeof entry[1] === 'string'));
+  // The local role-preview directory can contain legacy identifiers while the
+  // production API expects a Supabase profile UUID. In that case, omit the
+  // optional preview filter and let the API use the authenticated profile.
+  // This keeps analytics usable without changing lead data or access rules.
+  const params = new URLSearchParams({ end: filter.end, source: filter.source, timezone: filter.timezone });
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(filter.viewerId)) params.set('viewerId', filter.viewerId);
+  if (filter.start) params.set('start', filter.start);
   return request<ReturnType<typeof connectionAnalytics>>(session,`/v1/analytics/connections?${params}`);
 }
 
