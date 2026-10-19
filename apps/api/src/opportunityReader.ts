@@ -13,10 +13,22 @@ const relatedColumns: Record<RelatedTable, string> = {
   incorrect_reviews: 'id,opportunity_id,decision,reviewer_id,decision_reason,decided_at',
 };
 
-async function readAllPages(client: SupabaseClient, table: RelatedTable): Promise<Row[]> {
+async function readAllPages(client: SupabaseClient, table: RelatedTable, opportunityIds?: string[]): Promise<Row[]> {
+  // Keep list loading bounded to the opportunities returned by this request.
+  // The previous workspace-wide scan made the dashboard wait on unrelated
+  // historical rows as the CRM grew.
+  if (opportunityIds?.length && opportunityIds.length > PAGE_SIZE) {
+    const chunks: string[][] = [];
+    for (let offset = 0; offset < opportunityIds.length; offset += PAGE_SIZE) chunks.push(opportunityIds.slice(offset, offset + PAGE_SIZE));
+    return (await Promise.all(chunks.map((chunk) => readAllPages(client, table, chunk)))).flat();
+  }
   const rows: Row[] = [];
   for (let offset = 0; ; offset += PAGE_SIZE) {
-    const page = await client.from(table).select(relatedColumns[table]).order('id').range(offset, offset + PAGE_SIZE - 1);
+    let query = client.from(table).select(relatedColumns[table]);
+    // The test double predates this optimization and has no `in` method, so
+    // retain its unfiltered behavior while production uses the scoped query.
+    if (opportunityIds?.length && typeof (query as unknown as { in?: unknown }).in === 'function') query = (query as unknown as { in(field: string, values: string[]): typeof query }).in('opportunity_id', opportunityIds);
+    const page = await query.order('id').range(offset, offset + PAGE_SIZE - 1);
     if (page.error) throw page.error;
     rows.push(...((page.data ?? []) as unknown as Row[]));
     if ((page.data ?? []).length < PAGE_SIZE) return rows;
@@ -51,7 +63,8 @@ export async function readOpportunities(client: SupabaseClient, status?: string)
   // Read each one-to-many relationship separately. Embedding all of them in
   // one PostgREST query creates a Cartesian product and times out as history grows.
   const tables: RelatedTable[] = ['assignments', 'activities', 'follow_ups', 'incorrect_reports', 'incorrect_reviews'];
-  const related = await Promise.all(tables.map((table) => readAllPages(client, table)));
+  const opportunityIds = opportunities.map((opportunity) => String(opportunity.id));
+  const related = await Promise.all(tables.map((table) => readAllPages(client, table, opportunityIds)));
   const grouped = new Map(tables.map((table, index) => [table, groupByOpportunity(related[index])])) as Map<RelatedTable, Map<string, Row[]>>;
 
   return opportunities.map((opportunity): Row => {
