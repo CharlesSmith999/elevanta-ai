@@ -4,6 +4,7 @@ type Row = Record<string, unknown>;
 type RelatedTable = 'assignments' | 'activities' | 'follow_ups' | 'incorrect_reports' | 'incorrect_reviews';
 
 const PAGE_SIZE = 1000;
+const RELATED_ID_BATCH_SIZE = 100;
 
 const relatedColumns: Record<RelatedTable, string> = {
   assignments: 'id,opportunity_id,assigned_to,assigned_by,visibility_mode,reason,started_at,ended_at',
@@ -13,22 +14,19 @@ const relatedColumns: Record<RelatedTable, string> = {
   incorrect_reviews: 'id,opportunity_id,decision,reviewer_id,decision_reason,decided_at',
 };
 
-async function readAllPages(client: SupabaseClient, table: RelatedTable, opportunityIds?: string[]): Promise<Row[]> {
-  // Keep list loading bounded to the opportunities returned by this request.
-  // The previous workspace-wide scan made the dashboard wait on unrelated
-  // historical rows as the CRM grew.
-  if (opportunityIds?.length && opportunityIds.length > PAGE_SIZE) {
-    const chunks: string[][] = [];
-    for (let offset = 0; offset < opportunityIds.length; offset += PAGE_SIZE) chunks.push(opportunityIds.slice(offset, offset + PAGE_SIZE));
-    return (await Promise.all(chunks.map((chunk) => readAllPages(client, table, chunk)))).flat();
+async function readAllPages(client: SupabaseClient, table: RelatedTable, opportunityIds: string[]): Promise<Row[]> {
+  if (!opportunityIds.length) return [];
+  // UUID filters are URL-encoded. Keep each query below common gateway URL
+  // limits while fetching at most three independent batches per relation.
+  if (opportunityIds.length > RELATED_ID_BATCH_SIZE) {
+    const batches: string[][] = [];
+    for (let start = 0; start < opportunityIds.length; start += RELATED_ID_BATCH_SIZE) batches.push(opportunityIds.slice(start, start + RELATED_ID_BATCH_SIZE));
+    return (await Promise.all(batches.map((ids) => readAllPages(client, table, ids)))).flat();
   }
   const rows: Row[] = [];
   for (let offset = 0; ; offset += PAGE_SIZE) {
-    let query = client.from(table).select(relatedColumns[table]);
-    // The test double predates this optimization and has no `in` method, so
-    // retain its unfiltered behavior while production uses the scoped query.
-    if (opportunityIds?.length && typeof (query as unknown as { in?: unknown }).in === 'function') query = (query as unknown as { in(field: string, values: string[]): typeof query }).in('opportunity_id', opportunityIds);
-    const page = await query.order('id').range(offset, offset + PAGE_SIZE - 1);
+    const page = await client.from(table).select(relatedColumns[table])
+      .in('opportunity_id', opportunityIds).order('id').range(offset, offset + PAGE_SIZE - 1);
     if (page.error) throw page.error;
     rows.push(...((page.data ?? []) as unknown as Row[]));
     if ((page.data ?? []).length < PAGE_SIZE) return rows;
@@ -47,11 +45,14 @@ function groupByOpportunity(rows: Row[]) {
   return grouped;
 }
 
-export async function readOpportunities(client: SupabaseClient, status?: string, options?: { limit?: number; offset?: number }): Promise<Row[]> {
+export async function readOpportunities(client: SupabaseClient, status?: string, options?: { limit?: number; offset?: number; after?: string }): Promise<Row[]> {
   const opportunities: Row[] = [];
-  const limit = Math.max(1, Math.min(options?.limit ?? 250, 500));
+  const limit = Math.max(1, Math.min(options?.limit ?? 250, 250));
   const offset = Math.max(0, options?.offset ?? 0);
-  let query = client.from('opportunities').select('*,contacts(*)').order('updated_at', { ascending: false }).order('id').range(offset, offset + limit - 1);
+  // An immutable key avoids skipping records when a lead is updated while the
+  // browser is walking the pages. RLS remains enforced by the caller's client.
+  let query = client.from('opportunities').select('*,contacts(*)').order('id').range(offset, offset + limit - 1);
+  if (options?.after) query = query.gt('id', options.after);
   if (status) query = query.eq('status', status);
   const page = await query;
   if (page.error) throw page.error;
@@ -59,8 +60,8 @@ export async function readOpportunities(client: SupabaseClient, status?: string,
 
   if (!opportunities.length) return opportunities;
 
-  // Read each one-to-many relationship separately. Embedding all of them in
-  // one PostgREST query creates a Cartesian product and times out as history grows.
+  // Scope every history query to this page, not the entire workspace. Keep all
+  // pages of each relation so dashboard metrics and permanent history are intact.
   const tables: RelatedTable[] = ['assignments', 'activities', 'follow_ups', 'incorrect_reports', 'incorrect_reviews'];
   const opportunityIds = opportunities.map((opportunity) => String(opportunity.id));
   const related = await Promise.all(tables.map((table) => readAllPages(client, table, opportunityIds)));

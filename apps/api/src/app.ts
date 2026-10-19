@@ -396,11 +396,14 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     const requestedOffset = Number(request.query.offset);
     const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(Math.trunc(requestedLimit), 1), 500) : 250;
     const offset = Number.isFinite(requestedOffset) ? Math.max(Math.trunc(requestedOffset), 0) : 0;
-    const { data, error } = await request.supabase!.from('inbound_lead_candidates')
-      .select('*, inbound_messages(provider_message_id, provider_thread_id, received_at)', { count: 'exact' })
-      .order('created_at', { ascending: false }).order('id').range(offset, offset + limit - 1);
+    const after = request.query.after === undefined ? undefined : parse(id, request.query.after);
+    let query = request.supabase!.from('inbound_lead_candidates')
+      .select('*, inbound_messages(provider_message_id, provider_thread_id, received_at)')
+      .order('id').range(offset, offset + limit - 1);
+    if (after) query = query.gt('id', after);
+    const { data, error } = await query;
     if (error) throw error;
-    response.json({ researchLeads: data ?? [], offset, limit, hasMore: (data ?? []).length === limit });
+    response.json({ researchLeads: data ?? [], offset, limit, hasMore: (data ?? []).length === limit, nextCursor: data?.length === limit ? data[data.length - 1].id : null });
   }));
   app.post('/v1/inbound/research-leads', ...protectedRoute(async (request, response) => {
     if (request.profile!.role !== 'admin' && request.profile!.role !== 'marketer') { response.status(403).json({ message: 'Only Admin and Marketing may add research leads.' }); return; }
@@ -439,10 +442,11 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
       const parsed = typeof value === 'string' ? Number(value) : NaN;
       return Number.isFinite(parsed) ? parsed : fallback;
     };
-    const limit = Math.max(1, Math.min(Math.floor(parseNumber(request.query.limit, 250)), 500));
+    const limit = Math.max(1, Math.min(Math.floor(parseNumber(request.query.limit, 250)), 250));
     const offset = Math.max(0, Math.floor(parseNumber(request.query.offset, 0)));
-    const data = await readOpportunities(request.supabase!, status, { limit, offset });
-    response.json({ opportunities: data, offset, limit, hasMore: data.length === limit });
+    const after = request.query.after === undefined ? undefined : parse(id, request.query.after);
+    const data = await readOpportunities(request.supabase!, status, { limit, offset, after });
+    response.json({ opportunities: data, offset, limit, hasMore: data.length === limit, nextCursor: data.length === limit ? data[data.length - 1].id : null });
   }));
   app.post('/v1/opportunities', ...protectedRoute(async (request, response) => {
     const value = parse(newLead, request.body);
@@ -463,10 +467,13 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
   }));
   app.get('/v1/opportunities/:id/activity-history', ...protectedRoute(async (request, response) => {
     const opportunityId = parse(id, request.params.id);
-    const { data, error } = await request.supabase!.from('activities')
+    const after = request.query.after === undefined ? undefined : parse(id, request.query.after);
+    let query = request.supabase!.from('activities')
       .select('id, type, outcome, body, created_at, occurred_at, actor_id, assignment_id, contact_method_id, metadata, contact_methods(value, method_type)')
-      .eq('opportunity_id', opportunityId).order('occurred_at', { ascending: false });
-    if (error) throw error; response.json({ activities: data ?? [] });
+      .eq('opportunity_id', opportunityId).order('id').range(0, 249);
+    if (after) query = query.gt('id', after);
+    const { data, error } = await query;
+    if (error) throw error; response.json({ activities: data ?? [], nextCursor: data?.length === 250 ? data[data.length - 1].id : null });
   }));
   app.patch('/v1/opportunities/:id', ...protectedRoute(async (request, response) => {
     const value = parse(statusUpdate.partial(), request.body); const opportunityId = parse(id, request.params.id);

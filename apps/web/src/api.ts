@@ -3,6 +3,7 @@ import type { Activity, Assignment, FollowUp, IncorrectReport, Lead, LeadCategor
 import type { ContactFocus, ContactHealth, ContactMethodType } from './leadWorkflow';
 import type { ResearchLead, ResearchMethod, ResearchState } from './inboundResearch';
 import { supabase } from './auth';
+import { boundedRead, loadAllPages, type LoadOptions } from './pagedLoader';
 import type { connectionAnalytics } from '../../api/src/connectionAnalytics';
 
 export function loadConnectionAnalytics(session: Session, filter: {viewerId: string; start?: string; end: string; source: string; timezone: string}) {
@@ -39,6 +40,9 @@ type OpportunityRecord = {
   source_received_at?: string | null;
   historical_source_date?: string | null;
   lost_reason?: Lead['lostReason'] | null;
+  total_project_cost?: number | null;
+  upfront_payment_amount?: number | null;
+  won_at?: string | null;
   created_at: string;
   updated_at: string;
   contacts?: { name: string; normalized_phone?: string | null; normalized_email?: string | null } | null;
@@ -178,18 +182,26 @@ function mapOpportunity(record: OpportunityRecord): Lead {
     incorrectReview: review?.decision ? { state: review.decision, reviewerId: review.reviewer_id ?? undefined, reason: review.decision_reason ?? undefined, decidedAt: review.decided_at ?? undefined } : incorrectReports.length >= 3 ? { state: 'pending' } : undefined,
     routingPaused: !review?.decision && incorrectReports.length >= 3,
     lostReason: record.lost_reason ?? undefined,
+    totalProjectCost: record.total_project_cost ?? undefined,
+    upfrontPaymentAmount: record.upfront_payment_amount ?? undefined,
+    wonAt: record.won_at ?? undefined,
     duplicateOf: undefined,
     ...(currentOwner ? {} : {}),
   };
 }
 
-export async function loadRemoteLeads(session: Session): Promise<Lead[]> {
-  const result = await request<{ opportunities: OpportunityRecord[] }>(session, '/v1/opportunities?limit=250');
-  return result.opportunities.map(mapOpportunity);
+export async function loadRemoteLeads(session: Session, options: LoadOptions = {}): Promise<Lead[]> {
+  const records = await loadAllPages<OpportunityRecord>(async (after, signal) => {
+    const params = new URLSearchParams({ limit: '250' });
+    if (after) params.set('after', after);
+    const result = await request<{ opportunities: OpportunityRecord[]; nextCursor: string | null }>(session, `/v1/opportunities?${params}`, { signal });
+    return { rows: result.opportunities, nextCursor: result.nextCursor };
+  }, options);
+  return records.sort((a, b) => b.updated_at.localeCompare(a.updated_at) || a.id.localeCompare(b.id)).map(mapOpportunity);
 }
 
-export async function loadWorkspaceMembers(session: Session): Promise<WorkspaceMember[]> {
-  const result = await request<{ users: WorkspaceMember[] }>(session, '/v1/workspace-members');
+export async function loadWorkspaceMembers(session: Session, signal?: AbortSignal): Promise<WorkspaceMember[]> {
+  const result = await boundedRead((requestSignal) => request<{ users: WorkspaceMember[] }>(session, '/v1/workspace-members', { signal: requestSignal }), signal);
   return result.users;
 }
 
@@ -206,13 +218,29 @@ export const loadAdminUsers = (session: Session) => request<{ users: ManagedUser
 export const createAdminUser = (session: Session, body: unknown) => request<{ user: ManagedUser }>(session, '/v1/admin/users', { method: 'POST', body: JSON.stringify(body) });
 export const updateAdminUser = (session: Session, id: string, body: unknown) => request<{ user: ManagedUser }>(session, `/v1/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
 export const loadRemoteContactMethods = (session: Session, id: string) => request<{ contactMethods: RemoteContactMethod[] }>(session, `/v1/opportunities/${id}/contact-methods`);
-export const loadRemoteActivityHistory = (session: Session, id: string) => request<{ activities: RemoteActivity[] }>(session, `/v1/opportunities/${id}/activity-history`);
+export async function loadRemoteActivityHistory(session: Session, id: string) {
+  const activities = await loadAllPages<RemoteActivity>(async (after, signal) => {
+    const params = new URLSearchParams();
+    if (after) params.set('after', after);
+    const result = await request<{ activities: RemoteActivity[]; nextCursor: string | null }>(session, `/v1/opportunities/${id}/activity-history?${params}`, { signal });
+    return { rows: result.activities, nextCursor: result.nextCursor };
+  });
+  return { activities: activities.sort((a, b) => (b.occurred_at ?? b.created_at).localeCompare(a.occurred_at ?? a.created_at) || a.id.localeCompare(b.id)) };
+}
 export const addRemoteContactMethod = (session: Session, id: string, body: unknown) => request<{ contactMethodId: string }>(session, `/v1/opportunities/${id}/contact-methods`, { method: 'POST', body: JSON.stringify(body) });
 export const assessRemoteContactMethod = (session: Session, id: string, contactMethodId: string, body: unknown) => request<void>(session, `/v1/opportunities/${id}/contact-methods/${contactMethodId}`, { method: 'PATCH', body: JSON.stringify(body) });
 export const restoreRemoteContactMethod = (session: Session, id: string, contactMethodId: string, body: unknown) => request<void>(session, `/v1/opportunities/${id}/contact-methods/${contactMethodId}/restore`, { method: 'POST', body: JSON.stringify(body) });
 export const logRemoteSalesActivity = (session: Session, id: string, body: unknown) => request<{ activityId: string }>(session, `/v1/opportunities/${id}/activities`, { method: 'POST', body: JSON.stringify(body) });
 export const sendRemoteLeadEmail = (session: Session, id: string, body: { toEmail: string; subject: string; body: string; replyToMessageId?: string }) => request<{ status: 'sent'; messageId: string }>(session, `/v1/opportunities/${id}/email`, { method: 'POST', body: JSON.stringify(body) });
-export async function loadResearchLeads(session: Session) { const result = await request<{ researchLeads: RemoteResearchLead[] }>(session, '/v1/inbound/research-leads?limit=250'); return result.researchLeads.map(mapResearchLead); }
+export async function loadResearchLeads(session: Session) {
+  const records = await loadAllPages<RemoteResearchLead>(async (after, signal) => {
+    const params = new URLSearchParams({ limit: '250' });
+    if (after) params.set('after', after);
+    const result = await request<{ researchLeads: RemoteResearchLead[]; nextCursor: string | null }>(session, `/v1/inbound/research-leads?${params}`, { signal });
+    return { rows: result.researchLeads, nextCursor: result.nextCursor };
+  });
+  return records.map(mapResearchLead).sort((a, b) => b.receivedAt.localeCompare(a.receivedAt) || a.id.localeCompare(b.id));
+}
 export type GmailHealth = { mailbox:string; settingsRevision?:string; setupReady:boolean; connected:boolean; enabled:boolean; activatedAt?:string; lastSyncAt?:string; lastError?:string; activationApproved:boolean; failures?:{provider_message_id:string;failure_code:string;received_at:string}[] };
 export const replaceGmailMailbox = (session:Session,mailbox:string,expectedRevision:string) => request(session,'/v1/admin/gmail/replace-mailbox',{method:'POST',body:JSON.stringify({mailbox,expectedRevision,confirmed:true})});
 export const saveGmailMailbox = (session:Session,mailbox:string) => request(session,'/v1/admin/gmail/mailbox',{method:'PUT',body:JSON.stringify({mailbox})});
