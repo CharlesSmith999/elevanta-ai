@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { benchmarkBySource, canEditLeadDetails, canFlagIncorrectLead, canReassign, canUpdateLead, canViewDataQualityBoard, canViewLead, canViewManagementBoards, canViewNamedLeaderboard, dashboardDateRange, dashboardFor, dashboardReconciliation, dataQualityIssues, duplicateMatches, dueToday, filterDashboardLeads, financialMetrics, incorrectReviewState, isLeadIdentity, leadCategoryLabels, leadCategoryOptions, leaderboardForMarketing, leaderboardForSales, lossReasonBreakdown, overdue, responseHours, routingHours, salesIncorrectReportCount, seedLeads, sourceOptions, stageOwnershipSegments, transitionStage, userNameFor, users, validStatusTransition, validWonFinancials } from './domain.js';
+import { benchmarkBySource, canEditLeadDetails, canFlagIncorrectLead, canReassign, canUpdateLead, canViewDataQualityBoard, canViewLead, canViewManagementBoards, canViewNamedLeaderboard, dashboardDateRange, dashboardFor, dashboardReconciliation, dataQualityIssues, duplicateMatches, dueToday, filterDashboardLeads, financialMetrics, historicalStatusCount, historicalWorkedLeads, incorrectReviewState, isLeadIdentity, leadCategoryLabels, leadCategoryOptions, leaderboardForMarketing, leaderboardForSales, lossReasonBreakdown, overdue, responseHours, routingHours, salesIncorrectReportCount, seedLeads, sourceOptions, stageOwnershipSegments, transitionStage, userNameFor, users, validStatusTransition, validWonFinancials } from './domain.js';
 
 const user = (id: string) => users.find((candidate) => candidate.id === id)!;
 
@@ -130,6 +130,26 @@ test('leaderboard returns sample size and does not expose contact fields', () =>
   assert.equal(entry.sampleSize, 2);
   assert.equal('email' in entry, false);
   assert.equal('phone' in entry, false);
+});
+
+test('historical performance stays with the agent after reassignment', () => {
+  const lead = {
+    ...structuredClone(seedLeads[0]),
+    id: 'historical-reassignment',
+    status: 'connected' as const,
+    assignments: [
+      { id: 'assignment-mustabeen', ownerId: 'mustabeen', assignedBy: 'ali', at: '2026-07-01T09:00:00.000Z', endedAt: '2026-07-02T09:00:00.000Z', visibility: 'full_context' as const, reason: 'Initial assignment' },
+      { id: 'assignment-asad', ownerId: 'asad', assignedBy: 'ali', at: '2026-07-02T09:00:00.000Z', visibility: 'full_context' as const, reason: 'Reassigned' },
+    ],
+    stageHistory: [
+      { id: 'stage-lost', toStatus: 'lost' as const, enteredAt: '2026-07-01T12:00:00.000Z', exitedAt: '2026-07-02T10:00:00.000Z', actorId: 'mustabeen', reason: 'Budget' },
+      { id: 'stage-connected', toStatus: 'connected' as const, enteredAt: '2026-07-02T11:00:00.000Z', actorId: 'asad', reason: 'Reached contact' },
+    ],
+  };
+  assert.equal(historicalStatusCount([lead], 'mustabeen', 'lost'), 1);
+  assert.equal(historicalStatusCount([lead], 'asad', 'connected'), 1);
+  assert.equal(historicalWorkedLeads([lead], 'mustabeen').length, 1);
+  assert.equal(historicalWorkedLeads([lead], 'asad').length, 1);
 });
 
 test('data-quality exceptions flag missing Won financial values and reconciliation balances the source samples', () => {

@@ -240,6 +240,25 @@ const excludedFromConversion = (lead: Lead) => lead.status === 'duplicate' || le
 const hasReached = (lead: Lead, status: OpportunityStatus) => lead.status === status || (lead.stageHistory ?? []).some((stage) => stage.toStatus === status);
 const rate = (numerator: number, denominator: number) => denominator ? Math.round((numerator / denominator) * 100) : undefined;
 
+/**
+ * Counts a status reached by an agent, not only the lead's current status.
+ * A lead is counted once per agent and status even when it later moves to
+ * another owner or a different stage. The current-owner fallback keeps the
+ * helper useful for older records without stage-history actor attribution.
+ */
+export function historicalStatusCount(leads: Lead[], owner: string, status: OpportunityStatus): number {
+  return leads.filter((lead) => {
+    if (excludedFromConversion(lead)) return false;
+    const reachedByOwner = (lead.stageHistory ?? []).some((stage) => stage.actorId === owner && stage.toStatus === status);
+    const currentOwnerFallback = currentAssignment(lead)?.ownerId === owner && lead.status === status && !(lead.stageHistory ?? []).some((stage) => stage.toStatus === status);
+    return reachedByOwner || currentOwnerFallback;
+  }).length;
+}
+
+export function historicalWorkedLeads(leads: Lead[], owner: string): Lead[] {
+  return leads.filter((lead) => !excludedFromConversion(lead) && (lead.assignments.some((assignment) => assignment.ownerId === owner) || (lead.stageHistory ?? []).some((stage) => stage.actorId === owner)));
+}
+
 export type SourceBenchmark = {
   source: string;
   sampleSize: number;
@@ -280,11 +299,11 @@ export function benchmarkBySource(leads: Lead[]): SourceBenchmark[] {
 export type LeaderboardEntry = { userId: string; sampleSize: number; connected: number; won: number; connectionRate?: number; closeRate?: number; followUpCompletionRate?: number };
 export function leaderboardForSales(leads: Lead[], allUsers = users): LeaderboardEntry[] {
   return allUsers.filter((user) => user.role === 'sales_agent').map((user) => {
-    const owned = leads.filter((lead) => ownerId(lead) === user.id && !excludedFromConversion(lead));
+    const owned = historicalWorkedLeads(leads, user.id);
     const assigned = owned.filter((lead) => lead.assignments.length > 0).length;
-    const connected = owned.filter((lead) => hasReached(lead, 'connected')).length;
-    const won = owned.filter((lead) => lead.status === 'won').length;
-    const closed = owned.filter((lead) => lead.status === 'won' || lead.status === 'lost').length;
+    const connected = historicalStatusCount(owned, user.id, 'connected');
+    const won = historicalStatusCount(owned, user.id, 'won');
+    const closed = historicalStatusCount(owned, user.id, 'won') + historicalStatusCount(owned, user.id, 'lost');
     const followUps = owned.flatMap((lead) => lead.followUps);
     const due = followUps.filter((followUp) => followUp.status === 'completed' || new Date(followUp.dueAt) <= new Date()).length;
     const completed = followUps.filter((followUp) => followUp.status === 'completed').length;

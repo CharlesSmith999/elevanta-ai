@@ -145,7 +145,7 @@ function mapOpportunity(record: OpportunityRecord): Lead {
   const followUps: FollowUp[] = (record.follow_ups ?? []).map((item) => ({ id: item.id, ownerId: item.owner_id, dueAt: item.due_at, action: item.action_type, status: item.status }));
   const incorrectReports: IncorrectReport[] = (record.incorrect_reports ?? []).map((item) => ({ reporterId: item.reporter_id, reporterRole: item.reporter_role ?? undefined, reason: item.reason_code, evidence: item.evidence ?? undefined, at: item.created_at }));
   const review = record.incorrect_reviews?.[0];
-  const stageHistory: StageHistory[] = (record.activities ?? []).filter((item) => item.type === 'status_change' && item.to_status).map((item) => ({ id: item.id, fromStatus: item.from_status ?? undefined, toStatus: item.to_status!, enteredAt: item.created_at, actorId: item.actor_id ?? undefined, reason: item.body ?? 'Status updated' }));
+  const stageHistory: StageHistory[] = (record.activities ?? []).filter((item) => (item.type === 'status_change' || item.type === 'historical_status') && item.to_status).map((item) => ({ id: item.id, fromStatus: item.from_status ?? undefined, toStatus: item.to_status!, enteredAt: item.created_at, actorId: item.actor_id ?? undefined, reason: item.body ?? 'Status updated' }));
   const currentOwner = assignments.find((item) => !item.endedAt)?.ownerId;
   return {
     id: record.id,
@@ -181,18 +181,6 @@ export async function loadRemoteLeads(session: Session): Promise<Lead[]> {
   const result = await request<{ opportunities: OpportunityRecord[] }>(session, '/v1/opportunities');
   return result.opportunities.map(mapOpportunity);
 }
-
-export async function loadRemoteLeadPage(session: Session, offset = 0, limit = 50): Promise<{ leads: Lead[]; hasMore: boolean; nextOffset: number | null }> {
-  const params = new URLSearchParams({ offset: String(offset), limit: String(limit) });
-  const result = await request<{ opportunities: OpportunityRecord[]; hasMore: boolean; nextOffset: number | null }>(session, `/v1/opportunities?${params}`);
-  return { leads: result.opportunities.map(mapOpportunity), hasMore: result.hasMore, nextOffset: result.nextOffset };
-}
-
-export type DashboardSummary = { role: string; period: string; source: string; sampleSize: number; byStatus: Record<string, number>; byQualification: Record<string, number> };
-export const loadDashboardSummary = (session: Session, role: string, filters: { period?: string; source?: string; start?: string; end?: string } = {}) => {
-  const params = new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => Boolean(entry[1])));
-  return request<DashboardSummary>(session, `/v1/dashboards/${role}/summary?${params}`);
-};
 
 export async function loadWorkspaceMembers(session: Session): Promise<WorkspaceMember[]> {
   const result = await request<{ users: WorkspaceMember[] }>(session, '/v1/workspace-members');
