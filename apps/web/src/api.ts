@@ -184,7 +184,7 @@ function mapOpportunity(record: OpportunityRecord): Lead {
 }
 
 export async function loadRemoteLeads(session: Session): Promise<Lead[]> {
-  const result = await request<{ opportunities: OpportunityRecord[] }>(session, '/v1/opportunities');
+  const result = await request<{ opportunities: OpportunityRecord[] }>(session, '/v1/opportunities?limit=250');
   return result.opportunities.map(mapOpportunity);
 }
 
