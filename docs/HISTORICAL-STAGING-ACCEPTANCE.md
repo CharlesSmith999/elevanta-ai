@@ -8,7 +8,12 @@ Date: 2026-10-08. Authority: `CRM-DECISIONS-v1.16.md` and owner approval to reta
 - Migration `202610070001` is applied once to the existing Supabase project `jayxyikgefnzitxcbdov`. Staging row-level security is enabled; anonymous execution and direct application inserts are denied.
 - The sealed private batch reconciles: 18,885 canonical records, 4,137 ready candidates, 14,748 original review records, and 36,470 preserved source links. The ordered JSONB payload fingerprint matched the private source bundle: `ce3778e4c1042d0f47397635c20befbf`.
 - The original workbook checksum remained unchanged. The workbook and lead data are not in Git.
-- No historical records have been activated and no existing leads have been deleted.
+- At the time of this staging verification, no historical records had been activated and no existing leads had been deleted. The dated production activation update below is the later authoritative result.
+
+
+## Production activation update: October 19, 2026
+
+The staged batch `PG-Leads-reconciled-review.xlsx` was activated through the Admin-only workflow. Live reconciliation confirmed 4,102 activated opportunities and 4,102 active assignments from 18,885 source rows. Thirty-five rows remain in Admin review: 29 unsupported statuses, 5 phone collisions, and 1 MQL/SQL conflict. No existing CRM leads were changed or deleted.
 
 ## Owner-approved review rule
 
@@ -33,4 +38,4 @@ Another 29 ready candidates use unsupported status labels (`Meeting Scheduled`, 
 
 ## Remaining production work
 
-The activation implementation is not deployed or applied in production. Next: pass CI, merge and deploy through the existing GitHub/Vercel path, apply both migrations, activate safe candidates in chunks, and reconcile the activated/review totals and visibility by role. Test-lead cleanup is separate and still pending; no permanent deletion will occur without confirming the exact target at action time.
+The activation implementation and migrations are deployed and applied. The main batch activation is complete. Remaining work is human review of the 35 held records, role-visibility and dashboard reconciliation, and any separately approved test-lead cleanup. No permanent deletion will occur without confirming the exact target at action time.
