@@ -14,6 +14,11 @@ Activation is separately Admin-triggered, chunked, and retry-safe. Exact owner m
 
 The original status and source date basis remain linked to the immutable staged record. `Not available` and `No Answer` remain distinct CRM statuses. Historical `Incorrect` records are routed to Admin review, not made current Incorrect and not converted into fabricated three-agent reports. Unsupported statuses, conflicting qualification, duplicate contact methods, and matches to existing CRM contacts remain in review. No historical calls, notes-as-activities, follow-ups, Won/Lost timestamps, revenue, or loss reasons are fabricated. Historical source dates are stored independently of CRM creation dates; imported rows do not receive invented stage-history events.
 
+
+## Latest production activation: October 19, 2026
+
+The staged `PG-Leads-reconciled-review.xlsx` batch was activated through the Admin-only workflow. Production reconciliation confirmed 4,102 activated opportunities and 4,102 active assignments from 18,885 preserved source rows. Existing CRM leads were not changed or deleted. Thirty-five records remain in review: 29 unsupported historical statuses, 5 phone collisions with existing CRM contacts or restrictions, and 1 MQL/SQL conflict. Source provenance remains available for every row.
+
 ## Release order
 
 1. Run API/web TypeScript checks, domain tests, the frontend build, and the synthetic PostgreSQL tests, including the historical activation cases.
@@ -24,7 +29,7 @@ The original status and source date basis remain linked to the immutable staged 
 
 ## Remaining activation work
 
-Historical activation is implemented locally, but remains disabled in production until release and both source-controlled migrations have been applied. The owner approved routing 527 historical `Incorrect` records to Admin review. The source also contains unsupported historical labels; these stay in review until explicitly mapped. The live staging batch currently remains staged and must not be represented as activated until the production reconciliation confirms it.
+The main activation pass is complete. The owner-approved 527 historical `Incorrect` records remain governed by the source review rules, and the 35 records listed above remain in Admin review until a human decision is recorded. No held record should be activated by inference or by fabricating historical activity.
 
 Exact test-data retirement is a separate pending action. Never truncate lead tables, delete genuine Gmail/research records, or remove staff profiles as part of lead cleanup.
 
