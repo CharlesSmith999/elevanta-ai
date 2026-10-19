@@ -207,7 +207,7 @@ export async function sendAgentGmailEmail(db: SupabaseClient, workspace: string,
   const contact = Array.isArray(row.contacts) ? row.contacts[0] : row.contacts; const storedEmail = contact?.email?.trim().toLowerCase();
   if (!storedEmail || storedEmail !== toEmail) throw new Error('The recipient must match the lead email saved in the CRM.');
   if (!(row.assignments ?? []).some((assignment) => assignment.assigned_to === profile && !assignment.ended_at)) throw new Error('Only the current lead owner can send from this mailbox.');
-  const audit = await db.from('agent_email_sends').insert({ workspace_id: workspace, connection_id: connection.id, opportunity_id: opportunityId, profile_id: profile, to_email: toEmail, subject, body_preview: body.slice(0, 500), status: 'pending' }).select('id').single(); check(audit.error);
+  const audit = await db.from('agent_email_sends').insert({ workspace_id: workspace, connection_id: connection.id, opportunity_id: opportunityId, profile_id: profile, to_email: toEmail, subject, body_preview: body.slice(0, 500), status: 'pending' }).select('id').single(); check(audit.error); if (!audit.data?.id) throw new Error('Email send audit could not be created.'); const auditId = audit.data.id;
   try {
     const tokens = await tokenRequest({ grant_type: 'refresh_token', refresh_token: unseal(connection.encrypted_refresh_token, value.key, workspace) });
     const lines = [`To: ${headerSafe(toEmail, 'Recipient')}`, `Subject: ${headerSafe(subject, 'Subject')}`, 'MIME-Version: 1.0', 'Content-Type: text/plain; charset="UTF-8"'];
@@ -220,17 +220,17 @@ export async function sendAgentGmailEmail(db: SupabaseClient, workspace: string,
     lines.push('', body);
     const raw = encodeBase64Url(lines.join('\r\n'));
     const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', { method: 'POST', headers: { Authorization: `Bearer ${tokens.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ raw }), signal: AbortSignal.timeout(20000) });
-    if (!response.ok) { const code = response.status === 401 || response.status === 403 ? 'authorization' : response.status >= 500 ? 'temporary' : 'send_failed'; await db.from('agent_email_sends').update({ status: 'failed', failure_code: code }).eq('id', audit.data.id); throw new GmailReadError(code); }
+    if (!response.ok) { const code = response.status === 401 || response.status === 403 ? 'authorization' : response.status >= 500 ? 'temporary' : 'send_failed'; await db.from('agent_email_sends').update({ status: 'failed', failure_code: code }).eq('id', auditId); throw new GmailReadError(code === 'send_failed' ? 'invalid_response' : code); }
     const sent = await response.json() as { id?: string; threadId?: string };
     if (!sent.id) throw new GmailReadError('invalid_response');
-    const thread = await db.from('agent_email_threads').upsert({ workspace_id: workspace, connection_id: connection.id, provider_thread_id: sent.threadId ?? sent.id, subject, participants: [toEmail, connection.mailbox], first_message_at: new Date().toISOString(), last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: 'connection_id,provider_thread_id' }).select('id').single(); check(thread.error);
-    const message = await db.from('agent_email_messages').upsert({ workspace_id: workspace, connection_id: connection.id, thread_id: thread.data.id, provider_message_id: sent.id, direction: 'outbound', sender: connection.mailbox, recipients: [toEmail], subject, occurred_at: new Date().toISOString(), encrypted_body: seal(body, value.key, workspace), headers: replyHeaders }, { onConflict: 'connection_id,provider_message_id' }).select('id').single(); check(message.error);
-    check((await db.from('agent_email_message_links').upsert({ workspace_id: workspace, message_id: message.data.id, opportunity_id: opportunityId, confidence: 100, match_reason: 'manual_send', linked_by: profile }, { onConflict: 'message_id,opportunity_id', ignoreDuplicates: true })).error);
+    const thread = await db.from('agent_email_threads').upsert({ workspace_id: workspace, connection_id: connection.id, provider_thread_id: sent.threadId ?? sent.id, subject, participants: [toEmail, connection.mailbox], first_message_at: new Date().toISOString(), last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: 'connection_id,provider_thread_id' }).select('id').single(); check(thread.error); if (!thread.data?.id) throw new Error('Email thread could not be saved.'); const threadId = thread.data.id;
+    const message = await db.from('agent_email_messages').upsert({ workspace_id: workspace, connection_id: connection.id, thread_id: threadId, provider_message_id: sent.id, direction: 'outbound', sender: connection.mailbox, recipients: [toEmail], subject, occurred_at: new Date().toISOString(), encrypted_body: seal(body, value.key, workspace), headers: replyHeaders }, { onConflict: 'connection_id,provider_message_id' }).select('id').single(); check(message.error); if (!message.data?.id) throw new Error('Email message could not be saved.'); const messageId = message.data.id;
+    check((await db.from('agent_email_message_links').upsert({ workspace_id: workspace, message_id: messageId, opportunity_id: opportunityId, confidence: 100, match_reason: 'manual_send', linked_by: profile }, { onConflict: 'message_id,opportunity_id', ignoreDuplicates: true })).error);
     check((await db.from('activities').insert({ opportunity_id: opportunityId, actor_id: profile, type: 'email', outcome: 'email_sent', body: `Email sent from ${connection.mailbox}: ${subject}`, occurred_at: new Date().toISOString(), metadata: { source: 'agent_gmail_manual_send', provider_message_id: sent.id } })).error);
-    check((await db.from('agent_email_sends').update({ status: 'sent', message_id: message.data.id, provider_message_id: sent.id, sent_at: new Date().toISOString() }).eq('id', audit.data.id)).error);
-    return { status: 'sent' as const, messageId: message.data.id };
+    check((await db.from('agent_email_sends').update({ status: 'sent', message_id: messageId, provider_message_id: sent.id, sent_at: new Date().toISOString() }).eq('id', auditId)).error);
+    return { status: 'sent' as const, messageId };
   } catch (error) {
-    if (!(error instanceof GmailReadError)) await db.from('agent_email_sends').update({ status: 'failed', failure_code: 'send_failed' }).eq('id', audit.data.id);
+    if (!(error instanceof GmailReadError)) await db.from('agent_email_sends').update({ status: 'failed', failure_code: 'send_failed' }).eq('id', auditId);
     throw error;
   }
 }

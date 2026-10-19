@@ -124,9 +124,6 @@
 .lead-open-action { display:flex; align-items:center; justify-content:flex-end; gap:4px; color:var(--accent-strong); font-weight:800; }
 .lead-queue-empty { display:grid; place-items:center; gap:5px; padding:48px 20px; text-align:center; color:var(--muted); }
 .lead-queue-empty h3,.lead-queue-empty p { margin:0; }
-.lead-pagination { display:flex; align-items:center; justify-content:center; gap:14px; padding:14px 8px 2px; color:var(--muted); font-size:13px; }
-.lead-pagination .quiet { min-width:84px; }
-.chart-loading { min-height:180px; display:grid; place-items:center; color:var(--muted); }
 
 .lead-workspace { max-width:1320px; }
 .lead-workspace-head { align-items:flex-start; }

@@ -9,7 +9,7 @@ import { z, ZodError } from 'zod';
 import { stageImportRequest, sealImportRequest, importPageQuery, historicalActivationRequest } from './historicalImport.js';
 import { readConnectionReport } from './connectionReporting.js';
 import { buildApiXaviarReport, canRequestXaviar, opportunityBelongsToSubject, type XaviarOpportunity, type XaviarProfile } from './xaviar.js';
-import { readOpportunities, readOpportunityPage } from './opportunityReader.js';
+import { readOpportunities } from './opportunityReader.js';
 
 type Profile = { id: string; workspace_id: string; role: 'admin' | 'manager' | 'sales_agent' | 'marketer'; full_name: string; manager_id: string | null; department?: 'marketing' | 'sales' | null; active: boolean };
 type AuthenticatedRequest = Request & { profile?: Profile; supabase?: SupabaseClient };
@@ -86,7 +86,6 @@ const agentEmailSend = z.object({ toEmail: z.string().trim().email().max(254), s
 const incorrectReport = z.object({ reasonCode: z.enum(['Invalid contact information', 'Wrong person or business', 'Spam or fake request', 'Duplicate contact']), evidence: z.string().trim().max(3000).optional() });
 const reviewDecision = z.object({ decision: z.enum(['confirmed_incorrect', 'rejected', 'merge_duplicate']), reason: z.string().trim().max(3000).optional() });
 const dashboardQuery = z.object({ period: dashboardPeriods.default('lifetime'), source: z.enum(sourceOptions).optional(), start: z.string().date().optional(), end: z.string().date().optional() });
-const opportunityListQuery = z.object({ status: z.string().trim().optional(), offset: z.coerce.number().int().min(0).default(0), limit: z.coerce.number().int().min(1).max(100).optional() });
 const userRole = z.enum(['admin', 'manager', 'sales_agent', 'marketer']);
 const department = z.enum(['marketing', 'sales']);
 const createUser = z.object({
@@ -430,13 +429,8 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     response.json({ provider: 'gmail', liveConnection: 'disabled_pending_approval', parserVersion: 'fixture-v1', states });
   }));
   app.get('/v1/opportunities', ...protectedRoute(async (request, response) => {
-    const query = parse(opportunityListQuery, request.query);
-    if (query.limit) {
-      const page = await readOpportunityPage(request.supabase!, { status: query.status, offset: query.offset, limit: query.limit });
-      response.json({ opportunities: page.opportunities, offset: query.offset, limit: query.limit, hasMore: page.hasMore, nextOffset: page.hasMore ? query.offset + query.limit : null });
-      return;
-    }
-    const data = await readOpportunities(request.supabase!, query.status);
+    const status = typeof request.query.status === 'string' ? request.query.status : undefined;
+    const data = await readOpportunities(request.supabase!, status);
     response.json({ opportunities: data });
   }));
   app.post('/v1/opportunities', ...protectedRoute(async (request, response) => {
@@ -727,28 +721,6 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     if (error) throw error;
     await admin.from('audit_events').insert({ workspace_id: request.profile!.workspace_id, actor_id: request.profile!.id, entity_type: 'xaviar_release_review', entity_id: data.id, action: 'xaviar_release_review_recorded', before_json: null, after_json: data });
     response.status(201).json({ review: data });
-  }));
-  app.get('/v1/dashboards/:role/summary', ...protectedRoute(async (request, response) => {
-    const role = parse(dashboardRoles, request.params.role); const profile = request.profile!;
-    const permitted = profile.role === 'admin' || (role === 'agent' && profile.role === 'sales_agent') || profile.role === role || (role === 'manager' && profile.role === 'manager');
-    if (!permitted) { response.status(403).json({ message: 'This dashboard is outside your permitted role scope.' }); return; }
-    const filters = parse(dashboardQuery, request.query);
-    const count = async (field: 'status' | 'qualification' | 'source', value: string) => {
-      let query = request.supabase!.from('opportunities').select('id', { count: 'exact', head: true }).eq(field, value);
-      if (filters.source) query = query.eq('source', filters.source);
-      if (filters.start) query = query.gte('created_at', `${filters.start}T00:00:00.000Z`);
-      if (filters.end) query = query.lt('created_at', `${filters.end}T23:59:59.999Z`);
-      const result = await query; if (result.error) throw result.error; return result.count ?? 0;
-    };
-    const statuses = ['new', 'assigned', 'contacted', 'connected', 'follow_up_required', 'qualified', 'proposal_sent', 'won', 'lost', 'not_interested', 'incorrect', 'duplicate', 'do_not_contact', 'not_available', 'no_answer'];
-    const qualifications = ['mql', 'sql', 'not_available'];
-    const [statusCounts, qualificationCounts] = await Promise.all([
-      Promise.all(statuses.map(async (value) => [value, await count('status', value)] as const)),
-      Promise.all(qualifications.map(async (value) => [value, await count('qualification', value)] as const)),
-    ]);
-    const byStatus = Object.fromEntries(statusCounts); const byQualification = Object.fromEntries(qualificationCounts);
-    const sampleSize = Object.values(byStatus).reduce((sum, value) => sum + value, 0);
-    response.json({ role, period: filters.period, source: filters.source ?? 'all', sampleSize, byStatus, byQualification });
   }));
   app.get('/v1/dashboards/:role', ...protectedRoute(async (request, response) => {
     const role = parse(dashboardRoles, request.params.role); const profile = request.profile!;
