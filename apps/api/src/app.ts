@@ -392,10 +392,16 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
   }));
   app.get('/v1/inbound/research-leads', ...protectedRoute(async (request, response) => {
     if (request.profile!.role === 'sales_agent' || (request.profile!.role === 'manager' && request.profile!.department !== 'marketing')) { response.status(403).json({ message: 'Lead Research is available only to Marketing and Admin.' }); return; }
-    const { data, error } = await request.supabase!.from('inbound_lead_candidates')
-      .select('*, inbound_messages(provider_message_id, provider_thread_id, received_at)')
-      .order('created_at', { ascending: false });
-    if (error) throw error; response.json({ researchLeads: data ?? [] });
+    const researchLeads: unknown[] = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await request.supabase!.from('inbound_lead_candidates')
+        .select('*, inbound_messages(provider_message_id, provider_thread_id, received_at)')
+        .order('created_at', { ascending: false }).order('id').range(offset, offset + 999);
+      if (error) throw error;
+      researchLeads.push(...(data ?? []));
+      if (!data || data.length < 1000) break;
+    }
+    response.json({ researchLeads });
   }));
   app.post('/v1/inbound/research-leads', ...protectedRoute(async (request, response) => {
     if (request.profile!.role !== 'admin' && request.profile!.role !== 'marketer') { response.status(403).json({ message: 'Only Admin and Marketing may add research leads.' }); return; }
