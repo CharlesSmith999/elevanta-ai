@@ -5,6 +5,7 @@ import type { ResearchLead, ResearchMethod, ResearchState } from './inboundResea
 import { supabase } from './auth';
 import { boundedRead, loadAllPages, type LoadOptions } from './pagedLoader';
 import type { connectionAnalytics } from '../../api/src/connectionAnalytics';
+import { invalidateQueries } from './queryCache';
 
 export function loadConnectionAnalytics(session: Session, filter: {viewerId: string; start?: string; end: string; source: string; timezone: string}) {
   // The local role-preview directory can contain legacy identifiers while the
@@ -26,7 +27,7 @@ export function loadConnectionAnalytics(session: Session, filter: {viewerId: str
 const configuredApiBase = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
 const apiBase = import.meta.env.DEV && configuredApiBase ? configuredApiBase.replace(/\/+$/, '') : '/api';
 
-type OpportunityRecord = {
+export type OpportunityRecord = {
   id: string;
   status: OpportunityStatus;
   qualification: Qualification;
@@ -106,14 +107,14 @@ export type RemoteActivity = {
   contact_methods?: { value: string; method_type: ContactMethodType } | null;
 };
 
-type RemoteResearchLead = {
+export type RemoteResearchLead = {
   id: string; marketing_owner_id: string; research_state: ResearchState; name: string; masked_phone?: string | null; masked_email?: string | null;
   address?: string | null; source: string; lead_category: LeadCategory; credits?: number | null; description?: string | null; details?: string | null;
   discovered_methods?: ResearchMethod[] | null; evidence_links?: string[] | null; research_notes?: string | null; duplicate_state: ResearchLead['duplicateState']; published_opportunity_id?: string | null;
   inbound_messages?: { provider_message_id: string; provider_thread_id?: string | null; received_at: string } | null;
 };
 
-const mapResearchLead = (record: RemoteResearchLead & { revision?: number }): ResearchLead => ({ id: record.id, revision: record.revision ?? 0, providerMessageId: record.inbound_messages?.provider_message_id ?? 'Unavailable', providerThreadId: record.inbound_messages?.provider_thread_id ?? undefined, receivedAt: record.inbound_messages?.received_at ?? '', source: record.source, name: record.name, maskedPhone: record.masked_phone ?? undefined, maskedEmail: record.masked_email ?? undefined, address: record.address ?? undefined, category: record.lead_category, credits: record.credits ?? undefined, description: record.description ?? undefined, details: record.details ?? undefined, marketingOwnerId: record.marketing_owner_id, state: record.research_state, methods: record.discovered_methods ?? [], evidenceLinks: record.evidence_links ?? [], researchNotes: record.research_notes ?? undefined, duplicateState: record.duplicate_state, publishedOpportunityId: record.published_opportunity_id ?? undefined });
+export const mapResearchLead = (record: RemoteResearchLead & { revision?: number }): ResearchLead => ({ id: record.id, revision: record.revision ?? 0, providerMessageId: record.inbound_messages?.provider_message_id ?? 'Unavailable', providerThreadId: record.inbound_messages?.provider_thread_id ?? undefined, receivedAt: record.inbound_messages?.received_at ?? '', source: record.source, name: record.name, maskedPhone: record.masked_phone ?? undefined, maskedEmail: record.masked_email ?? undefined, address: record.address ?? undefined, category: record.lead_category, credits: record.credits ?? undefined, description: record.description ?? undefined, details: record.details ?? undefined, marketingOwnerId: record.marketing_owner_id, state: record.research_state, methods: record.discovered_methods ?? [], evidenceLinks: record.evidence_links ?? [], researchNotes: record.research_notes ?? undefined, duplicateState: record.duplicate_state, publishedOpportunityId: record.published_opportunity_id ?? undefined });
 
 async function send(session: Session, path: string, init?: RequestInit) {
   return fetch(`${apiBase}${path}`, {
@@ -145,11 +146,12 @@ export async function request<T>(session: Session, path: string, init?: RequestI
     if (body.issues?.length) body.message = body.issues.map((issue) => issue.message).filter(Boolean).join(' ');
     throw new ApiError(response.status, body.message ?? `CRM request failed (${response.status})`);
   }
+  if (init?.method && !['GET', 'HEAD'].includes(init.method.toUpperCase()) && !['/v1/calling-list', '/v1/calling-list/page', '/v1/calling-list/export'].includes(path)) invalidateQueries();
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
-function mapOpportunity(record: OpportunityRecord): Lead {
+export function mapOpportunity(record: OpportunityRecord): Lead {
   const assignments: Assignment[] = (record.assignments ?? []).map((item) => ({ id: item.id, ownerId: item.assigned_to, assignedBy: item.assigned_by, at: item.started_at, endedAt: item.ended_at ?? undefined, visibility: item.visibility_mode, reason: item.reason ?? 'CRM assignment' }));
   const activities: Activity[] = (record.activities ?? []).map((item) => ({ id: item.id, actorId: item.actor_id ?? 'system', at: item.created_at, kind: item.type === 'note' ? 'note' : item.type === 'assignment' ? 'assignment' : item.type === 'follow_up' ? 'follow_up' : item.type === 'incorrect_report' ? 'incorrect_report' : item.type === 'status_change' ? 'status' : 'system', body: item.body ?? 'CRM activity' }));
   const followUps: FollowUp[] = (record.follow_ups ?? []).map((item) => ({ id: item.id, ownerId: item.owner_id, dueAt: item.due_at, action: item.action_type, status: item.status }));
@@ -192,7 +194,7 @@ function mapOpportunity(record: OpportunityRecord): Lead {
 
 export async function loadRemoteLeads(session: Session, options: LoadOptions = {}): Promise<Lead[]> {
   const records = await loadAllPages<OpportunityRecord>(async (after, signal) => {
-    const params = new URLSearchParams({ limit: '250' });
+    const params = new URLSearchParams({ limit: '500' });
     if (after) params.set('after', after);
     const result = await request<{ opportunities: OpportunityRecord[]; nextCursor: string | null }>(session, `/v1/opportunities?${params}`, { signal });
     return { rows: result.opportunities, nextCursor: result.nextCursor };
