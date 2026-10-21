@@ -1,5 +1,6 @@
 import cors from 'cors';
 import { readCallingList, usableCallingMethod } from './callingList.js';
+import { callingPageSchema, readCallingPage, readCallingExport } from './callingPage.js';
 import express, { NextFunction, Request, Response } from 'express';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { ConfigurationError, supabaseConfig } from './config.js';
@@ -9,7 +10,8 @@ import { z, ZodError } from 'zod';
 import { stageImportRequest, sealImportRequest, importPageQuery, historicalActivationRequest } from './historicalImport.js';
 import { readConnectionReport } from './connectionReporting.js';
 import { buildApiXaviarReport, canRequestXaviar, opportunityBelongsToSubject, type XaviarOpportunity, type XaviarProfile } from './xaviar.js';
-import { readOpportunities, readOpportunityPage } from './opportunityReader.js';
+import { readOpportunities } from './opportunityReader.js';
+import { readWorkspace, readWorkspaceDetail, readWorkspaceAlerts, workspaceLeadQuery, workspaceResearchQuery, workspaceSummaryQuery, workspaceDetailQuery, workspaceAlertQuery } from './workspaceReads.js';
 
 type Profile = { id: string; workspace_id: string; role: 'admin' | 'manager' | 'sales_agent' | 'marketer'; full_name: string; manager_id: string | null; department?: 'marketing' | 'sales' | null; active: boolean };
 type AuthenticatedRequest = Request & { profile?: Profile; supabase?: SupabaseClient };
@@ -86,7 +88,6 @@ const agentEmailSend = z.object({ toEmail: z.string().trim().email().max(254), s
 const incorrectReport = z.object({ reasonCode: z.enum(['Invalid contact information', 'Wrong person or business', 'Spam or fake request', 'Duplicate contact']), evidence: z.string().trim().max(3000).optional() });
 const reviewDecision = z.object({ decision: z.enum(['confirmed_incorrect', 'rejected', 'merge_duplicate']), reason: z.string().trim().max(3000).optional() });
 const dashboardQuery = z.object({ period: dashboardPeriods.default('lifetime'), source: z.enum(sourceOptions).optional(), start: z.string().date().optional(), end: z.string().date().optional() });
-const opportunityListQuery = z.object({ status: z.string().trim().optional(), offset: z.coerce.number().int().min(0).default(0), limit: z.coerce.number().int().min(1).max(100).optional() });
 const userRole = z.enum(['admin', 'manager', 'sales_agent', 'marketer']);
 const department = z.enum(['marketing', 'sales']);
 const createUser = z.object({
@@ -237,6 +238,22 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     if (error) throw error;
     response.json({ records });
   }));
+  app.post('/v1/calling-list/page', ...protectedRoute(async (request, response) => {
+    const profile = request.profile!;
+    if (profile.role !== 'admin' && profile.role !== 'sales_agent' && !(profile.role === 'manager' && profile.department === 'sales')) { response.status(403).json({ message: 'Calling view is unavailable for your role.' }); return; }
+    const value = parse(callingPageSchema, request.body);
+    response.setHeader('Cache-Control', 'private, no-store');
+    response.json(await readCallingPage(request.supabase!, { ...value, viewerId: profile.role === 'admin' ? value.viewerId : profile.id }));
+  }));
+  app.post('/v1/calling-list/page/export', ...protectedRoute(async (request, response) => {
+    const profile = request.profile!;
+    if (profile.role !== 'admin' && profile.role !== 'sales_agent' && !(profile.role === 'manager' && profile.department === 'sales')) { response.status(403).json({ message: 'Calling export is unavailable for your role.' }); return; }
+    const value = parse(callingPageSchema, request.body);
+    const records = (await readCallingExport(request.supabase!, { ...value, viewerId: profile.role === 'admin' ? value.viewerId : profile.id })).filter(row => row.methods.some(usableCallingMethod));
+    const { error } = await adminClient().from('audit_events').insert({ workspace_id: profile.workspace_id, actor_id: profile.id, entity_type: 'lead_export', entity_id: profile.id, action: 'calling_list_exported', after_json: { filters: value, exported_count: records.length, opportunity_ids: records.map(row => row.id) } });
+    if (error) throw error;
+    response.json({ records });
+  }));
   app.get('/v1/analytics/connections', ...protectedRoute(async (request,response) => {
     const query = parse(z.object({ start: z.string().datetime({offset:true}).optional(), end: z.string().datetime({offset:true}), timezone: z.string().max(100), source: z.string().max(160).optional(), viewerId: id.optional() }),request.query);
     try { new Intl.DateTimeFormat('en-US',{timeZone:query.timezone}).format(); } catch { response.status(400).json({message:'Choose a valid timezone.'}); return; }
@@ -375,6 +392,36 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     for (const connection of data ?? []) results.push({ workspaceId: connection.workspace_id, profileId: connection.profile_id, ...(await syncAgentGmail(db, connection.workspace_id, connection.profile_id)) });
     response.json({ state: 'processed', results });
   }));
+  app.get('/v1/workspace/summary', ...protectedRoute(async (request,response)=>{
+    response.setHeader('Cache-Control','private, no-store');
+    response.json(await readWorkspace(request.supabase!,'summary',parse(workspaceSummaryQuery,request.query)));
+  }));
+  app.get('/v1/workspace/leads', ...protectedRoute(async (request,response)=>{
+    response.setHeader('Cache-Control','private, no-store');
+    response.json(await readWorkspace(request.supabase!,'leads',parse(workspaceLeadQuery,request.query)));
+  }));
+  app.get('/v1/workspace/leads/:id', ...protectedRoute(async (request,response)=>{
+    response.setHeader('Cache-Control','private, no-store');
+    const {viewerId}=parse(workspaceDetailQuery,request.query);
+    const opportunity=await readWorkspaceDetail(request.supabase!,'lead',parse(id,request.params.id),viewerId);
+    if(!opportunity){response.status(404).json({message:'Lead not found.'});return;}
+    response.json({opportunity});
+  }));
+  app.get('/v1/workspace/research', ...protectedRoute(async (request,response)=>{
+    response.setHeader('Cache-Control','private, no-store');
+    response.json(await readWorkspace(request.supabase!,'research',parse(workspaceResearchQuery,request.query)));
+  }));
+  app.get('/v1/workspace/research/:id', ...protectedRoute(async (request,response)=>{
+    response.setHeader('Cache-Control','private, no-store');
+    const {viewerId}=parse(workspaceDetailQuery,request.query);
+    const researchLead=await readWorkspaceDetail(request.supabase!,'research',parse(id,request.params.id),viewerId);
+    if(!researchLead){response.status(404).json({message:'Research lead not found.'});return;}
+    response.json({researchLead});
+  }));
+  app.get('/v1/workspace/alerts', ...protectedRoute(async (request,response)=>{
+    response.setHeader('Cache-Control','private, no-store');
+    response.json(await readWorkspaceAlerts(request.supabase!,parse(workspaceAlertQuery,request.query).since));
+  }));
   app.get('/v1/workspace-members', ...protectedRoute(async (request, response) => {
     const { data, error } = await request.supabase!
       .from('profiles')
@@ -393,10 +440,18 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
   }));
   app.get('/v1/inbound/research-leads', ...protectedRoute(async (request, response) => {
     if (request.profile!.role === 'sales_agent' || (request.profile!.role === 'manager' && request.profile!.department !== 'marketing')) { response.status(403).json({ message: 'Lead Research is available only to Marketing and Admin.' }); return; }
-    const { data, error } = await request.supabase!.from('inbound_lead_candidates')
+    const requestedLimit = Number(request.query.limit);
+    const requestedOffset = Number(request.query.offset);
+    const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(Math.trunc(requestedLimit), 1), 500) : 250;
+    const offset = Number.isFinite(requestedOffset) ? Math.max(Math.trunc(requestedOffset), 0) : 0;
+    const after = request.query.after === undefined ? undefined : parse(id, request.query.after);
+    let query = request.supabase!.from('inbound_lead_candidates')
       .select('*, inbound_messages(provider_message_id, provider_thread_id, received_at)')
-      .order('created_at', { ascending: false });
-    if (error) throw error; response.json({ researchLeads: data ?? [] });
+      .order('id').range(offset, offset + limit - 1);
+    if (after) query = query.gt('id', after);
+    const { data, error } = await query;
+    if (error) throw error;
+    response.json({ researchLeads: data ?? [], offset, limit, hasMore: (data ?? []).length === limit, nextCursor: data?.length === limit ? data[data.length - 1].id : null });
   }));
   app.post('/v1/inbound/research-leads', ...protectedRoute(async (request, response) => {
     if (request.profile!.role !== 'admin' && request.profile!.role !== 'marketer') { response.status(403).json({ message: 'Only Admin and Marketing may add research leads.' }); return; }
@@ -430,14 +485,16 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     response.json({ provider: 'gmail', liveConnection: 'disabled_pending_approval', parserVersion: 'fixture-v1', states });
   }));
   app.get('/v1/opportunities', ...protectedRoute(async (request, response) => {
-    const query = parse(opportunityListQuery, request.query);
-    if (query.limit) {
-      const page = await readOpportunityPage(request.supabase!, { status: query.status, offset: query.offset, limit: query.limit });
-      response.json({ opportunities: page.opportunities, offset: query.offset, limit: query.limit, hasMore: page.hasMore, nextOffset: page.hasMore ? query.offset + query.limit : null });
-      return;
-    }
-    const data = await readOpportunities(request.supabase!, query.status);
-    response.json({ opportunities: data });
+    const status = typeof request.query.status === 'string' ? request.query.status : undefined;
+    const parseNumber = (value: unknown, fallback: number) => {
+      const parsed = typeof value === 'string' ? Number(value) : NaN;
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+    const limit = Math.max(1, Math.min(Math.floor(parseNumber(request.query.limit, 500)), 500));
+    const offset = Math.max(0, Math.floor(parseNumber(request.query.offset, 0)));
+    const after = request.query.after === undefined ? undefined : parse(id, request.query.after);
+    const data = await readOpportunities(request.supabase!, status, { limit, offset, after });
+    response.json({ opportunities: data, offset, limit, hasMore: data.length === limit, nextCursor: data.length === limit ? data[data.length - 1].id : null });
   }));
   app.post('/v1/opportunities', ...protectedRoute(async (request, response) => {
     const value = parse(newLead, request.body);
@@ -458,10 +515,13 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
   }));
   app.get('/v1/opportunities/:id/activity-history', ...protectedRoute(async (request, response) => {
     const opportunityId = parse(id, request.params.id);
-    const { data, error } = await request.supabase!.from('activities')
+    const after = request.query.after === undefined ? undefined : parse(id, request.query.after);
+    let query = request.supabase!.from('activities')
       .select('id, type, outcome, body, created_at, occurred_at, actor_id, assignment_id, contact_method_id, metadata, contact_methods(value, method_type)')
-      .eq('opportunity_id', opportunityId).order('occurred_at', { ascending: false });
-    if (error) throw error; response.json({ activities: data ?? [] });
+      .eq('opportunity_id', opportunityId).order('id').range(0, 249);
+    if (after) query = query.gt('id', after);
+    const { data, error } = await query;
+    if (error) throw error; response.json({ activities: data ?? [], nextCursor: data?.length === 250 ? data[data.length - 1].id : null });
   }));
   app.patch('/v1/opportunities/:id', ...protectedRoute(async (request, response) => {
     const value = parse(statusUpdate.partial(), request.body); const opportunityId = parse(id, request.params.id);
@@ -633,7 +693,9 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     const value = stageImportRequest.parse(request.body);
     const { data, error } = await request.supabase!.rpc('stage_historical_import', { p_manifest: value.manifest, p_rows: value.rows });
     if (error) throw error;
-    response.json({ batchId: data });
+    // Use send here because the Vercel build's Express type resolution can
+    // select a response type without the json convenience method.
+    response.status(200).send({ batchId: data });
   }));
   app.post('/v1/imports/validate', ...protectedRoute(async (request, response) => {
     if (request.profile!.role !== 'admin') { response.status(403).json({ message: 'Only Admin may validate historical imports.' }); return; }
@@ -728,28 +790,6 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     await admin.from('audit_events').insert({ workspace_id: request.profile!.workspace_id, actor_id: request.profile!.id, entity_type: 'xaviar_release_review', entity_id: data.id, action: 'xaviar_release_review_recorded', before_json: null, after_json: data });
     response.status(201).json({ review: data });
   }));
-  app.get('/v1/dashboards/:role/summary', ...protectedRoute(async (request, response) => {
-    const role = parse(dashboardRoles, request.params.role); const profile = request.profile!;
-    const permitted = profile.role === 'admin' || (role === 'agent' && profile.role === 'sales_agent') || profile.role === role || (role === 'manager' && profile.role === 'manager');
-    if (!permitted) { response.status(403).json({ message: 'This dashboard is outside your permitted role scope.' }); return; }
-    const filters = parse(dashboardQuery, request.query);
-    const count = async (field: 'status' | 'qualification' | 'source', value: string) => {
-      let query = request.supabase!.from('opportunities').select('id', { count: 'exact', head: true }).eq(field, value);
-      if (filters.source) query = query.eq('source', filters.source);
-      if (filters.start) query = query.gte('created_at', `${filters.start}T00:00:00.000Z`);
-      if (filters.end) query = query.lt('created_at', `${filters.end}T23:59:59.999Z`);
-      const result = await query; if (result.error) throw result.error; return result.count ?? 0;
-    };
-    const statuses = ['new', 'assigned', 'contacted', 'connected', 'follow_up_required', 'qualified', 'proposal_sent', 'won', 'lost', 'not_interested', 'incorrect', 'duplicate', 'do_not_contact', 'not_available', 'no_answer'];
-    const qualifications = ['mql', 'sql', 'not_available'];
-    const [statusCounts, qualificationCounts] = await Promise.all([
-      Promise.all(statuses.map(async (value) => [value, await count('status', value)] as const)),
-      Promise.all(qualifications.map(async (value) => [value, await count('qualification', value)] as const)),
-    ]);
-    const byStatus = Object.fromEntries(statusCounts); const byQualification = Object.fromEntries(qualificationCounts);
-    const sampleSize = Object.values(byStatus).reduce((sum, value) => sum + value, 0);
-    response.json({ role, period: filters.period, source: filters.source ?? 'all', sampleSize, byStatus, byQualification });
-  }));
   app.get('/v1/dashboards/:role', ...protectedRoute(async (request, response) => {
     const role = parse(dashboardRoles, request.params.role); const profile = request.profile!;
     const permitted = profile.role === 'admin' || (role === 'agent' && profile.role === 'sales_agent') || profile.role === role || (role === 'manager' && profile.role === 'manager');
@@ -775,6 +815,7 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     if (error instanceof ConfigurationError) { response.status(503).json({ message: error.message }); return; }
     if (error instanceof ZodError) { response.status(400).json({ message: 'Please correct the submitted fields.', issues: error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message })) }); return; }
     const message = errorMessage(error);
+    if (typeof error==='object' && error!==null && 'code' in error && error.code==='42501') { response.status(403).json({message});return; }
     const status = /not permitted|only admin|only the current|only admin and marketing/i.test(message) ? 403 : /not found/i.test(message) ? 404 : /requires|cannot|invalid|must|paused|duplicate/i.test(message) ? 422 : 500;
     response.status(status).json({ message });
   });
