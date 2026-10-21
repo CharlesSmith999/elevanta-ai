@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { IconActivityHeartbeat, IconAlertTriangle, IconArrowRight, IconArrowUpRight, IconBriefcase, IconBulb, IconCalendar, IconChartBar, IconChartPieFilled, IconChecklist, IconChevronDown, IconCircleCheck, IconClock, IconCurrencyDollar, IconFilter, IconFlag, IconHistory, IconHome, IconMail, IconMenu2, IconMoonStars, IconPhone, IconReportAnalytics, IconRobot, IconRocket, IconSearch, IconSparkles, IconSun, IconTarget, IconTargetArrow, IconTrophy, IconTrendingUp, IconUserCircle, IconUsers, IconX } from '@tabler/icons-react';
 import { Area, AreaChart, Bar as RechartsBar, BarChart as RechartsBarChart, CartesianGrid, Cell, Funnel, FunnelChart, LabelList, Line, LineChart, RadialBar, RadialBarChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from 'recharts';
 import {
@@ -69,6 +69,8 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   const [viewerId, setViewerId] = useState(session?.user.id ?? 'shariq');
   const [page, setPage] = useState('Dashboard');
   const [selectedId, setSelectedId] = useState<string | undefined>();
+  const detailRequest = useRef(0);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [remoteDetail, setRemoteDetail] = useState<Lead | undefined>();
   const [callingMode, setCallingMode] = useState(false);
   const [callingDirty, setCallingDirty] = useState(false);
@@ -114,7 +116,10 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   const filteredDashboard = useMemo(() => dashboardFor(viewer.role === 'manager' && viewer.department === 'marketing' ? { ...viewer, role: 'admin' } : viewer, dashboardLeads, new Date(), workspaceDirectory), [viewer, dashboardLeads, workspaceDirectory]);
   const duplicateCount = useMemo(() => duplicateMatches(leads).length, [leads]);
   const summaryFilters = useMemo(() => ({ viewerId: viewer.id, period: dashboardPeriod, source: dashboardSource, start: selectedRange.start, end: selectedRange.end }), [viewer.id, dashboardPeriod, dashboardSource, selectedRange.start, selectedRange.end]);
-  const summaryQuery = useWorkspaceQuery(session && remoteLoaded ? workspaceKey(session, 'summary', summaryFilters) : null, (signal) => loadWorkspaceSummary(session!, summaryFilters, signal), 60_000);
+  const summaryQuery = useWorkspaceQuery(session && remoteLoaded && ['Dashboard', 'Reports', 'Leaderboard', 'Benchmark Board', 'Data quality'].includes(page) ? workspaceKey(session, 'summary', summaryFilters) : null, (signal) => loadWorkspaceSummary(session!, summaryFilters, signal), 60_000);
+  // Coaching requires complete evidence. Load it only when explicitly opened,
+  // never at login or as a side effect of opening ordinary lists/dashboards.
+  const coachingQuery = useWorkspaceQuery(session && remoteLoaded && page === 'Xaviar' ? workspaceKey(session, 'coaching', { viewerId: viewer.id }) : null, signal => loadRemoteLeads(session!, { signal }), 60_000);
 
   useEffect(() => { if (!session) localStorage.setItem(storageKey, JSON.stringify(leads)); }, [leads, session]);
   useEffect(() => { localStorage.setItem(themeStorageKey, theme); }, [theme]);
@@ -141,12 +146,23 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   function persist(action: (activeSession: Session) => Promise<unknown>, success?: string) {
     if (session && !remoteLoaded) { setNotice('This change was not saved because the CRM connection is unavailable. Sign in again and retry.'); return; }
     if (!session) return;
-    void action(session).then(() => { if (success) setNotice(success); }).catch((error: unknown) => setNotice(error instanceof Error ? error.message : 'The CRM could not save this change.'));
+    void action(session).then(() => { invalidateQueries(); if (success) setNotice(success); }).catch((error: unknown) => setNotice(error instanceof Error ? error.message : 'The CRM could not save this change.'));
   }
 
-  const mutateLead = (leadId: string, mutate: (lead: Lead) => Lead) => { setLeads((existing) => existing.map((lead) => lead.id === leadId ? mutate(lead) : lead)); setRemoteDetail((current) => current?.id === leadId ? mutate(current) : current); invalidateQueries(); };
+  const mutateLead = (leadId: string, mutate: (lead: Lead) => Lead) => { setLeads((existing) => existing.map((lead) => lead.id === leadId ? mutate(lead) : lead)); setRemoteDetail((current) => current?.id === leadId ? mutate(current) : current); };
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [page, selectedId]);
-  const select = (leadId: string) => { setSelectedId(leadId); setPage('Lead inbox'); if (session) void loadLeadDetail(session, leadId, viewer.id).then(setRemoteDetail).catch((error) => setNotice(error instanceof Error ? error.message : 'Lead details could not be loaded.')); };
+  const select = (leadId: string) => {
+    const request = ++detailRequest.current;
+    setRemoteDetail(undefined); setSelectedId(leadId); setPage('Lead inbox');
+    if (session) {
+      setDetailLoading(true);
+      void loadLeadDetail(session, leadId, viewer.id).then(lead => {
+        if (request === detailRequest.current) setRemoteDetail(lead);
+      }).catch(error => {
+        if (request === detailRequest.current) setNotice(error instanceof Error ? error.message : 'Lead details could not be loaded.');
+      }).finally(() => { if (request === detailRequest.current) setDetailLoading(false); });
+    }
+  };
   function callingSaved(leadId:string,result:CallResult,note:string,due:string) {
     setCallingDirty(true);
     if (!session) mutateLead(leadId, lead => ({...lead,activities:[...lead.activities,leadActivity(viewer.id,'note',`Call result: ${result.replaceAll('_',' ')}. ${note}`)],followUps:due ? [...lead.followUps,{id:makeId('follow-up'),ownerId:viewer.id,dueAt:new Date(due).toISOString(),action:'Call',status:'open'}] : lead.followUps}));
@@ -276,7 +292,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
         setShowCreate(false);
         formElement.reset();
         try {
-          setLeads(await loadRemoteLeads(session));
+          invalidateQueries();
           setNotice(duplicate ? 'Lead saved to the CRM and flagged as a duplicate candidate for review.' : owner ? 'Lead saved to the CRM and assigned successfully.' : 'Lead saved to the CRM without an assignment.');
         } catch {
           setRemoteLoaded(false);
@@ -294,6 +310,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
 
   function resetDemo() { setLeads(structuredClone(seedLeads)); setSelectedId(undefined); setNotice('Test workspace reset to the protected sample data.'); }
   function switchViewer(nextViewerId: string) {
+    ++detailRequest.current; setRemoteDetail(undefined); setDetailLoading(false);
     setViewerId(nextViewerId);
     setPage('Dashboard');
     setDashboardScope('company');
@@ -302,6 +319,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
     setMobileNavOpen(false);
   }
   function navigate(next: string) {
+    ++detailRequest.current; setRemoteDetail(undefined); setDetailLoading(false);
     if (next === 'Dashboard') setDashboardScope('company');
     setPage(next);
     setSelectedId(undefined);
@@ -335,9 +353,12 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
       {notice && <div className="toast" role="status">{notice}</div>}
       {(!session || remoteLoaded) && <>
       {remoteSummaryPage ? <RemoteDashboard viewer={viewer} viewers={switchableUsers} summary={summaryQuery.data} loading={summaryQuery.loading} error={summaryQuery.error} onRetry={summaryQuery.refresh} period={dashboardPeriod} customStart={customStart} customEnd={customEnd} source={dashboardSource} theme={theme} onViewer={switchViewer} onPeriod={setDashboardPeriod} onCustomStart={setCustomStart} onCustomEnd={setCustomEnd} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} onOpenLead={select} session={session} start={selectedRange.start} end={selectedRange.end} page={page as 'Dashboard' | 'Reports' | 'Leaderboard' | 'Benchmark Board' | 'Data quality'} /> : adminReference ? <AdminCommandCenter viewer={viewer} viewers={switchableUsers} directory={workspaceDirectory} leads={dashboardLeads} dashboard={filteredDashboard} period={dashboardPeriod} customStart={customStart} customEnd={customEnd} source={dashboardSource} theme={theme} onViewer={switchViewer} onPeriod={setDashboardPeriod} onCustomStart={setCustomStart} onCustomEnd={setCustomEnd} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} /> : roleReferenceDashboard && roleReferenceKind ? <RoleReferenceDashboard kind={roleReferenceKind} viewer={viewer} viewers={switchableUsers} leads={dashboardLeads} period={dashboardPeriod} customStart={customStart} customEnd={customEnd} source={dashboardSource} theme={theme} session={session} start={selectedRange.start} end={selectedRange.end} onViewer={switchViewer} onPeriod={setDashboardPeriod} onCustomStart={setCustomStart} onCustomEnd={setCustomEnd} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} onCreate={() => setShowCreate(true)} onOpenLead={select} /> : <>
-{page === 'Lead inbox' && (selected || remoteDetail ? <LeadWorkspace lead={selected ?? remoteDetail!} viewer={viewer} workspaceUsers={workspaceDirectory} session={session} onBack={() => { setSelectedId(undefined); setRemoteDetail(undefined); }} onStatus={updateStatus} onQualification={updateQualification} onReassign={reassign} onEditDetails={editLeadDetails} onReportIncorrect={reportIncorrect} onDecision={decideReview} /> : <>{session ? <RemoteLeadList session={session} viewer={viewer} users={workspaceDirectory} onSelect={select} onCreate={() => setShowCreate(true)} /> : <><div className="calling-view-switch">{(viewer.role === 'admin' || viewer.role === 'sales_agent' || (viewer.role === 'manager' && viewer.department === 'sales')) && <><button className={!callingMode ? 'primary' : 'quiet'} aria-pressed={!callingMode} onClick={() => setCallingMode(false)}>Lead view</button><button className={callingMode ? 'primary' : 'quiet'} aria-pressed={callingMode} onClick={() => setCallingMode(true)}>Calling view</button></>}</div>{callingMode ? <CallingView key={viewer.id} leads={visible} viewer={viewer} session={session} ready={!session || remoteLoaded} onDetails={select} onSaved={callingSaved} /> : <section className="inbox-layout"><LeadTable viewer={viewer} canCreate={viewer.role === 'admin' || viewer.role === 'marketer'} leads={visible} users={workspaceDirectory} onSelect={select} onCreate={() => setShowCreate(true)} /></section>}</>}</>)}
+{page === 'Lead inbox' && (detailLoading ? <p role="status">Loading lead details…</p> : selected || remoteDetail ? <LeadWorkspace lead={selected ?? remoteDetail!} viewer={viewer} workspaceUsers={workspaceDirectory} session={session} onBack={() => { setSelectedId(undefined); setRemoteDetail(undefined); }} onStatus={updateStatus} onQualification={updateQualification} onReassign={reassign} onEditDetails={editLeadDetails} onReportIncorrect={reportIncorrect} onDecision={decideReview} /> : <>
+<div className="calling-view-switch">{(viewer.role === 'admin' || viewer.role === 'sales_agent' || (viewer.role === 'manager' && viewer.department === 'sales')) && <><button className={!callingMode ? 'primary' : 'quiet'} aria-pressed={!callingMode} onClick={() => setCallingMode(false)}>Lead view</button><button className={callingMode ? 'primary' : 'quiet'} aria-pressed={callingMode} onClick={() => setCallingMode(true)}>Calling view</button></>}</div>
+{callingMode ? <CallingView key={viewer.id} leads={visible} viewer={viewer} session={session} ready={!session || remoteLoaded} onDetails={select} onSaved={callingSaved} /> : session ? <RemoteLeadList session={session} viewer={viewer} users={workspaceDirectory} onSelect={select} onCreate={() => setShowCreate(true)} /> : <section className="inbox-layout"><LeadTable viewer={viewer} canCreate={viewer.role === 'admin' || viewer.role === 'marketer'} leads={visible} users={workspaceDirectory} onSelect={select} onCreate={() => setShowCreate(true)} /></section>}
+</>)}
       {page === 'Lead research' && <LeadResearchQueue viewer={viewer} users={workspaceDirectory} session={session} onNotice={setNotice} onPublished={async (research, salesOwnerId) => {
-        if (session) setLeads(await loadRemoteLeads(session));
+        if (session) invalidateQueries();
         else {
           const at = new Date().toISOString();
           const id = `research-opportunity-${research.id}`;
@@ -353,7 +374,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
       {page === 'Benchmark Board' && canViewManagementBoards(viewer) && <BenchmarkBoard leads={dashboardLeads} />}
       {page === 'Leaderboard' && <Leaderboard leads={dashboardLeads} privateBenchmarkLeads={leads} viewer={viewer} directory={workspaceDirectory} scope={dashboardScope} />}
       {page === 'Data quality' && canViewDataQualityBoard(viewer) && <DataQualityBoard leads={dashboardLeads} range={selectedRange} source={dashboardSource} />}
-      {page === 'Xaviar' && <XaviarWorkspace leads={leads} viewer={viewer} />}
+      {page === 'Xaviar' && (session ? coachingQuery.error ? <p role="alert">{coachingQuery.error}<button onClick={coachingQuery.refresh}>Retry coaching</button></p> : !coachingQuery.data ? <p role="status">Loading complete coaching evidence…</p> : <XaviarWorkspace leads={coachingQuery.data} viewer={viewer} /> : <XaviarWorkspace leads={leads} viewer={viewer} />)}
       {page === 'My profile' && viewer.role === 'sales_agent' && session && <section className="profile-page"><div className="board-heading"><div><span className="eyebrow">ACCOUNT SETTINGS</span><h2>{viewer.name}</h2><p>Manage your CRM profile and read-only Gmail connection.</p></div></div><AgentGmailConnection session={session} /></section>}
       {page === 'User management' && viewer.role === 'admin' && session && <AdminUserManagement session={session} onNotice={setNotice} onChanged={() => setConnectionAttempt((value) => value + 1)} />}
       </>}
