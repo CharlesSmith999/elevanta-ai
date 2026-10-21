@@ -1,5 +1,6 @@
 import cors from 'cors';
 import { readCallingList, usableCallingMethod } from './callingList.js';
+import { callingPageSchema, readCallingPage, readCallingExport } from './callingPage.js';
 import express, { NextFunction, Request, Response } from 'express';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { ConfigurationError, supabaseConfig } from './config.js';
@@ -10,6 +11,7 @@ import { stageImportRequest, sealImportRequest, importPageQuery, historicalActiv
 import { readConnectionReport } from './connectionReporting.js';
 import { buildApiXaviarReport, canRequestXaviar, opportunityBelongsToSubject, type XaviarOpportunity, type XaviarProfile } from './xaviar.js';
 import { readOpportunities } from './opportunityReader.js';
+import { readWorkspace, readWorkspaceDetail, readWorkspaceAlerts, workspaceLeadQuery, workspaceResearchQuery, workspaceSummaryQuery, workspaceDetailQuery, workspaceAlertQuery } from './workspaceReads.js';
 
 type Profile = { id: string; workspace_id: string; role: 'admin' | 'manager' | 'sales_agent' | 'marketer'; full_name: string; manager_id: string | null; department?: 'marketing' | 'sales' | null; active: boolean };
 type AuthenticatedRequest = Request & { profile?: Profile; supabase?: SupabaseClient };
@@ -236,6 +238,22 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     if (error) throw error;
     response.json({ records });
   }));
+  app.post('/v1/calling-list/page', ...protectedRoute(async (request, response) => {
+    const profile = request.profile!;
+    if (profile.role !== 'admin' && profile.role !== 'sales_agent' && !(profile.role === 'manager' && profile.department === 'sales')) { response.status(403).json({ message: 'Calling view is unavailable for your role.' }); return; }
+    const value = parse(callingPageSchema, request.body);
+    response.setHeader('Cache-Control', 'private, no-store');
+    response.json(await readCallingPage(request.supabase!, { ...value, viewerId: profile.role === 'admin' ? value.viewerId : profile.id }));
+  }));
+  app.post('/v1/calling-list/page/export', ...protectedRoute(async (request, response) => {
+    const profile = request.profile!;
+    if (profile.role !== 'admin' && profile.role !== 'sales_agent' && !(profile.role === 'manager' && profile.department === 'sales')) { response.status(403).json({ message: 'Calling export is unavailable for your role.' }); return; }
+    const value = parse(callingPageSchema, request.body);
+    const records = (await readCallingExport(request.supabase!, { ...value, viewerId: profile.role === 'admin' ? value.viewerId : profile.id })).filter(row => row.methods.some(usableCallingMethod));
+    const { error } = await adminClient().from('audit_events').insert({ workspace_id: profile.workspace_id, actor_id: profile.id, entity_type: 'lead_export', entity_id: profile.id, action: 'calling_list_exported', after_json: { filters: value, exported_count: records.length, opportunity_ids: records.map(row => row.id) } });
+    if (error) throw error;
+    response.json({ records });
+  }));
   app.get('/v1/analytics/connections', ...protectedRoute(async (request,response) => {
     const query = parse(z.object({ start: z.string().datetime({offset:true}).optional(), end: z.string().datetime({offset:true}), timezone: z.string().max(100), source: z.string().max(160).optional(), viewerId: id.optional() }),request.query);
     try { new Intl.DateTimeFormat('en-US',{timeZone:query.timezone}).format(); } catch { response.status(400).json({message:'Choose a valid timezone.'}); return; }
@@ -374,6 +392,36 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     for (const connection of data ?? []) results.push({ workspaceId: connection.workspace_id, profileId: connection.profile_id, ...(await syncAgentGmail(db, connection.workspace_id, connection.profile_id)) });
     response.json({ state: 'processed', results });
   }));
+  app.get('/v1/workspace/summary', ...protectedRoute(async (request,response)=>{
+    response.setHeader('Cache-Control','private, no-store');
+    response.json(await readWorkspace(request.supabase!,'summary',parse(workspaceSummaryQuery,request.query)));
+  }));
+  app.get('/v1/workspace/leads', ...protectedRoute(async (request,response)=>{
+    response.setHeader('Cache-Control','private, no-store');
+    response.json(await readWorkspace(request.supabase!,'leads',parse(workspaceLeadQuery,request.query)));
+  }));
+  app.get('/v1/workspace/leads/:id', ...protectedRoute(async (request,response)=>{
+    response.setHeader('Cache-Control','private, no-store');
+    const {viewerId}=parse(workspaceDetailQuery,request.query);
+    const opportunity=await readWorkspaceDetail(request.supabase!,'lead',parse(id,request.params.id),viewerId);
+    if(!opportunity){response.status(404).json({message:'Lead not found.'});return;}
+    response.json({opportunity});
+  }));
+  app.get('/v1/workspace/research', ...protectedRoute(async (request,response)=>{
+    response.setHeader('Cache-Control','private, no-store');
+    response.json(await readWorkspace(request.supabase!,'research',parse(workspaceResearchQuery,request.query)));
+  }));
+  app.get('/v1/workspace/research/:id', ...protectedRoute(async (request,response)=>{
+    response.setHeader('Cache-Control','private, no-store');
+    const {viewerId}=parse(workspaceDetailQuery,request.query);
+    const researchLead=await readWorkspaceDetail(request.supabase!,'research',parse(id,request.params.id),viewerId);
+    if(!researchLead){response.status(404).json({message:'Research lead not found.'});return;}
+    response.json({researchLead});
+  }));
+  app.get('/v1/workspace/alerts', ...protectedRoute(async (request,response)=>{
+    response.setHeader('Cache-Control','private, no-store');
+    response.json(await readWorkspaceAlerts(request.supabase!,parse(workspaceAlertQuery,request.query).since));
+  }));
   app.get('/v1/workspace-members', ...protectedRoute(async (request, response) => {
     const { data, error } = await request.supabase!
       .from('profiles')
@@ -442,7 +490,7 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
       const parsed = typeof value === 'string' ? Number(value) : NaN;
       return Number.isFinite(parsed) ? parsed : fallback;
     };
-    const limit = Math.max(1, Math.min(Math.floor(parseNumber(request.query.limit, 250)), 250));
+    const limit = Math.max(1, Math.min(Math.floor(parseNumber(request.query.limit, 500)), 500));
     const offset = Math.max(0, Math.floor(parseNumber(request.query.offset, 0)));
     const after = request.query.after === undefined ? undefined : parse(id, request.query.after);
     const data = await readOpportunities(request.supabase!, status, { limit, offset, after });
@@ -767,6 +815,7 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     if (error instanceof ConfigurationError) { response.status(503).json({ message: error.message }); return; }
     if (error instanceof ZodError) { response.status(400).json({ message: 'Please correct the submitted fields.', issues: error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message })) }); return; }
     const message = errorMessage(error);
+    if (typeof error==='object' && error!==null && 'code' in error && error.code==='42501') { response.status(403).json({message});return; }
     const status = /not permitted|only admin|only the current|only admin and marketing/i.test(message) ? 403 : /not found/i.test(message) ? 404 : /requires|cannot|invalid|must|paused|duplicate/i.test(message) ? 422 : 500;
     response.status(status).json({ message });
   });
