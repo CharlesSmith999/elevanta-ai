@@ -20,6 +20,8 @@
 .review-description { white-space:pre-wrap; max-height:160px; overflow:auto; }
 .lead-inbox-filters,.research-filters { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
 .lead-inbox-filters .lead-search,.research-search { flex:1 1 260px; }
+.lead-date-range { display:flex; flex:1 1 280px; gap:8px; align-items:end; }
+.lead-date-range label { flex:1 1 120px; }
 .queue-filter-details { position:relative; }
 .queue-filter-details summary,.admin-intake-settings summary { cursor:pointer; padding:12px; border:1px solid var(--border); border-radius:10px; color:var(--text); font-weight:600; }
 .queue-filter-fields { display:flex; flex-wrap:wrap; gap:12px; padding-top:12px; }
@@ -124,9 +126,6 @@
 .lead-open-action { display:flex; align-items:center; justify-content:flex-end; gap:4px; color:var(--accent-strong); font-weight:800; }
 .lead-queue-empty { display:grid; place-items:center; gap:5px; padding:48px 20px; text-align:center; color:var(--muted); }
 .lead-queue-empty h3,.lead-queue-empty p { margin:0; }
-.lead-pagination { display:flex; align-items:center; justify-content:center; gap:14px; padding:14px 8px 2px; color:var(--muted); font-size:13px; }
-.lead-pagination .quiet { min-width:84px; }
-.chart-loading { min-height:180px; display:grid; place-items:center; color:var(--muted); }
 
 .lead-workspace { max-width:1320px; }
 .lead-workspace-head { align-items:flex-start; }
