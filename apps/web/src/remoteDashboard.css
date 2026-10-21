@@ -1,0 +1,23 @@
+.remote-summary-dashboard { min-width: 0; }
+.remote-summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 18px; }
+.remote-summary-panel { min-width: 0; padding: 20px; }
+.remote-summary-panel table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.remote-summary-panel th, .remote-summary-panel td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); }
+.remote-summary-panel .table-wrap { overflow-x: auto; }
+.remote-summary-note { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.remote-summary-state { padding: 32px; margin: 24px 0; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+.remote-summary-facts, .remote-summary-ring dl, .remote-summary-funnel dl { margin: 12px 0; }
+.remote-summary-facts > div, .remote-summary-ring dl > div, .remote-summary-funnel dl > div { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.remote-summary-facts dt, .remote-summary-ring dt { color: var(--muted); font-size: 12px; }
+.remote-summary-facts dd, .remote-summary-ring dd, .remote-summary-funnel dd { margin: 0; font-weight: 700; text-align: right; }
+.remote-summary-funnel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(140px, .8fr); gap: 12px; }
+.remote-summary-funnel small { display: block; color: var(--muted); font-size: 11px; margin-top: 5px; }
+.remote-summary-ring { display: grid; grid-template-columns: minmax(140px, .8fr) minmax(0, 1fr); gap: 12px; align-items: center; }
+.remote-summary-ring dt i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 7px; }
+.remote-summary-priorities { display: grid; gap: 8px; }
+.remote-summary-priorities button { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); text-align: left; cursor: pointer; }
+.remote-summary-priorities button b { flex: 1; }
+.remote-summary-priorities span, .remote-summary-priorities small { font-size: 12px; color: var(--muted); }
+.remote-summary-metrics strong { overflow-wrap: anywhere; }
+@media (max-width: 1000px) { .remote-summary-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 560px) { .remote-summary-ring, .remote-summary-funnel { grid-template-columns: minmax(0, 1fr); } .remote-summary-panel { padding: 14px; } }
