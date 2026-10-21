@@ -22,6 +22,11 @@ import { AdminUserManagement } from './AdminUserManagement';
 import { HistoricalImports } from './HistoricalImports';
 import { ConnectionAnalyticsPanel } from './ConnectionAnalyticsPanel';
 import { needsSalesAction } from './leadWorkflow';
+import { RemoteDashboard } from './RemoteDashboard';
+import { RemoteLeadList } from './RemoteLeadList';
+import { loadLeadDetail, loadWorkspaceSummary, workspaceKey } from './workspaceApi';
+import { useWorkspaceQuery } from './useWorkspaceQuery';
+import { invalidateQueries } from './queryCache';
 import type { Session } from '@supabase/supabase-js';
 
 const storageKey = 'elevanta-test-workspace-v1';
@@ -64,6 +69,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   const [viewerId, setViewerId] = useState(session?.user.id ?? 'shariq');
   const [page, setPage] = useState('Dashboard');
   const [selectedId, setSelectedId] = useState<string | undefined>();
+  const [remoteDetail, setRemoteDetail] = useState<Lead | undefined>();
   const [callingMode, setCallingMode] = useState(false);
   const [callingDirty, setCallingDirty] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
@@ -107,6 +113,8 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   }, [scopedDashboardLeads, selectedRange, dashboardSource, dashboardStatus, dashboardTeamMember, dashboardScope]);
   const filteredDashboard = useMemo(() => dashboardFor(viewer.role === 'manager' && viewer.department === 'marketing' ? { ...viewer, role: 'admin' } : viewer, dashboardLeads, new Date(), workspaceDirectory), [viewer, dashboardLeads, workspaceDirectory]);
   const duplicateCount = useMemo(() => duplicateMatches(leads).length, [leads]);
+  const summaryFilters = useMemo(() => ({ viewerId: viewer.id, period: dashboardPeriod, source: dashboardSource, start: selectedRange.start, end: selectedRange.end }), [viewer.id, dashboardPeriod, dashboardSource, selectedRange.start, selectedRange.end]);
+  const summaryQuery = useWorkspaceQuery(session && remoteLoaded ? workspaceKey(session, 'summary', summaryFilters) : null, (signal) => loadWorkspaceSummary(session!, summaryFilters, signal), 60_000);
 
   useEffect(() => { if (!session) localStorage.setItem(storageKey, JSON.stringify(leads)); }, [leads, session]);
   useEffect(() => { localStorage.setItem(themeStorageKey, theme); }, [theme]);
@@ -118,14 +126,14 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
     setConnectionError('');
     setRemoteLoaded(false);
     setLoadedLeadCount(0);
-    Promise.all([loadRemoteLeads(session, { signal: controller.signal, onProgress: (count) => { if (active) setLoadedLeadCount(count); } }), loadWorkspaceMembers(session, controller.signal)]).then(([remoteLeads, members]) => {
+    Promise.all([loadWorkspaceMembers(session, controller.signal)]).then(([members]) => {
       if (!active) return;
       const directory: User[] = members.map((member) => ({ id: member.id, name: member.full_name, role: member.role, managerId: member.manager_id ?? undefined, department: member.department ?? 'marketing' }));
-      setLeads(remoteLeads);
+      setLeads([]);
       if (directory.length) setWorkspaceDirectory(directory);
       setViewerId(directory.some((member) => member.id === session.user.id) ? session.user.id : directory[0]?.id ?? 'shariq');
       setRemoteLoaded(true);
-      setNotice('Connected to the CRM workspace.');
+      setNotice('Connected to the CRM workspace. Lists and summaries load on demand.');
     }).catch((error: unknown) => { controller.abort(); if (active) { setRemoteLoaded(false); setConnectionError(error instanceof Error ? error.message : 'The CRM could not load your workspace.'); } });
     return () => { active = false; controller.abort(); };
   }, [session?.user.id, session?.access_token, connectionAttempt]);
@@ -136,9 +144,9 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
     void action(session).then(() => { if (success) setNotice(success); }).catch((error: unknown) => setNotice(error instanceof Error ? error.message : 'The CRM could not save this change.'));
   }
 
-  const mutateLead = (leadId: string, mutate: (lead: Lead) => Lead) => setLeads((existing) => existing.map((lead) => lead.id === leadId ? mutate(lead) : lead));
+  const mutateLead = (leadId: string, mutate: (lead: Lead) => Lead) => { setLeads((existing) => existing.map((lead) => lead.id === leadId ? mutate(lead) : lead)); setRemoteDetail((current) => current?.id === leadId ? mutate(current) : current); invalidateQueries(); };
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [page, selectedId]);
-  const select = (leadId: string) => { setSelectedId(leadId); setPage('Lead inbox'); };
+  const select = (leadId: string) => { setSelectedId(leadId); setPage('Lead inbox'); if (session) void loadLeadDetail(session, leadId, viewer.id).then(setRemoteDetail).catch((error) => setNotice(error instanceof Error ? error.message : 'Lead details could not be loaded.')); };
   function callingSaved(leadId:string,result:CallResult,note:string,due:string) {
     setCallingDirty(true);
     if (!session) mutateLead(leadId, lead => ({...lead,activities:[...lead.activities,leadActivity(viewer.id,'note',`Call result: ${result.replaceAll('_',' ')}. ${note}`)],followUps:due ? [...lead.followUps,{id:makeId('follow-up'),ownerId:viewer.id,dueAt:new Date(due).toISOString(),action:'Call',status:'open'}] : lead.followUps}));
@@ -147,7 +155,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   useEffect(() => {
     if (!callingDirty || (page === 'Lead inbox' && callingMode && !selectedId)) return;
     setCallingDirty(false);
-    if (session) void loadRemoteLeads(session).then(setLeads).catch(() => setNotice('Call saved. Refresh the workspace to update lead summaries.'));
+    if (session) { invalidateQueries(); summaryQuery.refresh(); }
   }, [callingDirty, callingMode, page, selectedId, session]);
 
   function updateStatus(lead: Lead, next: OpportunityStatus, options?: { persist?: boolean; lostReason?: Lead['lostReason'] }) {
@@ -304,8 +312,9 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
     : viewer.role === 'marketer' ? 'marketing-agent'
     : viewer.role === 'sales_agent' ? 'sales-agent'
     : undefined;
-  const adminReference = page === 'Dashboard' && viewer.role === 'admin';
-  const roleReferenceDashboard = page === 'Dashboard' && Boolean(roleReferenceKind);
+  const adminReference = !session && page === 'Dashboard' && viewer.role === 'admin';
+  const roleReferenceDashboard = !session && page === 'Dashboard' && Boolean(roleReferenceKind);
+  const remoteSummaryPage = session && ['Dashboard', 'Reports', 'Leaderboard', 'Benchmark Board', 'Data quality'].includes(page);
   const referenceDashboard = adminReference || roleReferenceDashboard;
 
   return <main className={`app-shell theme-${theme} admin-reference-shell role-reference-shell ${mobileNavOpen ? 'nav-open' : ''}`}>
@@ -325,8 +334,8 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
       </div>}
       {notice && <div className="toast" role="status">{notice}</div>}
       {(!session || remoteLoaded) && <>
-      {adminReference ? <AdminCommandCenter viewer={viewer} viewers={switchableUsers} directory={workspaceDirectory} leads={dashboardLeads} dashboard={filteredDashboard} period={dashboardPeriod} customStart={customStart} customEnd={customEnd} source={dashboardSource} theme={theme} onViewer={switchViewer} onPeriod={setDashboardPeriod} onCustomStart={setCustomStart} onCustomEnd={setCustomEnd} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} /> : roleReferenceDashboard && roleReferenceKind ? <RoleReferenceDashboard kind={roleReferenceKind} viewer={viewer} viewers={switchableUsers} leads={dashboardLeads} period={dashboardPeriod} customStart={customStart} customEnd={customEnd} source={dashboardSource} theme={theme} session={session} start={selectedRange.start} end={selectedRange.end} onViewer={switchViewer} onPeriod={setDashboardPeriod} onCustomStart={setCustomStart} onCustomEnd={setCustomEnd} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} onCreate={() => setShowCreate(true)} onOpenLead={select} /> : <>
-{page === 'Lead inbox' && (selected ? <LeadWorkspace lead={selected} viewer={viewer} workspaceUsers={workspaceDirectory} session={session} onBack={() => setSelectedId(undefined)} onStatus={updateStatus} onQualification={updateQualification} onReassign={reassign} onEditDetails={editLeadDetails} onReportIncorrect={reportIncorrect} onDecision={decideReview} /> : <><div className="calling-view-switch">{(viewer.role === 'admin' || viewer.role === 'sales_agent' || (viewer.role === 'manager' && viewer.department === 'sales')) && <><button className={!callingMode ? 'primary' : 'quiet'} aria-pressed={!callingMode} onClick={() => setCallingMode(false)}>Lead view</button><button className={callingMode ? 'primary' : 'quiet'} aria-pressed={callingMode} onClick={() => setCallingMode(true)}>Calling view</button></>}</div>{callingMode ? <CallingView key={viewer.id} leads={visible} viewer={viewer} session={session} ready={!session || remoteLoaded} onDetails={select} onSaved={callingSaved} /> : <section className="inbox-layout"><LeadTable viewer={viewer} canCreate={viewer.role === 'admin' || viewer.role === 'marketer'} leads={visible} users={workspaceDirectory} onSelect={select} onCreate={() => setShowCreate(true)} /></section>}</>)}
+      {remoteSummaryPage ? <RemoteDashboard viewer={viewer} viewers={switchableUsers} summary={summaryQuery.data} loading={summaryQuery.loading} error={summaryQuery.error} onRetry={summaryQuery.refresh} period={dashboardPeriod} customStart={customStart} customEnd={customEnd} source={dashboardSource} theme={theme} onViewer={switchViewer} onPeriod={setDashboardPeriod} onCustomStart={setCustomStart} onCustomEnd={setCustomEnd} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} onOpenLead={select} session={session} start={selectedRange.start} end={selectedRange.end} page={page as 'Dashboard' | 'Reports' | 'Leaderboard' | 'Benchmark Board' | 'Data quality'} /> : adminReference ? <AdminCommandCenter viewer={viewer} viewers={switchableUsers} directory={workspaceDirectory} leads={dashboardLeads} dashboard={filteredDashboard} period={dashboardPeriod} customStart={customStart} customEnd={customEnd} source={dashboardSource} theme={theme} onViewer={switchViewer} onPeriod={setDashboardPeriod} onCustomStart={setCustomStart} onCustomEnd={setCustomEnd} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} /> : roleReferenceDashboard && roleReferenceKind ? <RoleReferenceDashboard kind={roleReferenceKind} viewer={viewer} viewers={switchableUsers} leads={dashboardLeads} period={dashboardPeriod} customStart={customStart} customEnd={customEnd} source={dashboardSource} theme={theme} session={session} start={selectedRange.start} end={selectedRange.end} onViewer={switchViewer} onPeriod={setDashboardPeriod} onCustomStart={setCustomStart} onCustomEnd={setCustomEnd} onSource={setDashboardSource} onTheme={setTheme} onNavigate={navigate} onCreate={() => setShowCreate(true)} onOpenLead={select} /> : <>
+{page === 'Lead inbox' && (selected || remoteDetail ? <LeadWorkspace lead={selected ?? remoteDetail!} viewer={viewer} workspaceUsers={workspaceDirectory} session={session} onBack={() => { setSelectedId(undefined); setRemoteDetail(undefined); }} onStatus={updateStatus} onQualification={updateQualification} onReassign={reassign} onEditDetails={editLeadDetails} onReportIncorrect={reportIncorrect} onDecision={decideReview} /> : <>{session ? <RemoteLeadList session={session} viewer={viewer} users={workspaceDirectory} onSelect={select} onCreate={() => setShowCreate(true)} /> : <><div className="calling-view-switch">{(viewer.role === 'admin' || viewer.role === 'sales_agent' || (viewer.role === 'manager' && viewer.department === 'sales')) && <><button className={!callingMode ? 'primary' : 'quiet'} aria-pressed={!callingMode} onClick={() => setCallingMode(false)}>Lead view</button><button className={callingMode ? 'primary' : 'quiet'} aria-pressed={callingMode} onClick={() => setCallingMode(true)}>Calling view</button></>}</div>{callingMode ? <CallingView key={viewer.id} leads={visible} viewer={viewer} session={session} ready={!session || remoteLoaded} onDetails={select} onSaved={callingSaved} /> : <section className="inbox-layout"><LeadTable viewer={viewer} canCreate={viewer.role === 'admin' || viewer.role === 'marketer'} leads={visible} users={workspaceDirectory} onSelect={select} onCreate={() => setShowCreate(true)} /></section>}</>}</>)}
       {page === 'Lead research' && <LeadResearchQueue viewer={viewer} users={workspaceDirectory} session={session} onNotice={setNotice} onPublished={async (research, salesOwnerId) => {
         if (session) setLeads(await loadRemoteLeads(session));
         else {
@@ -337,9 +346,9 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
         }
         navigate('Lead inbox');
       }} />}
-      {page === 'Follow-ups' && <FollowUpList leads={visible} viewer={viewer} onSelect={select} onComplete={completeFollowUp} />}
-      {page === 'Assignments' && <AssignmentList leads={visible} users={workspaceDirectory} onSelect={select} />}
-      {page === 'Review queue' && <><ReviewQueue leads={leads.filter((lead) => lead.incorrectReview?.state === 'pending')} directory={workspaceDirectory} onSelect={select} />{session && viewer.role === 'admin' && <HistoricalImports session={session} />}</>}
+      {page === 'Follow-ups' && (session ? <RemoteLeadList session={session} viewer={viewer} users={workspaceDirectory} onSelect={select} onCreate={() => setShowCreate(true)} mode="Follow-ups" /> : <FollowUpList leads={visible} viewer={viewer} onSelect={select} onComplete={completeFollowUp} />)}
+      {page === 'Assignments' && (session ? <RemoteLeadList session={session} viewer={viewer} users={workspaceDirectory} onSelect={select} onCreate={() => setShowCreate(true)} mode="Assignments" /> : <AssignmentList leads={visible} users={workspaceDirectory} onSelect={select} />)}
+      {page === 'Review queue' && (session ? <><RemoteLeadList session={session} viewer={viewer} users={workspaceDirectory} onSelect={select} onCreate={() => setShowCreate(true)} mode="Review queue" />{viewer.role === 'admin' && <HistoricalImports session={session} />}</> : <ReviewQueue leads={leads.filter((lead) => lead.incorrectReview?.state === 'pending')} directory={workspaceDirectory} onSelect={select} />)}
       {page === 'Reports' && <Reports dashboard={dashboard} viewer={viewer} duplicates={duplicateCount} />}
       {page === 'Benchmark Board' && canViewManagementBoards(viewer) && <BenchmarkBoard leads={dashboardLeads} />}
       {page === 'Leaderboard' && <Leaderboard leads={dashboardLeads} privateBenchmarkLeads={leads} viewer={viewer} directory={workspaceDirectory} scope={dashboardScope} />}
@@ -348,7 +357,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
       {page === 'My profile' && viewer.role === 'sales_agent' && session && <section className="profile-page"><div className="board-heading"><div><span className="eyebrow">ACCOUNT SETTINGS</span><h2>{viewer.name}</h2><p>Manage your CRM profile and read-only Gmail connection.</p></div></div><AgentGmailConnection session={session} /></section>}
       {page === 'User management' && viewer.role === 'admin' && session && <AdminUserManagement session={session} onNotice={setNotice} onChanged={() => setConnectionAttempt((value) => value + 1)} />}
       </>}
-      {page === 'Dashboard' && (viewer.role === 'admin' || viewer.role === 'manager') && <ConnectionAnalyticsPanel session={session} viewerId={viewer.id} start={selectedRange.start} end={selectedRange.end} source={dashboardSource} />}
+      {!session && page === 'Dashboard' && (viewer.role === 'admin' || viewer.role === 'manager') && <ConnectionAnalyticsPanel session={session} viewerId={viewer.id} start={selectedRange.start} end={selectedRange.end} source={dashboardSource} />}
       </>}
     </section>
     {remoteLoaded && <LeadAlertController session={session} user={signedInUser} onLeads={receiveAlertLeads} onNotice={receiveAlertNotice} />}
