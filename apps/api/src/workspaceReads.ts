@@ -14,12 +14,12 @@ export const workspaceLeadQuery = z.object({ ...common, ...dates, timezone,
   queue: z.enum(['all','action','first','today','overdue','waiting','review','unassigned','assignments','followups','dataquality']).default('all'),
   sort: z.enum(['urgent','assigned','name','updated']).default('urgent'),
 }).refine((value) => !value.start || !value.end || Date.parse(value.start)<=Date.parse(value.end), 'Start must not be after end');
-export const workspaceResearchQuery = z.object({ ...common, source: z.string().max(100).default('all'),
+export const workspaceResearchQuery = z.object({ ...common, ...dates, source: z.string().max(100).default('all'),
   state: z.enum(['all','new','researching','found','not_found','connected','ready_for_sales','sent_to_sales','rejected']).default('all'),
   category: z.enum(['all','app','game','seo','smm','web','not_available']).default('all'),
   readiness: z.enum(['all','ready','needs_contact']).default('all'), duplicate: z.enum(['all','clear','possible','confirmed']).default('all'),
   recent: z.enum(['true','false']).default('false'),
-});
+}).refine((value) => !value.start || !value.end || Date.parse(value.start)<=Date.parse(value.end), 'Start must not be after end');
 export const workspaceSummaryQuery = z.object({ viewerId, ...dates, timezone,
   source:z.string().max(100).default('all'),status:z.string().max(40).default('all'),
   owner:z.union([z.literal('all'),z.string().uuid()]).default('all'),scope:z.enum(['company','marketing','sales']).default('company'),
