@@ -511,7 +511,19 @@ export function createApp(clientForToken: (token: string) => SupabaseClient = co
     const { data, error } = await request.supabase!.from('opportunity_contact_methods')
       .select('id, health, focus, assessment_reason, last_assessed_at, last_assessed_by, contact_methods(id, method_type, value, label, globally_restricted)')
       .eq('opportunity_id', opportunityId).order('created_at', { ascending: true });
-    if (error) throw error; response.json({ contactMethods: data ?? [] });
+    if (error) throw error;
+    if (request.profile!.role === 'sales_agent') {
+      const { data: assignment, error: assignmentError } = await request.supabase!.from('assignments').select('id').eq('opportunity_id', opportunityId).eq('assigned_to', request.profile!.id).is('ended_at', null).maybeSingle();
+      if (assignmentError) throw assignmentError;
+      if (assignment) {
+        const { data: observations, error: observationError } = await request.supabase!.from('assignment_contact_method_assessments').select('contact_method_id, health, focus, reason, assessed_at, assessed_by').eq('assignment_id', assignment.id);
+        if (observationError) throw observationError;
+        const byMethod = new Map((observations ?? []).map((item) => [item.contact_method_id, item]));
+        response.json({ contactMethods: (data ?? []).map((item) => { const method = Array.isArray(item.contact_methods) ? item.contact_methods[0] : item.contact_methods; const observation = byMethod.get(method?.id ?? ''); return observation ? { ...item, health: observation.health, focus: observation.focus, assessment_reason: observation.reason, last_assessed_at: observation.assessed_at, last_assessed_by: observation.assessed_by } : item; }) });
+        return;
+      }
+    }
+    response.json({ contactMethods: data ?? [] });
   }));
   app.get('/v1/opportunities/:id/activity-history', ...protectedRoute(async (request, response) => {
     const opportunityId = parse(id, request.params.id);
