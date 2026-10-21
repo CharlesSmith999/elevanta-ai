@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { IconActivityHeartbeat, IconAlertTriangle, IconArrowRight, IconArrowUpRight, IconBriefcase, IconBulb, IconCalendar, IconChartBar, IconChartPieFilled, IconChecklist, IconChevronDown, IconCircleCheck, IconClock, IconCurrencyDollar, IconFilter, IconFlag, IconHistory, IconHome, IconMail, IconMenu2, IconMoonStars, IconPhone, IconReportAnalytics, IconRobot, IconRocket, IconSearch, IconSparkles, IconSun, IconTarget, IconTargetArrow, IconTrophy, IconTrendingUp, IconUserCircle, IconUsers, IconX } from '@tabler/icons-react';
 import { Area, AreaChart, Bar as RechartsBar, BarChart as RechartsBarChart, CartesianGrid, Cell, Funnel, FunnelChart, LabelList, Line, LineChart, RadialBar, RadialBarChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from 'recharts';
 import {
@@ -8,22 +8,25 @@ import {
 } from './domain';
 import { authEnabled, supabase, type AuthState } from './auth';
 import { addRemoteFollowUp, addRemoteNote, completeRemoteFollowUp, createAdminUser, createRemoteLead, decideRemoteReview, loadAdminUsers, loadRemoteLeads, loadWorkspaceMembers, reassignRemoteLead, reportRemoteIncorrect, updateAdminUser, updateRemoteLeadDetails, updateRemoteStatus, type ManagedUser } from './api';
-import { RoleReferenceDashboard, RoleReferenceKind, RoleReferenceSidebar, RoleSwitcher } from './RoleReferenceDashboards';
-import { XaviarWorkspace } from './XaviarWorkspace';
+import type { RoleReferenceKind } from './RoleReferenceDashboards';
 import { navigationFor } from './navigation';
-import { CreateLeadForm } from './CreateLeadForm';
-import { LeadWorkspace } from './LeadWorkspace';
-import { CallingView } from './CallingView';
+const RoleReferenceDashboard = lazy(() => import('./RoleReferenceDashboards').then(module => ({ default: module.RoleReferenceDashboard })));
+const RoleReferenceSidebar = lazy(() => import('./RoleReferenceDashboards').then(module => ({ default: module.RoleReferenceSidebar })));
+const RoleSwitcher = lazy(() => import('./RoleReferenceDashboards').then(module => ({ default: module.RoleSwitcher })));
+const XaviarWorkspace = lazy(() => import('./XaviarWorkspace').then(module => ({ default: module.XaviarWorkspace })));
+const CreateLeadForm = lazy(() => import('./CreateLeadForm').then(module => ({ default: module.CreateLeadForm })));
+const LeadWorkspace = lazy(() => import('./LeadWorkspace').then(module => ({ default: module.LeadWorkspace })));
+const CallingView = lazy(() => import('./CallingView').then(module => ({ default: module.CallingView })));
 import type { CallResult } from './callingModel';
-import { LeadResearchQueue } from './LeadResearchQueue';
-import { AgentGmailConnection } from './AgentGmailConnection';
-import { LeadAlertController } from './LeadAlertController';
-import { AdminUserManagement } from './AdminUserManagement';
-import { HistoricalImports } from './HistoricalImports';
-import { ConnectionAnalyticsPanel } from './ConnectionAnalyticsPanel';
+const LeadResearchQueue = lazy(() => import('./LeadResearchQueue').then(module => ({ default: module.LeadResearchQueue })));
+const AgentGmailConnection = lazy(() => import('./AgentGmailConnection').then(module => ({ default: module.AgentGmailConnection })));
+const LeadAlertController = lazy(() => import('./LeadAlertController').then(module => ({ default: module.LeadAlertController })));
+const AdminUserManagement = lazy(() => import('./AdminUserManagement').then(module => ({ default: module.AdminUserManagement })));
+const HistoricalImports = lazy(() => import('./HistoricalImports').then(module => ({ default: module.HistoricalImports })));
+const ConnectionAnalyticsPanel = lazy(() => import('./ConnectionAnalyticsPanel').then(module => ({ default: module.ConnectionAnalyticsPanel })));
 import { needsSalesAction } from './leadWorkflow';
-import { RemoteDashboard } from './RemoteDashboard';
-import { RemoteLeadList } from './RemoteLeadList';
+const RemoteDashboard = lazy(() => import('./RemoteDashboard').then(module => ({ default: module.RemoteDashboard })));
+const RemoteLeadList = lazy(() => import('./RemoteLeadList').then(module => ({ default: module.RemoteLeadList })));
 import { loadLeadDetail, loadWorkspaceSummary, workspaceKey } from './workspaceApi';
 import { useWorkspaceQuery } from './useWorkspaceQuery';
 import { invalidateQueries } from './queryCache';
@@ -78,7 +81,8 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   const [createError, setCreateError] = useState('');
   const [creatingLead, setCreatingLead] = useState(false);
   const [notice, setNotice] = useState('');
-  const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>('lifetime');
+  // Keep the first dashboard request bounded to the current month. Users can still switch periods from the visible filter.
+  const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>('monthly');
   const [dashboardSource, setDashboardSource] = useState('all');
   const [dashboardStatus, setDashboardStatus] = useState<'all' | OpportunityStatus>('all');
   const [dashboardTeamMember, setDashboardTeamMember] = useState('all');
@@ -338,12 +342,13 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
   return <main className={`app-shell theme-${theme} admin-reference-shell role-reference-shell ${mobileNavOpen ? 'nav-open' : ''}`}>
     <button className="mobile-nav-toggle" type="button" aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen((open) => !open)}>{mobileNavOpen ? <IconX size={22} /> : <IconMenu2 size={22} />}<span>Menu</span></button>
     {mobileNavOpen && <button className="mobile-nav-backdrop" type="button" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} />}
+    <Suspense fallback={<div className="workspace-loading" role="status">Loading workspace view…</div>}>
     <aside className={`sidebar ${mobileNavOpen ? 'mobile-open' : ''}`}>{viewer.role === 'admin'
       ? <AdminReferenceSidebar viewer={viewer} activePage={page} onNavigate={navigate} onReset={session ? undefined : resetDemo} onSignOut={onSignOut} />
       : roleReferenceKind && <RoleReferenceSidebar kind={roleReferenceKind} viewer={viewer} activePage={page} onNavigate={navigate} onReset={session ? undefined : resetDemo} onSignOut={onSignOut} />}
     </aside>
     <section className={`content ${referenceDashboard ? 'reference-dashboard-content' : 'unified-content'}`}>
-      {!referenceDashboard && <><UnifiedPageHeader page={page} viewer={viewer} viewers={switchableUsers} theme={theme} onViewer={switchViewer} onTheme={setTheme} />
+      {!referenceDashboard && <>{(!remoteSummaryPage || !remoteLoaded) && <UnifiedPageHeader page={page} viewer={viewer} viewers={switchableUsers} theme={theme} onViewer={switchViewer} onTheme={setTheme} />}
         {(remoteLoaded || !session) && <div className={remoteLoaded ? 'notice compact-connection' : 'notice'}><b>{remoteLoaded ? 'Connected CRM workspace' : 'Functional test workspace'}</b><span>{remoteLoaded ? 'Changes are saved to the shared CRM database and are visible according to each user’s role and assignment.' : 'These are browser-only test records. Sign in before using the CRM operationally.'}</span></div>}</>}
       {session && !remoteLoaded && <div className="connection-banner" role={connectionError ? 'alert' : 'status'}>
         <strong>{connectionError ? 'CRM connection unavailable' : 'Connecting to your CRM workspace…'}</strong>
@@ -383,6 +388,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
     </section>
     {remoteLoaded && <LeadAlertController session={session} user={signedInUser} onLeads={receiveAlertLeads} onNotice={receiveAlertNotice} />}
     {showCreate && <CreateLeadForm error={createError} saving={creatingLead} viewer={viewer} salesAgents={workspaceDirectory.filter((user) => user.role === 'sales_agent')} crmReady={!session || remoteLoaded} onReconnect={session ? onSignOut : undefined} onClose={() => setShowCreate(false)} onSubmit={createLead} />}
+    </Suspense>
   </main>;
 }
 
