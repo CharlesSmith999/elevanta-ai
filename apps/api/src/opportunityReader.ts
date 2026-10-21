@@ -5,6 +5,7 @@ type RelatedTable = 'assignments' | 'activities' | 'follow_ups' | 'incorrect_rep
 
 const PAGE_SIZE = 1000;
 const RELATED_ID_BATCH_SIZE = 100;
+const RELATED_BATCH_CONCURRENCY = 3;
 
 const relatedColumns: Record<RelatedTable, string> = {
   assignments: 'id,opportunity_id,assigned_to,assigned_by,visibility_mode,reason,started_at,ended_at',
@@ -17,11 +18,26 @@ const relatedColumns: Record<RelatedTable, string> = {
 async function readAllPages(client: SupabaseClient, table: RelatedTable, opportunityIds: string[]): Promise<Row[]> {
   if (!opportunityIds.length) return [];
   // UUID filters are URL-encoded. Keep each query below common gateway URL
-  // limits while fetching at most three independent batches per relation.
+  // limits. An explicit worker pool caps concurrency even with larger lead pages.
   if (opportunityIds.length > RELATED_ID_BATCH_SIZE) {
     const batches: string[][] = [];
     for (let start = 0; start < opportunityIds.length; start += RELATED_ID_BATCH_SIZE) batches.push(opportunityIds.slice(start, start + RELATED_ID_BATCH_SIZE));
-    return (await Promise.all(batches.map((ids) => readAllPages(client, table, ids)))).flat();
+    const results: Row[][] = new Array(batches.length);
+    let nextBatch = 0;
+    let failed = false;
+    const worker = async () => {
+      while (!failed && nextBatch < batches.length) {
+        const index = nextBatch++;
+        try {
+          results[index] = await readAllPages(client, table, batches[index]);
+        } catch (error) {
+          failed = true;
+          throw error;
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(RELATED_BATCH_CONCURRENCY, batches.length) }, worker));
+    return results.flat();
   }
   const rows: Row[] = [];
   for (let offset = 0; ; offset += PAGE_SIZE) {
@@ -47,7 +63,7 @@ function groupByOpportunity(rows: Row[]) {
 
 export async function readOpportunities(client: SupabaseClient, status?: string, options?: { limit?: number; offset?: number; after?: string }): Promise<Row[]> {
   const opportunities: Row[] = [];
-  const limit = Math.max(1, Math.min(options?.limit ?? 250, 250));
+  const limit = Math.max(1, Math.min(options?.limit ?? 500, 500));
   const offset = Math.max(0, options?.offset ?? 0);
   // An immutable key avoids skipping records when a lead is updated while the
   // browser is walking the pages. RLS remains enforced by the caller's client.
