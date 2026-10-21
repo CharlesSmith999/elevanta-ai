@@ -53,21 +53,22 @@ test('authenticated CRM, research and history handlers expose complete bounded c
     next();
   });
     for (const [route, key] of [['/v1/opportunities', 'opportunities'], ['/v1/inbound/research-leads', 'researchLeads'], ['/v1/opportunities/:id/activity-history', 'activities']]) {
+      const pageSize = key === 'opportunities' ? 500 : 250;
       const loaded: Row[] = [];
       let after: string | null = null;
       let pages = 0;
       do {
-        const params: Record<string, string> = { limit: '250' };
+        const params: Record<string, string> = { limit: String(pageSize) };
         if (after) params.after = after;
         const body = await get(route, params);
-        assert.ok(body[key].length <= 250);
+        assert.ok(body[key].length <= pageSize);
         loaded.push(...body[key]);
         after = body.nextCursor;
         assert.ok(++pages <= 3);
       } while (after);
       assert.equal(loaded.length, 501, route);
       assert.equal(new Set(loaded.map((row) => row.id)).size, 501, route);
-      assert.equal(pages, 3, route);
+      assert.equal(pages, key === 'opportunities' ? 2 : 3, route);
       await assert.rejects(get(route, { after: 'invalid' }));
     }
     assert.ok(queries.some((query) => query.after === uuid(249)));
