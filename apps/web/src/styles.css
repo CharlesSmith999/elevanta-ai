@@ -713,3 +713,5 @@
   .assignment-reason { max-width: none; white-space: normal; }
   .assignment-pagination { align-items: flex-start; flex-direction: column; }
 }
+
+.workspace-loading { display: grid; min-height: 180px; place-items: center; color: var(--muted); font-size: 13px; }
