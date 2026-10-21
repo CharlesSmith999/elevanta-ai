@@ -23,6 +23,21 @@ test('exact page multiples and empty collections terminate without losing record
   assert.deepEqual(await loadAllPages(async () => ({ rows: [], nextCursor: null })), []);
 });
 
+test('500-record pages preserve exact multiples and a partial final page', async () => {
+  for (const count of [0, 500, 1000, 10_327]) {
+    const records = Array.from({ length: count }, (_, index) => ({ id: String(index) }));
+    let calls = 0;
+    const result = await loadAllPages(async (after) => {
+      calls++;
+      const offset = after ? Number(after) + 1 : 0;
+      const rows = records.slice(offset, offset + 500);
+      return { rows, nextCursor: rows.length === 500 ? rows.at(-1)!.id : null };
+    });
+    assert.deepEqual(result, records);
+    assert.equal(calls, Math.floor(count / 500) + 1);
+  }
+});
+
 test('failed later page rejects rather than returning misleading partial totals', async () => {
   await assert.rejects(loadAllPages(async (after) => {
     if (after) throw new Error('Synthetic API failure');
