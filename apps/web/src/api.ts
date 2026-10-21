@@ -3,10 +3,18 @@ import type { Activity, Assignment, FollowUp, IncorrectReport, Lead, LeadCategor
 import type { ContactFocus, ContactHealth, ContactMethodType } from './leadWorkflow';
 import type { ResearchLead, ResearchMethod, ResearchState } from './inboundResearch';
 import { supabase } from './auth';
+import { boundedRead, loadAllPages, type LoadOptions } from './pagedLoader';
 import type { connectionAnalytics } from '../../api/src/connectionAnalytics';
+import { invalidateQueries } from './queryCache';
 
 export function loadConnectionAnalytics(session: Session, filter: {viewerId: string; start?: string; end: string; source: string; timezone: string}) {
-  const params = new URLSearchParams(Object.entries(filter).filter((entry): entry is [string,string] => typeof entry[1] === 'string'));
+  // The local role-preview directory can contain legacy identifiers while the
+  // production API expects a Supabase profile UUID. In that case, omit the
+  // optional preview filter and let the API use the authenticated profile.
+  // This keeps analytics usable without changing lead data or access rules.
+  const params = new URLSearchParams({ end: filter.end, source: filter.source, timezone: filter.timezone });
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(filter.viewerId)) params.set('viewerId', filter.viewerId);
+  if (filter.start) params.set('start', filter.start);
   return request<ReturnType<typeof connectionAnalytics>>(session,`/v1/analytics/connections?${params}`);
 }
 
@@ -19,7 +27,7 @@ export function loadConnectionAnalytics(session: Session, filter: {viewerId: str
 const configuredApiBase = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
 const apiBase = import.meta.env.DEV && configuredApiBase ? configuredApiBase.replace(/\/+$/, '') : '/api';
 
-type OpportunityRecord = {
+export type OpportunityRecord = {
   id: string;
   status: OpportunityStatus;
   qualification: Qualification;
@@ -33,6 +41,9 @@ type OpportunityRecord = {
   source_received_at?: string | null;
   historical_source_date?: string | null;
   lost_reason?: Lead['lostReason'] | null;
+  total_project_cost?: number | null;
+  upfront_payment_amount?: number | null;
+  won_at?: string | null;
   created_at: string;
   updated_at: string;
   contacts?: { name: string; normalized_phone?: string | null; normalized_email?: string | null } | null;
@@ -96,14 +107,14 @@ export type RemoteActivity = {
   contact_methods?: { value: string; method_type: ContactMethodType } | null;
 };
 
-type RemoteResearchLead = {
+export type RemoteResearchLead = {
   id: string; marketing_owner_id: string; research_state: ResearchState; name: string; masked_phone?: string | null; masked_email?: string | null;
   address?: string | null; source: string; lead_category: LeadCategory; credits?: number | null; description?: string | null; details?: string | null;
   discovered_methods?: ResearchMethod[] | null; evidence_links?: string[] | null; research_notes?: string | null; duplicate_state: ResearchLead['duplicateState']; published_opportunity_id?: string | null;
   inbound_messages?: { provider_message_id: string; provider_thread_id?: string | null; received_at: string } | null;
 };
 
-const mapResearchLead = (record: RemoteResearchLead & { revision?: number }): ResearchLead => ({ id: record.id, revision: record.revision ?? 0, providerMessageId: record.inbound_messages?.provider_message_id ?? 'Unavailable', providerThreadId: record.inbound_messages?.provider_thread_id ?? undefined, receivedAt: record.inbound_messages?.received_at ?? '', source: record.source, name: record.name, maskedPhone: record.masked_phone ?? undefined, maskedEmail: record.masked_email ?? undefined, address: record.address ?? undefined, category: record.lead_category, credits: record.credits ?? undefined, description: record.description ?? undefined, details: record.details ?? undefined, marketingOwnerId: record.marketing_owner_id, state: record.research_state, methods: record.discovered_methods ?? [], evidenceLinks: record.evidence_links ?? [], researchNotes: record.research_notes ?? undefined, duplicateState: record.duplicate_state, publishedOpportunityId: record.published_opportunity_id ?? undefined });
+export const mapResearchLead = (record: RemoteResearchLead & { revision?: number }): ResearchLead => ({ id: record.id, revision: record.revision ?? 0, providerMessageId: record.inbound_messages?.provider_message_id ?? 'Unavailable', providerThreadId: record.inbound_messages?.provider_thread_id ?? undefined, receivedAt: record.inbound_messages?.received_at ?? '', source: record.source, name: record.name, maskedPhone: record.masked_phone ?? undefined, maskedEmail: record.masked_email ?? undefined, address: record.address ?? undefined, category: record.lead_category, credits: record.credits ?? undefined, description: record.description ?? undefined, details: record.details ?? undefined, marketingOwnerId: record.marketing_owner_id, state: record.research_state, methods: record.discovered_methods ?? [], evidenceLinks: record.evidence_links ?? [], researchNotes: record.research_notes ?? undefined, duplicateState: record.duplicate_state, publishedOpportunityId: record.published_opportunity_id ?? undefined });
 
 async function send(session: Session, path: string, init?: RequestInit) {
   return fetch(`${apiBase}${path}`, {
@@ -135,17 +146,18 @@ export async function request<T>(session: Session, path: string, init?: RequestI
     if (body.issues?.length) body.message = body.issues.map((issue) => issue.message).filter(Boolean).join(' ');
     throw new ApiError(response.status, body.message ?? `CRM request failed (${response.status})`);
   }
+  if (init?.method && !['GET', 'HEAD'].includes(init.method.toUpperCase()) && !['/v1/calling-list', '/v1/calling-list/page', '/v1/calling-list/export'].includes(path)) invalidateQueries();
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
-function mapOpportunity(record: OpportunityRecord): Lead {
+export function mapOpportunity(record: OpportunityRecord): Lead {
   const assignments: Assignment[] = (record.assignments ?? []).map((item) => ({ id: item.id, ownerId: item.assigned_to, assignedBy: item.assigned_by, at: item.started_at, endedAt: item.ended_at ?? undefined, visibility: item.visibility_mode, reason: item.reason ?? 'CRM assignment' }));
   const activities: Activity[] = (record.activities ?? []).map((item) => ({ id: item.id, actorId: item.actor_id ?? 'system', at: item.created_at, kind: item.type === 'note' ? 'note' : item.type === 'assignment' ? 'assignment' : item.type === 'follow_up' ? 'follow_up' : item.type === 'incorrect_report' ? 'incorrect_report' : item.type === 'status_change' ? 'status' : 'system', body: item.body ?? 'CRM activity' }));
   const followUps: FollowUp[] = (record.follow_ups ?? []).map((item) => ({ id: item.id, ownerId: item.owner_id, dueAt: item.due_at, action: item.action_type, status: item.status }));
   const incorrectReports: IncorrectReport[] = (record.incorrect_reports ?? []).map((item) => ({ reporterId: item.reporter_id, reporterRole: item.reporter_role ?? undefined, reason: item.reason_code, evidence: item.evidence ?? undefined, at: item.created_at }));
   const review = record.incorrect_reviews?.[0];
-  const stageHistory: StageHistory[] = (record.activities ?? []).filter((item) => item.type === 'status_change' && item.to_status).map((item) => ({ id: item.id, fromStatus: item.from_status ?? undefined, toStatus: item.to_status!, enteredAt: item.created_at, actorId: item.actor_id ?? undefined, reason: item.body ?? 'Status updated' }));
+  const stageHistory: StageHistory[] = (record.activities ?? []).filter((item) => (item.type === 'status_change' || item.type === 'historical_status') && item.to_status).map((item) => ({ id: item.id, fromStatus: item.from_status ?? undefined, toStatus: item.to_status!, enteredAt: item.created_at, actorId: item.actor_id ?? undefined, reason: item.body ?? 'Status updated' }));
   const currentOwner = assignments.find((item) => !item.endedAt)?.ownerId;
   return {
     id: record.id,
@@ -172,30 +184,26 @@ function mapOpportunity(record: OpportunityRecord): Lead {
     incorrectReview: review?.decision ? { state: review.decision, reviewerId: review.reviewer_id ?? undefined, reason: review.decision_reason ?? undefined, decidedAt: review.decided_at ?? undefined } : incorrectReports.length >= 3 ? { state: 'pending' } : undefined,
     routingPaused: !review?.decision && incorrectReports.length >= 3,
     lostReason: record.lost_reason ?? undefined,
+    totalProjectCost: record.total_project_cost ?? undefined,
+    upfrontPaymentAmount: record.upfront_payment_amount ?? undefined,
+    wonAt: record.won_at ?? undefined,
     duplicateOf: undefined,
     ...(currentOwner ? {} : {}),
   };
 }
 
-export async function loadRemoteLeads(session: Session): Promise<Lead[]> {
-  const result = await request<{ opportunities: OpportunityRecord[] }>(session, '/v1/opportunities');
-  return result.opportunities.map(mapOpportunity);
+export async function loadRemoteLeads(session: Session, options: LoadOptions = {}): Promise<Lead[]> {
+  const records = await loadAllPages<OpportunityRecord>(async (after, signal) => {
+    const params = new URLSearchParams({ limit: '500' });
+    if (after) params.set('after', after);
+    const result = await request<{ opportunities: OpportunityRecord[]; nextCursor: string | null }>(session, `/v1/opportunities?${params}`, { signal });
+    return { rows: result.opportunities, nextCursor: result.nextCursor };
+  }, options);
+  return records.sort((a, b) => b.updated_at.localeCompare(a.updated_at) || a.id.localeCompare(b.id)).map(mapOpportunity);
 }
 
-export async function loadRemoteLeadPage(session: Session, offset = 0, limit = 50): Promise<{ leads: Lead[]; hasMore: boolean; nextOffset: number | null }> {
-  const params = new URLSearchParams({ offset: String(offset), limit: String(limit) });
-  const result = await request<{ opportunities: OpportunityRecord[]; hasMore: boolean; nextOffset: number | null }>(session, `/v1/opportunities?${params}`);
-  return { leads: result.opportunities.map(mapOpportunity), hasMore: result.hasMore, nextOffset: result.nextOffset };
-}
-
-export type DashboardSummary = { role: string; period: string; source: string; sampleSize: number; byStatus: Record<string, number>; byQualification: Record<string, number> };
-export const loadDashboardSummary = (session: Session, role: string, filters: { period?: string; source?: string; start?: string; end?: string } = {}) => {
-  const params = new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => Boolean(entry[1])));
-  return request<DashboardSummary>(session, `/v1/dashboards/${role}/summary?${params}`);
-};
-
-export async function loadWorkspaceMembers(session: Session): Promise<WorkspaceMember[]> {
-  const result = await request<{ users: WorkspaceMember[] }>(session, '/v1/workspace-members');
+export async function loadWorkspaceMembers(session: Session, signal?: AbortSignal): Promise<WorkspaceMember[]> {
+  const result = await boundedRead((requestSignal) => request<{ users: WorkspaceMember[] }>(session, '/v1/workspace-members', { signal: requestSignal }), signal);
   return result.users;
 }
 
@@ -212,13 +220,29 @@ export const loadAdminUsers = (session: Session) => request<{ users: ManagedUser
 export const createAdminUser = (session: Session, body: unknown) => request<{ user: ManagedUser }>(session, '/v1/admin/users', { method: 'POST', body: JSON.stringify(body) });
 export const updateAdminUser = (session: Session, id: string, body: unknown) => request<{ user: ManagedUser }>(session, `/v1/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
 export const loadRemoteContactMethods = (session: Session, id: string) => request<{ contactMethods: RemoteContactMethod[] }>(session, `/v1/opportunities/${id}/contact-methods`);
-export const loadRemoteActivityHistory = (session: Session, id: string) => request<{ activities: RemoteActivity[] }>(session, `/v1/opportunities/${id}/activity-history`);
+export async function loadRemoteActivityHistory(session: Session, id: string) {
+  const activities = await loadAllPages<RemoteActivity>(async (after, signal) => {
+    const params = new URLSearchParams();
+    if (after) params.set('after', after);
+    const result = await request<{ activities: RemoteActivity[]; nextCursor: string | null }>(session, `/v1/opportunities/${id}/activity-history?${params}`, { signal });
+    return { rows: result.activities, nextCursor: result.nextCursor };
+  });
+  return { activities: activities.sort((a, b) => (b.occurred_at ?? b.created_at).localeCompare(a.occurred_at ?? a.created_at) || a.id.localeCompare(b.id)) };
+}
 export const addRemoteContactMethod = (session: Session, id: string, body: unknown) => request<{ contactMethodId: string }>(session, `/v1/opportunities/${id}/contact-methods`, { method: 'POST', body: JSON.stringify(body) });
 export const assessRemoteContactMethod = (session: Session, id: string, contactMethodId: string, body: unknown) => request<void>(session, `/v1/opportunities/${id}/contact-methods/${contactMethodId}`, { method: 'PATCH', body: JSON.stringify(body) });
 export const restoreRemoteContactMethod = (session: Session, id: string, contactMethodId: string, body: unknown) => request<void>(session, `/v1/opportunities/${id}/contact-methods/${contactMethodId}/restore`, { method: 'POST', body: JSON.stringify(body) });
 export const logRemoteSalesActivity = (session: Session, id: string, body: unknown) => request<{ activityId: string }>(session, `/v1/opportunities/${id}/activities`, { method: 'POST', body: JSON.stringify(body) });
 export const sendRemoteLeadEmail = (session: Session, id: string, body: { toEmail: string; subject: string; body: string; replyToMessageId?: string }) => request<{ status: 'sent'; messageId: string }>(session, `/v1/opportunities/${id}/email`, { method: 'POST', body: JSON.stringify(body) });
-export async function loadResearchLeads(session: Session) { const result = await request<{ researchLeads: RemoteResearchLead[] }>(session, '/v1/inbound/research-leads'); return result.researchLeads.map(mapResearchLead); }
+export async function loadResearchLeads(session: Session) {
+  const records = await loadAllPages<RemoteResearchLead>(async (after, signal) => {
+    const params = new URLSearchParams({ limit: '250' });
+    if (after) params.set('after', after);
+    const result = await request<{ researchLeads: RemoteResearchLead[]; nextCursor: string | null }>(session, `/v1/inbound/research-leads?${params}`, { signal });
+    return { rows: result.researchLeads, nextCursor: result.nextCursor };
+  });
+  return records.map(mapResearchLead).sort((a, b) => b.receivedAt.localeCompare(a.receivedAt) || a.id.localeCompare(b.id));
+}
 export type GmailHealth = { mailbox:string; settingsRevision?:string; setupReady:boolean; connected:boolean; enabled:boolean; activatedAt?:string; lastSyncAt?:string; lastError?:string; activationApproved:boolean; failures?:{provider_message_id:string;failure_code:string;received_at:string}[] };
 export const replaceGmailMailbox = (session:Session,mailbox:string,expectedRevision:string) => request(session,'/v1/admin/gmail/replace-mailbox',{method:'POST',body:JSON.stringify({mailbox,expectedRevision,confirmed:true})});
 export const saveGmailMailbox = (session:Session,mailbox:string) => request(session,'/v1/admin/gmail/mailbox',{method:'PUT',body:JSON.stringify({mailbox})});

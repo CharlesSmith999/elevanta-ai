@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { IconBellRinging, IconVolume, IconX } from '@tabler/icons-react';
 import type { Session } from '@supabase/supabase-js';
-import { loadRemoteLeads, loadResearchLeads } from './api';
-import { ownerId, type Lead, type User } from './domain';
+import { request } from './api';
+import { type Lead, type User } from './domain';
+import { invalidateQueries } from './queryCache';
 
 export const researchAlertRefreshEvent = 'elevanta:research-alert-refresh';
 
@@ -126,42 +127,21 @@ export function LeadAlertController({ session, user, onLeads, onNotice }: {
   useEffect(() => {
     if (!session || !user || (!eligibleForResearch && !eligibleForAssignment)) return;
     let active = true;
-    let initialized = false;
-    let known = new Set<string>();
+    let cursor: string | undefined;
     let timer: number | undefined;
 
     const check = async () => {
       try {
-        if (eligibleForResearch) {
-          const records = await loadResearchLeads(session);
-          if (!active) return;
-          const next = new Set(records.map((record) => record.id));
-          if (initialized) {
-            const newIds = [...next].filter((id) => !known.has(id) && claimAlert(user.id, 'research', id));
-            if (newIds.length) {
-              window.dispatchEvent(new CustomEvent(researchAlertRefreshEvent));
-              onNotice(`${newIds.length} new lead${newIds.length === 1 ? '' : 's'} arrived in Lead Research.`);
-              void playBell();
-            }
-          }
-          known = next;
-        } else {
-          const leads = await loadRemoteLeads(session);
-          if (!active) return;
-          const next = new Set(leads.flatMap((lead) => lead.assignments
-            .filter((assignment) => !assignment.endedAt && assignment.ownerId === user.id && ownerId(lead) === user.id)
-            .map((assignment) => assignment.id)));
-          if (initialized) {
-            const newIds = [...next].filter((id) => !known.has(id) && claimAlert(user.id, 'assignment', id));
-            if (newIds.length) {
-              onLeads(leads);
-              onNotice(`${newIds.length} new lead${newIds.length === 1 ? '' : 's'} assigned to you.`);
-              void playBell();
-            }
-          }
-          known = next;
+        if (document.visibilityState === 'hidden' || !navigator.onLine) return;
+        const result = await request<{cursor: string; research: number; assignments: number}>(session, `/v1/workspace/alerts${cursor ? `?since=${encodeURIComponent(cursor)}` : ''}`);
+        if (!active) return;
+        const count = eligibleForResearch ? result.research : result.assignments;
+        if (cursor && count > 0 && claimAlert(user.id, eligibleForResearch ? 'research' : 'assignment', result.cursor)) {
+          invalidateQueries();
+          onNotice(`${count} new lead${count === 1 ? '' : 's'} ${eligibleForResearch ? 'arrived in Lead Research.' : 'assigned to you.'}`);
+          void playBell();
         }
-        initialized = true;
+        cursor = result.cursor;
       } catch {
         // The normal connection banner owns API failure messaging. Alerts retry quietly.
       } finally {

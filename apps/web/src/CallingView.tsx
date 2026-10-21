@@ -1,22 +1,37 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { IconPhone, IconCopy } from '@tabler/icons-react';
 import { request } from './api';
+import { useDebouncedValue, useWorkspaceQuery } from './useWorkspaceQuery';
+import { workspaceKey } from './workspaceApi';
+import type { CallingPage } from '../../api/src/callingPage';
 import { currentAssignment, leadCategoryLabels, lostReasonOptions, ownerId, type Lead, type User, type LeadCategory } from './domain';
-import { callingRows, callTab, callMetrics, localDay, callResults, callResultTones, type CallingRecord, type CallRow, type CallResult } from './callingModel';
+import { callingRows, callTab, callMetrics, localDay, callResults, callResultTones, callingCsv, type CallingRecord, type CallRow, type CallResult } from './callingModel';
 import './callingView.css';
 
 function samples(leads: Lead[]): CallingRecord[] {
   return leads.map(lead => ({ id: lead.id, name: lead.name, category: lead.category ?? 'not_available', status: lead.status, qualification: lead.qualification, source: lead.source, ownerId: ownerId(lead) ?? null, assignedAt: currentAssignment(lead)?.at ?? null, blocked: Boolean(lead.routingPaused) || ['incorrect','duplicate','do_not_contact','won','lost','not_interested'].includes(lead.status), methods: (lead.discoveredContactMethods ?? (lead.phone ? [{type: 'phone' as const, value: lead.phone}] : [])).map((method,index) => ({ ...method, id: `${lead.id}-${index}`, health: 'unverified', focus: 'active', restricted: false })), events: [], followUps: lead.followUps.filter(item => item.status === 'open').map(item => ({ methodId: null, dueAt: item.dueAt })) }));
 }
 
+function savedOutcomes(viewerId: string): string[] {
+  try { const saved: unknown = JSON.parse(localStorage.getItem(`elevanta-calling-status-filters:${viewerId}`) ?? '[]'); return Array.isArray(saved) ? saved.filter((value): value is string => typeof value === 'string' && (value === 'never' || Object.hasOwn(callResults,value))) : []; }
+  catch { return []; }
+}
+
 export function CallingView({ leads, viewer, session, ready, onDetails, onSaved }: { leads: Lead[]; viewer: User; session?: Session; ready: boolean; onDetails: (id: string) => void; onSaved: (leadId:string,result:CallResult,note:string,due:string) => void }) {
   const [records, setRecords] = useState<CallingRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [sampleLoading, setSampleLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [tab, setTab] = useState('todo');
-  const [outcomes, setOutcomes] = useState<string[]>([]);
+  const [preference, setPreference] = useState(() => ({viewerId:viewer.id, values:savedOutcomes(viewer.id)}));
+  const outcomes = preference.viewerId === viewer.id ? preference.values : savedOutcomes(viewer.id);
+  function setOutcomes(update: string[] | ((current: string[]) => string[])) {
+    const values = typeof update === 'function' ? update(outcomes) : update;
+    setPreference({viewerId:viewer.id,values});
+    try { localStorage.setItem(`elevanta-calling-status-filters:${viewer.id}`,JSON.stringify(values)); } catch { /* Preferences remain usable when browser storage is unavailable. */ }
+    setPage(0);
+  }
   const [service, setService] = useState('all');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
@@ -24,41 +39,57 @@ export function CallingView({ leads, viewer, session, ready, onDetails, onSaved 
   const [clock, setClock] = useState(new Date());
   const [reportDay, setReportDay] = useState(localDay(new Date()));
   const [revision, setRevision] = useState(0);
-  const scope = useMemo(() => leads.map(lead => lead.id).sort().join(','), [leads]);
+  const [exporting, setExporting] = useState(false);
+  const scope = session ? '' : leads.map(lead => lead.id).sort().join(',');
   const identity = `${session?.user.id ?? 'sample'}:${viewer.id}:${scope}`;
   const identityRef = useRef(identity); identityRef.current = identity;
-  const filterKey = `elevanta-calling-status-filters:${viewer.id}`;
-  useEffect(() => { try { const saved = JSON.parse(localStorage.getItem(filterKey) ?? 'null'); if (Array.isArray(saved)) setOutcomes(saved.filter(value => value === 'never' || value in callResults)); } catch { /* Use all results when no saved preference exists. */ } }, [filterKey]);
-  useEffect(() => { localStorage.setItem(filterKey, JSON.stringify(outcomes)); }, [filterKey, outcomes]);
   useEffect(() => { const timer = window.setInterval(() => setClock(new Date()), 30000); return () => window.clearInterval(timer); }, []);
   useEffect(() => {
-    let active = true; setRecords([]); setLoading(true); setError(''); setExpanded(undefined);
-    if (session && !ready) { setLoading(false); setError('Reconnect to the CRM before opening the calling view.'); return; }
+    setRecords([]); setSampleLoading(true); setError(''); setExpanded(undefined);
     if (!session) {
       let cached: CallingRecord[] = []; try { cached = JSON.parse(localStorage.getItem(`elevanta-sample-calls:${viewer.id}`) ?? '[]'); } catch { /* Fresh sample workspace. */ }
-      setRecords(samples(leads).map(record => { const saved=cached.find(item=>item.id===record.id); return saved ? {...record,methods:saved.methods,events:saved.events,followUps:saved.followUps,blocked:saved.blocked} : record; })); setLoading(false); return;
+      setRecords(samples(leads).map(record => { const saved=cached.find(item=>item.id===record.id); return saved ? {...record,methods:saved.methods,events:saved.events,followUps:saved.followUps,blocked:saved.blocked} : record; }));
     }
-    const ids = scope ? scope.split(',') : [];
-    void (async () => {
-      const result: CallingRecord[] = [];
-      for (let offset = 0; offset < ids.length; offset += 400) {
-        const responses = await Promise.all([0,100,200,300].filter(step => offset+step < ids.length).map(step => request<{records: CallingRecord[]}>(session, '/v1/calling-list', { method: 'POST', body: JSON.stringify({ids: ids.slice(offset+step, offset+step+100)}) })));
-        if (!active) return;
-        result.push(...responses.flatMap(response => response.records));
-      }
-      if (active) { setRecords(result); setLoading(false); }
-    })().catch(err => { if (active) { setError(err instanceof Error ? err.message : 'Calling list could not load.'); setLoading(false); } });
-    return () => { active = false; };
+    setSampleLoading(false);
   }, [identity, revision, ready]);
-  useEffect(() => { if (!session && !loading) localStorage.setItem(`elevanta-sample-calls:${viewer.id}`,JSON.stringify(records)); }, [session,loading,records,viewer.id]);
+  useEffect(() => { if (!session && !sampleLoading) localStorage.setItem(`elevanta-sample-calls:${viewer.id}`,JSON.stringify(records)); }, [session,sampleLoading,records,viewer.id]);
   const today = localDay(clock);
-  const deferredQuery = useDeferredValue(query);
-  const rows = useMemo(() => callingRows(records, today), [records, today]);
-  const matching = useMemo(() => rows.filter(row => (!outcomes.length || outcomes.includes(row.latest?.outcome ?? 'never')) && (service === 'all' || row.record.category === service) && row.record.name.toLowerCase().includes(deferredQuery.trim().toLowerCase())), [rows, outcomes, service, deferredQuery]);
-  const filtered = useMemo(() => matching.filter(row => callTab(row, tab, clock)), [matching, tab, clock]);
-  const metrics = useMemo(() => callMetrics(records, reportDay, viewer.role === 'sales_agent' ? viewer.id : undefined), [records, reportDay, viewer.role]);
-  const pageIndex = Math.min(page, Math.max(0, Math.ceil(filtered.length/30)-1));
-  useEffect(() => { setPage(0); }, [tab,outcomes,service,query]);
+  const debouncedQuery = useDebouncedValue(query);
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const input = {viewerId:viewer.id,page,pageSize:30 as const,tab,outcomes,service,query:debouncedQuery,reportDay,timeZone};
+  const remote = useWorkspaceQuery<CallingPage>(session && ready ? workspaceKey(session,'calling',{...input,today}) : null,
+    signal => request<CallingPage>(session!, '/v1/calling-list/page', {method:'POST',body:JSON.stringify(input),signal}));
+  const refreshRef = useRef(remote.refresh); refreshRef.current = remote.refresh;
+  useEffect(() => {
+    if (!session || !ready || expanded) return;
+    const timer = window.setInterval(() => refreshRef.current(),30_000);
+    return () => window.clearInterval(timer);
+  }, [session?.user.id,ready,expanded]);
+  const loading = session ? remote.loading : sampleLoading;
+  const loadError = error || remote.error || (session && !ready ? 'Reconnect to the CRM before opening the calling view.' : '');
+  const rows = callingRows(records, today);
+  const matching = rows.filter(row => (!outcomes.length || outcomes.includes(row.latest?.outcome ?? 'never')) && (service === 'all' || row.record.category === service) && row.record.name.toLowerCase().includes(query.trim().toLowerCase()));
+  const filtered = matching.filter(row => callTab(row, tab, clock));
+  const metrics = session ? remote.data?.metrics ?? {attempts:0,unique:0,connected:0,rate:0} : callMetrics(records, reportDay, viewer.role === 'sales_agent' ? viewer.id : undefined);
+  const total = session ? remote.data?.total ?? 0 : filtered.length;
+  const pageIndex = Math.min(page, Math.max(0, Math.ceil(total/30)-1));
+  const visibleRows = session ? remote.data?.rows ?? [] : filtered.slice(pageIndex*30,pageIndex*30+30);
+  const tabCount = (key: string) => session ? remote.data?.tabCounts[key as keyof CallingPage['tabCounts']] ?? 0 : matching.filter(row => callTab(row,key,clock)).length;
+  useEffect(() => { if (remote.data && page > pageIndex) setPage(pageIndex); }, [remote.data,page,pageIndex]);
+  useEffect(() => { setPage(0);setExpanded(undefined); }, [identity]);
+  async function exportRows() {
+    setExporting(true); setError('');
+    try {
+      const captured = identity;
+      const result = session ? await request<{records:CallingRecord[]}>(session, '/v1/calling-list/page/export', {method:'POST', body:JSON.stringify(input)}) : {records};
+      if (identityRef.current !== captured) return;
+      const keys = new Set(filtered.map(row => row.key));
+      const selected = session ? result.records : result.records.map(record => ({...record, methods:record.methods.filter(method => keys.has(`${record.id}:${method.id}`))}));
+      const url = URL.createObjectURL(new Blob([callingCsv(selected)], {type:'text/csv;charset=utf-8;'}));
+      const link = document.createElement('a'); link.href = url; link.download = `calling-list-${today}.csv`; link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setNotice('Filtered calling list downloaded.');
+    } catch(err) { setError(err instanceof Error ? err.message : 'Download failed.'); } finally { setExporting(false); }
+  }
   async function save(row: CallRow, result: CallResult, note: string, due: string, reason: string, requestId: string) {
     const captured = identity;
     if (session) {
@@ -72,13 +103,13 @@ export function CallingView({ leads, viewer, session, ready, onDetails, onSaved 
   const canAct = (viewer.role === 'sales_agent' || viewer.role === 'admin') && (!session || session.user.id === viewer.id);
   const canCallRow = (row: CallRow) => row.usable && canAct && (viewer.role === 'admin' || row.record.ownerId === viewer.id);
   return <section className="panel calling-view" aria-label="Calling view">
-    <div className="panel-heading"><div><h2>Calling view</h2><p>Call, record the result, and continue with the next row.</p>{viewer.role === 'admin' && <small className="admin-call-note">Admin test actions are recorded under your Admin account.</small>}</div></div>
+    <div className="panel-heading"><div><h2>Calling view</h2><p>Call, record the result, and continue with the next row.</p>{viewer.role === 'admin' && <small className="admin-call-note">Admin test actions are recorded under your Admin account.</small>}</div><button className="quiet" disabled={loading || exporting || !total} onClick={() => void exportRows()}>{exporting ? 'Preparing download…' : 'Download filtered leads'}</button></div>
     <div className="calling-metrics"><label>Report date<input type="date" value={reportDay} max={today} onChange={event => setReportDay(event.target.value || today)} /></label><span><b>{metrics.attempts}</b> Logged calls</span><span><b>{metrics.unique}</b> Unique numbers</span><span><b>{metrics.connected}</b> Reached contacts</span><span><b>{metrics.rate}%</b> Connection rate</span></div>
     <small>Based on manually logged calls in your local timezone. A Dial click is not counted.</small>
-    <nav className="calling-tabs" aria-label="Calling lists">{[['todo','To Call'],['called','Called Today'],['followup','Follow-up Needed']].map(([key,label]) => <button className={tab === key ? 'primary' : 'quiet'} aria-pressed={tab === key} key={key} onClick={() => {setTab(key);setExpanded(undefined);}}>{label} <b>{matching.filter(row => callTab(row,key,clock)).length}</b></button>)}</nav>
-    <div className="calling-filters"><label>Search<input placeholder="Lead name" value={query} onChange={event => setQuery(event.target.value)} /></label><details className="calling-status-filter"><summary>Last call result {outcomes.length ? `(${outcomes.length} selected)` : '(All results)'}</summary><div className="calling-status-options"><label><input type="checkbox" checked={outcomes.includes('never')} onChange={event => setOutcomes(current => event.target.checked ? [...current, 'never'] : current.filter(value => value !== 'never'))} /> <span className="calling-result result-gray">Never called</span></label>{Object.entries(callResults).map(([key,label]) => <label key={key}><input type="checkbox" checked={outcomes.includes(key)} onChange={event => setOutcomes(current => event.target.checked ? [...current, key] : current.filter(value => value !== key))} /> <span className={`calling-result result-${callResultTones[key as CallResult]}`}>{label}</span></label>)}<button type="button" className="quiet" onClick={() => setOutcomes([])}>Clear status filters</button></div></details><label>Service<select aria-label="Service" value={service} onChange={event => setService(event.target.value)}><option value="all">All services</option>{Object.entries(leadCategoryLabels).map(([key,label]) => <option key={key} value={key}>{label}</option>)}</select></label><button className="quiet" disabled={loading || Boolean(expanded)} onClick={() => setRevision(value => value+1)}>Refresh</button></div>
-    {notice && <p role="status">{notice}</p>}{error && <p role="alert">{error}</p>}
-    {loading ? <p role="status">Loading contact health and call history…</p> : <><div className="calling-table"><div className="calling-heading"><span>Lead</span><span>Service</span><span>Last result</span><span>Actions</span></div>{filtered.slice(pageIndex*30,pageIndex*30+30).map(row => <div className="calling-entry" key={row.key}><div className="calling-row"><button className="calling-name" onClick={() => onDetails(row.record.id)}>{row.record.name}</button><span>{leadCategoryLabels[row.record.category as LeadCategory] ?? 'Not available'}</span><span className={`calling-result result-${callResultTones[row.latest?.outcome as CallResult] ?? 'gray'}`}>{row.latest ? callResults[row.latest.outcome as CallResult] ?? row.latest.outcome : 'Never called'}</span><div className="calling-actions"><button className="quiet" disabled={!row.usable} aria-label={`Copy number for ${row.record.name}`} onClick={() => void navigator.clipboard.writeText(row.method.value).then(() => setNotice('Number copied.')).catch(() => setError('Clipboard access failed. Use Details to copy the number manually.'))}><IconCopy size={17}/> Copy</button>{canCallRow(row) && <a className="primary calling-call" href={`tel:${row.method.value.trim().startsWith('+') ? '+' : ''}${row.method.value.replace(/\D/g,'')}`} onClick={() => setExpanded(row.key)}><IconPhone size={20}/> Call</a>}{canCallRow(row) && <button className="quiet" onClick={() => setExpanded(expanded === row.key ? undefined : row.key)}>Log result</button>}<button className="quiet" onClick={() => onDetails(row.record.id)}>Details</button></div></div>{expanded === row.key && <CallResultForm key={row.key} onSave={(result,note,due,reason,id) => save(row,result,note,due,reason,id)} onCancel={() => setExpanded(undefined)} />}</div>)}{!filtered.length && <p className="calling-empty">No numbers match this list. Try another tab or filter.</p>}</div><div className="calling-pagination"><button className="quiet" disabled={!pageIndex} onClick={() => setPage(pageIndex-1)}>Previous</button><span>{filtered.length} numbers · Page {pageIndex+1} of {Math.max(1,Math.ceil(filtered.length/30))}</span><button className="quiet" disabled={(pageIndex+1)*30 >= filtered.length} onClick={() => setPage(pageIndex+1)}>Next</button></div></>}
+    <nav className="calling-tabs" aria-label="Calling lists">{[['todo','To Call'],['called','Called Today'],['followup','Follow-up Needed']].map(([key,label]) => <button className={tab === key ? 'primary' : 'quiet'} aria-pressed={tab === key} key={key} onClick={() => {setTab(key);setPage(0);setExpanded(undefined);}}>{label} <b>{tabCount(key)}</b></button>)}</nav>
+    <div className="calling-filters"><label>Search<input placeholder="Lead name" value={query} onChange={event => {setQuery(event.target.value);setPage(0);}} /></label><details className="calling-status-filter"><summary>Last call result {outcomes.length ? `(${outcomes.length} selected)` : '(All results)'}</summary><div className="calling-status-options"><label><input type="checkbox" checked={outcomes.includes('never')} onChange={event => setOutcomes(current => event.target.checked ? [...current, 'never'] : current.filter(value => value !== 'never'))} /> <span className="calling-result result-gray">Never called</span></label>{Object.entries(callResults).map(([key,label]) => <label key={key}><input type="checkbox" checked={outcomes.includes(key)} onChange={event => setOutcomes(current => event.target.checked ? [...current, key] : current.filter(value => value !== key))} /> <span className={`calling-result result-${callResultTones[key as CallResult]}`}>{label}</span></label>)}<button type="button" className="quiet" onClick={() => setOutcomes([])}>Clear status filters</button></div></details><label>Service<select aria-label="Service" value={service} onChange={event => {setService(event.target.value);setPage(0);}}><option value="all">All services</option>{Object.entries(leadCategoryLabels).map(([key,label]) => <option key={key} value={key}>{label}</option>)}</select></label><button className="quiet" disabled={loading || Boolean(expanded)} onClick={() => session ? remote.refresh() : setRevision(value => value+1)}>Refresh</button></div>
+    {notice && <p role="status">{notice}</p>}{loadError && <p role="alert">{loadError}</p>}
+    {loading && (!session || !remote.data) ? <p role="status">Loading contact health and call history…</p> : <><div className="calling-table"><div className="calling-heading"><span>Lead</span><span>Service</span><span>Last result</span><span>Actions</span></div>{visibleRows.map(row => <div className="calling-entry" key={row.key}><div className="calling-row"><button className="calling-name" onClick={() => onDetails(row.record.id)}>{row.record.name}</button><span>{leadCategoryLabels[row.record.category as LeadCategory] ?? 'Not available'}</span><span className={`calling-result result-${callResultTones[row.latest?.outcome as CallResult] ?? 'gray'}`}>{row.latest ? callResults[row.latest.outcome as CallResult] ?? row.latest.outcome : 'Never called'}</span><div className="calling-actions"><button className="quiet" disabled={!row.usable} aria-label={`Copy number for ${row.record.name}`} onClick={() => void navigator.clipboard.writeText(row.method.value).then(() => setNotice('Number copied.')).catch(() => setError('Clipboard access failed. Use Details to copy the number manually.'))}><IconCopy size={17}/> Copy</button>{canCallRow(row) && <a className="primary calling-call" href={`tel:${row.method.value.trim().startsWith('+') ? '+' : ''}${row.method.value.replace(/\D/g,'')}`} onClick={() => setExpanded(row.key)}><IconPhone size={20}/> Call</a>}{canCallRow(row) && <button className="quiet" onClick={() => setExpanded(expanded === row.key ? undefined : row.key)}>Log result</button>}<button className="quiet" onClick={() => onDetails(row.record.id)}>Details</button></div></div>{expanded === row.key && <CallResultForm key={row.key} onSave={(result,note,due,reason,id) => save(row,result,note,due,reason,id)} onCancel={() => setExpanded(undefined)} />}</div>)}{!total && <p className="calling-empty">No numbers match this list. Try another tab or filter.</p>}</div><div className="calling-pagination"><button className="quiet" disabled={!pageIndex} onClick={() => setPage(pageIndex-1)}>Previous</button><span>{total} numbers · Page {pageIndex+1} of {Math.max(1,Math.ceil(total/30))}</span><button className="quiet" disabled={(pageIndex+1)*30 >= total} onClick={() => setPage(pageIndex+1)}>Next</button></div></>}
   </section>;
 }
 
