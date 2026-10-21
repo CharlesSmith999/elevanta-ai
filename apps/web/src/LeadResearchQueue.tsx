@@ -1,13 +1,14 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { GmailConnection } from './GmailConnection';
-import { researchRefresh } from './researchRefresh';
 import { newestResearchFirst, isRecentResearchArrival } from './researchArrivals';
 import './researchArrivals.css';
 import { IconArrowLeft, IconCircleCheck, IconExternalLink, IconMail, IconPhone, IconSearch, IconSend, IconShieldLock, IconTrash } from '@tabler/icons-react';
 import type { Session } from '@supabase/supabase-js';
 import type { LeadCategory, User } from './domain';
 import { leadCategoryLabels, leadCategoryOptions } from './domain';
-import { loadResearchLeads, publishResearchLead, updateResearchLead } from './api';
+import { publishResearchLead, updateResearchLead } from './api';
+import { loadResearchPage, workspaceKey } from './workspaceApi';
+import { useDebouncedValue, useWorkspaceQuery } from './useWorkspaceQuery';
 import { researchAlertRefreshEvent } from './LeadAlertController';
 import { canViewResearchLead, isReadyForSales, researchStateLabels, researchStates, seedResearchLeads, validResearchMethod, researchMethodKey, validEvidenceUrl, type ResearchLead, type ResearchMethod, type ResearchState } from './inboundResearch';
 
@@ -23,6 +24,11 @@ export function LeadResearchQueue({ viewer, users, session, onPublished, onNotic
   const [duplicateFilter, setDuplicateFilter] = useState<'all' | ResearchLead['duplicateState']>('all');
   const [saving, setSaving] = useState(false);
   const [recentOnly, setRecentOnly] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const limit = 50;
+  const settledQuery = useDebouncedValue(query);
+  const remoteFilters = { viewerId: viewer.id, query: settledQuery, state: stateFilter, category: categoryFilter, readiness: readinessFilter, duplicate: duplicateFilter, recent: recentOnly, offset, limit };
+  const remotePage = useWorkspaceQuery(session && !selectedId && !saving ? workspaceKey(session, 'research', remoteFilters) : null, signal => loadResearchPage(session!, remoteFilters, signal), 60_000);
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [selectedId]);
   const selected = items.find((item) => item.id === selectedId && canViewResearchLead(viewer, item, users));
   const visible = useMemo(() => {
@@ -42,26 +48,17 @@ export function LeadResearchQueue({ viewer, users, session, onPublished, onNotic
   useEffect(() => {
     if (!session) { setLoading(false); return; }
     if (selectedId || saving) return;
-    setLoading(true); setError('');
-    return researchRefresh({
-      load: () => loadResearchLeads(session),
-      apply: records => { setItems(records); setError(''); },
-      fail: reason => setError(reason instanceof Error ? reason.message : 'Research leads could not be loaded.'),
-      settled: () => setLoading(false),
-      schedule: (tick, ms) => { const timer = window.setInterval(tick, ms); return () => window.clearInterval(timer); },
-    });
-  }, [session, selectedId, saving]);
+    setLoading(remotePage.loading);
+    if (remotePage.data) { setItems(remotePage.data.items); setError(''); }
+    if (remotePage.error) setError(remotePage.error);
+  }, [session, selectedId, saving, remotePage.loading, remotePage.data, remotePage.error]);
 
   useEffect(() => {
     if (!session || selectedId || saving) return;
-    let active = true;
-    const refresh = () => {
-      void loadResearchLeads(session).then((records) => { if (active) { setItems(records); setError(''); } })
-        .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Research leads could not be loaded.'); });
-    };
+    const refresh = () => remotePage.refresh();
     window.addEventListener(researchAlertRefreshEvent, refresh);
-    return () => { active = false; window.removeEventListener(researchAlertRefreshEvent, refresh); };
-  }, [session, selectedId, saving]);
+    return () => window.removeEventListener(researchAlertRefreshEvent, refresh);
+  }, [session, selectedId, saving, remotePage.refresh]);
 
   async function save(next: ResearchLead) {
     if (next.state === 'ready_for_sales' && !isReadyForSales(next)) {
@@ -96,15 +93,15 @@ export function LeadResearchQueue({ viewer, users, session, onPublished, onNotic
   if (viewer.role === 'sales_agent' || (viewer.role === 'manager' && viewer.department !== 'marketing')) return <section className="research-empty"><IconShieldLock size={34} /><h2>Marketing workspace only</h2><p>Raw and masked research leads are never visible to Sales roles.</p></section>;
   if (selected) return <ResearchWorkspace lead={selected} salesAgents={users.filter((user) => user.role === 'sales_agent')} saving={saving} error={error} onBack={() => setSelectedId(undefined)} onSave={save} onPublish={publish} />;
 
-  const counts = Object.fromEntries(researchStates.map((state) => [state, items.filter((item) => canViewResearchLead(viewer, item, users) && item.state === state).length]));
-  const recentCount = items.filter(item => canViewResearchLead(viewer, item, users) && isRecentResearchArrival(item)).length;
+  const counts = remotePage.data?.counts ?? Object.fromEntries(researchStates.map((state) => [state, items.filter((item) => canViewResearchLead(viewer, item, users) && item.state === state).length]));
+  const recentCount = remotePage.data?.recentCount ?? items.filter(item => canViewResearchLead(viewer, item, users) && isRecentResearchArrival(item)).length;
   return <section className="research-page">
     {viewer.role === 'admin' && session && <details className="admin-intake-settings"><summary>Admin · Email connection settings</summary><GmailConnection session={session} /></details>}
     <header className="research-hero"><div><span className="eyebrow">MARKETING / INBOUND RESEARCH</span><h2>Lead Research Queue</h2><p>Shared Marketing queue. Anyone in Marketing can add details and send a ready lead to Sales. No claim step is required.</p></div><div className="research-connection"><IconMail size={20} /><span><b>{session ? 'Shared CRM research' : 'Demo research'}</b><small>{session ? 'List refreshes every minute; open drafts stay unchanged' : 'Safe test data only'}</small></span></div></header>
     <div className="research-arrivals-bar"><div><b>New arrivals · {loading ? '…' : recentCount} received in the last 24 hours</b><small>Newest received emails first. This is not an unread count.</small></div><button className="quiet" aria-pressed={recentOnly} onClick={() => { setRecentOnly(!recentOnly); setQuery(''); setStateFilter('all'); setCategoryFilter('all'); setReadinessFilter('all'); setDuplicateFilter('all'); }}>{recentOnly ? 'Show all research' : 'View new arrivals'}</button></div>
     <div className="research-metrics" aria-busy={loading}><article><strong>{loading ? '…' : visible.length}</strong><span>Visible items</span></article><article><strong>{loading ? '…' : counts.researching ?? 0}</strong><span>Researching</span></article><article><strong>{loading ? '…' : (counts.found ?? 0) + (counts.connected ?? 0)}</strong><span>Information found</span></article><article><strong>{loading ? '…' : counts.ready_for_sales ?? 0}</strong><span>Ready for Sales</span></article></div>
     <div className="queue-shortcuts" aria-label="Research work queues">{(['all','new','researching','ready_for_sales','sent_to_sales'] as const).map(value => <button key={value} className="quiet" aria-pressed={stateFilter === value} onClick={() => setStateFilter(value)}>{value === 'all' ? 'All research' : researchStateLabels[value]}</button>)}</div><div className="research-toolbar research-filters" aria-label="Research lead filters"><label className="research-search"><span>Search</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name, source, location, phone or email" /></label><details className="queue-filter-details"><summary>Filter research</summary><div className="queue-filter-fields"><label>Status<select value={stateFilter} onChange={(event) => setStateFilter(event.target.value as typeof stateFilter)}><option value="all">All research states</option>{researchStates.map((state) => <option key={state} value={state}>{researchStateLabels[state]}</option>)}</select></label><label>Category<select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value as typeof categoryFilter)}><option value="all">All categories</option>{leadCategoryOptions.map((category) => <option key={category} value={category}>{leadCategoryLabels[category]}</option>)}</select></label><label>Contact readiness<select value={readinessFilter} onChange={(event) => setReadinessFilter(event.target.value as typeof readinessFilter)}><option value="all">All leads</option><option value="ready">Ready for Sales</option><option value="needs_contact">Needs contact details</option></select></label><label>Duplicate check<select value={duplicateFilter} onChange={(event) => setDuplicateFilter(event.target.value as typeof duplicateFilter)}><option value="all">All results</option><option value="clear">Clear</option><option value="possible">Possible duplicate</option><option value="confirmed">Confirmed duplicate</option></select></label><button type="button" className="quiet research-reset" onClick={() => { setQuery(''); setStateFilter('all'); setCategoryFilter('all'); setReadinessFilter('all'); setDuplicateFilter('all'); setRecentOnly(false); }}>Reset</button></div></details><span className="research-result-count">{visible.length} result{visible.length === 1 ? '' : 's'}</span></div>
-    {error && <p className="warning" role="alert">{error}</p>}{loading ? <p className="research-loading">Loading research queue…</p> : <div className="research-list"><div className="research-row research-head"><span>Lead</span><span>Category</span><span>Research state</span><span>Contact readiness</span><span>Received</span></div>{visible.map((lead) => <button key={lead.id} className={`research-row${isRecentResearchArrival(lead) ? ' recent-arrival' : ''}`} onClick={() => setSelectedId(lead.id)}><span data-label="Lead"><b>{lead.name}</b>{isRecentResearchArrival(lead) && <span className="research-arrival-badge">Received in last 24h</span>}<small>{lead.maskedEmail ?? lead.maskedPhone ?? 'Masked contact unavailable'}</small></span><span data-label="Category">{leadCategoryLabels[lead.category]}</span><span data-label="Research state"><i className={`research-status ${lead.state}`}>{researchStateLabels[lead.state]}</i></span><span data-label="Contact readiness" className={isReadyForSales(lead) ? 'research-ready' : ''}>{isReadyForSales(lead) ? 'Usable contact found' : 'Research required'}</span><span data-label="Received">{new Date(lead.receivedAt).toLocaleString()}</span></button>)}{!visible.length && !error && <p className="research-loading">No research leads match these filters.</p>}</div>}
+    {error && <p className="warning" role="alert">{error}</p>}{loading ? <p className="research-loading">Loading research queue…</p> : <div className="research-list"><div className="research-row research-head"><span>Lead</span><span>Category</span><span>Research state</span><span>Contact readiness</span><span>Received</span></div>{visible.map((lead) => <button key={lead.id} className={`research-row${isRecentResearchArrival(lead) ? ' recent-arrival' : ''}`} onClick={() => setSelectedId(lead.id)}><span data-label="Lead"><b>{lead.name}</b>{isRecentResearchArrival(lead) && <span className="research-arrival-badge">Received in last 24h</span>}<small>{lead.maskedEmail ?? lead.maskedPhone ?? 'Masked contact unavailable'}</small></span><span data-label="Category">{leadCategoryLabels[lead.category]}</span><span data-label="Research state"><i className={`research-status ${lead.state}`}>{researchStateLabels[lead.state]}</i></span><span data-label="Contact readiness" className={isReadyForSales(lead) ? 'research-ready' : ''}>{isReadyForSales(lead) ? 'Usable contact found' : 'Research required'}</span><span data-label="Received">{new Date(lead.receivedAt).toLocaleString()}</span></button>)}{!visible.length && !error && <p className="research-loading">No research leads match these filters.</p>}<footer className="workspace-pagination"><span>{remotePage.data ? `${offset + 1}–${Math.min(offset + limit, remotePage.data.total)} of ${remotePage.data.total.toLocaleString()}` : ''}</span><div><button className="quiet" disabled={offset === 0 || loading} onClick={() => setOffset(Math.max(0, offset - limit))}>Previous</button><button className="quiet" disabled={!remotePage.data?.hasMore || loading} onClick={() => setOffset(offset + limit)}>Next</button></div></footer></div>}
   </section>;
 }
 
