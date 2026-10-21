@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { IconArrowUpRight, IconCalendar, IconChartBar, IconClock, IconCurrencyDollar, IconFilter, IconRefresh, IconTrophy, IconUsers } from '@tabler/icons-react';
 import { Bar, BarChart, CartesianGrid, Cell, Funnel, FunnelChart, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -77,6 +77,7 @@ function Pipeline({ summary, marketing }: { summary: WorkspaceSummary; marketing
 }
 
 export function RemoteDashboard(props: RemoteDashboardProps) {
+  const [showConnections, setShowConnections] = useState(false);
   const { viewer, viewers, summary, loading, error, onRetry, period, customStart, customEnd, source, theme, onViewer, onPeriod, onCustomStart, onCustomEnd, onSource, onTheme, onNavigate, onOpenLead, session, start, end, page = 'Dashboard' } = props;
   const admin = viewer.role === 'admin';
   const marketing = viewer.role === 'marketer' || (viewer.role === 'manager' && viewer.department === 'marketing');
@@ -137,6 +138,7 @@ export function RemoteDashboard(props: RemoteDashboardProps) {
     {error && <div className="connection-banner" role="alert"><strong>Dashboard refresh failed</strong><span>{error}. Showing the last successful summary.</span><button onClick={onRetry}>Retry</button></div>}
     <p className="remote-summary-note" role="status">{loading ? 'Refreshing complete summary…' : `Complete summary for this selection. Updated ${new Date(summary.generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`}</p>
     <section className="admin-reference-section"><div className="admin-reference-section-heading"><h2>{page === 'Dashboard' ? 'Work now' : 'Overview'}</h2></div><Metrics values={metrics} /></section>
+    {page === 'Dashboard' && personal && <section><button className="quiet" onClick={() => setShowConnections(value => !value)}>{showConnections ? 'Hide connection analytics' : 'Show connection analytics'}</button>{showConnections && <ConnectionAnalyticsPanel session={session} viewerId={viewer.id} start={start} end={end} source={source} audience={marketing ? 'marketing-agent' : 'sales-agent'} />}</section>}
     <section className="remote-summary-grid" aria-label={page === 'Dashboard' ? 'Performance' : page}>{body}</section>
   </div>;
 }
