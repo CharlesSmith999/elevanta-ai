@@ -9,7 +9,7 @@ import {
 import { authEnabled, supabase, type AuthState } from './auth';
 import { addRemoteFollowUp, addRemoteNote, completeRemoteFollowUp, createAdminUser, createRemoteLead, decideRemoteReview, loadAdminUsers, loadRemoteLeads, loadWorkspaceMembers, reassignRemoteLead, reportRemoteIncorrect, updateAdminUser, updateRemoteLeadDetails, updateRemoteStatus, type ManagedUser } from './api';
 import type { RoleReferenceKind } from './RoleReferenceDashboards';
-import { navigationFor } from './navigation';
+import { navigationFor, canNavigateTo } from './navigation';
 const RoleReferenceDashboard = lazy(() => import('./RoleReferenceDashboards').then(module => ({ default: module.RoleReferenceDashboard })));
 const RoleReferenceSidebar = lazy(() => import('./RoleReferenceDashboards').then(module => ({ default: module.RoleReferenceSidebar })));
 const RoleSwitcher = lazy(() => import('./RoleReferenceDashboards').then(module => ({ default: module.RoleSwitcher })));
@@ -323,6 +323,7 @@ function WorkspaceApp({ onSignOut, session }: { onSignOut?: () => void; session?
     setMobileNavOpen(false);
   }
   function navigate(next: string) {
+    if (!canNavigateTo(viewer, next)) return;
     ++detailRequest.current; setRemoteDetail(undefined); setDetailLoading(false);
     if (next === 'Dashboard') setDashboardScope('company');
     setPage(next);
