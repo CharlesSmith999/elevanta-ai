@@ -6,6 +6,16 @@ import { users, type User } from './domain.js';
 const viewer = (id: string) => users.find((candidate) => candidate.id === id)!;
 const marketingManager: User = { id: 'marketing-manager-test', name: 'Marketing Manager', role: 'manager', department: 'marketing' };
 
+test('reports and ranking pages are temporarily available only to Admin', () => {
+  for (const page of ['Reports', 'Benchmark Board', 'Leaderboard']) {
+    assert.equal(canNavigateTo(viewer('shariq'), page), true);
+    for (const candidate of [viewer('ali'), marketingManager, viewer('muzammil'), viewer('owais')]) {
+      assert.equal(canNavigateTo(candidate, page), false);
+      assert.equal(navigationFor(candidate).some((item) => item.label === 'My standing'), false);
+    }
+  }
+});
+
 test('every role keeps Dashboard and Xaviar in its navigation contract', () => {
   for (const candidate of [viewer('shariq'), viewer('ali'), marketingManager, viewer('muzammil'), viewer('owais')]) {
     const pages = navigationFor(candidate).map((item) => item.page);
