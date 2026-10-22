@@ -65,8 +65,10 @@ const salesAgent: NavigationItem[] = [
 
 export function navigationFor(viewer: User): NavigationItem[] {
   if (viewer.role === 'admin') return admin;
-  if (viewer.role === 'manager') return viewer.department === 'marketing' ? marketingManager : salesManager;
-  return viewer.role === 'marketer' ? marketingAgent : salesAgent;
+  const items = viewer.role === 'manager'
+    ? viewer.department === 'marketing' ? marketingManager : salesManager
+    : viewer.role === 'marketer' ? marketingAgent : salesAgent;
+  return items.filter((item) => !['Reports', 'Benchmark Board', 'Leaderboard'].includes(item.page));
 }
 
 export function canNavigateTo(viewer: User, page: string) {
